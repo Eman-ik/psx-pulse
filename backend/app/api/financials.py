@@ -10,7 +10,12 @@ router = APIRouter(prefix="/financials", tags=["financials"])
 
 @router.get("/{issuer_id}/facts")
 def list_facts(issuer_id: int, db: Session = Depends(get_db)) -> list[dict]:
-    facts = db.execute(select(FinancialFact).where(FinancialFact.issuer_id == issuer_id)).scalars().all()
+    facts = db.execute(
+        select(FinancialFact).where(
+            FinancialFact.issuer_id == issuer_id,
+            FinancialFact.superseded_by_id.is_(None),
+        )
+    ).scalars().all()
     return [
         {
             "line_item": f.line_item,
@@ -19,6 +24,7 @@ def list_facts(issuer_id: int, db: Session = Depends(get_db)) -> list[dict]:
             "scope": f.scope,
             "value": float(f.value),
             "unit": f.unit,
+            "is_restated": f.is_restated,
         }
         for f in facts
     ]

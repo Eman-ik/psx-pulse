@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -39,6 +39,7 @@ class PriceOHLCV(Base):
     """Daily OHLCV bar. is_delayed defaults True since v1 has no licensed real-time feed."""
 
     __tablename__ = "price_ohlcv"
+    __table_args__ = (UniqueConstraint("security_id", "trade_date", name="uq_price_ohlcv_security_date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     security_id: Mapped[int] = mapped_column(ForeignKey("security.id"), index=True)

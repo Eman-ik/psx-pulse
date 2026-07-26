@@ -23,25 +23,53 @@ primary_sources:
     use: Manual cross-check / backfill if psxdata is unavailable
     notes: Public download intended for individual/non-commercial use — recheck PSX terms of use before any commercial/public launch.
 
-  - name: PSX company announcements / notices
-    url: https://dps.psx.com.pk
+  - name: PSX per-company page (dps.psx.com.pk/company/{symbol})
+    url: https://dps.psx.com.pk/company/FFC
     tier: primary
-    use: Corporate announcements, results, board notices (evidence: source_document)
+    use: >
+      Confirmed working (app/ingestion/psx_announcements.py, app/ingestion/psx_payouts.py):
+      company-filtered Announcements (Financial Results / Board Meetings / Others tabs,
+      each with a source PDF — server-rendered, plain httpx GET, no JS rendering needed)
+      and Payouts/dividend history (POST /company/payouts with {"symbol": SYMBOL}).
+    notes: >
+      The page footer states "Market data powered by capitalstake.com. Provided by PSX" —
+      i.e. even PSX's own public portal is displaying Capital Stake-licensed data, not raw
+      PSX-only data. Same rights caveat as psxdata: fine for this dev/educational pilot,
+      but Capital Stake's own terms of use (linked from the page) should be reviewed before
+      any public/commercial launch, in addition to PSX's own terms.
+    also_available_not_yet_ingested: >
+      The same page also server-renders per-company Financials (Sales/PAT/EPS by year),
+      Ratios (margins, EPS growth, PEG), Equity Profile (market cap, shares, free float)
+      and Company Profile (business description, key people, auditor, registrar) —
+      relevant head start for Milestone 3 (financial taxonomy) and Milestone 4 (company
+      research pages) — and GET /company/reports/{symbol} lists financial-report filing
+      dates. None of these are ingested yet.
 
-  - name: Company investor-relations pages (FFC, EFERT, FATIMA, DAWH)
+  - name: Company investor-relations pages (direct from issuer websites)
     url: null
     tier: primary
-    use: Annual/quarterly report PDFs, manually entered into financial_fact per Milestone 3
+    use: Fallback for full annual/quarterly report PDFs if the PSX portal's data is incomplete
 
-  - name: State Bank of Pakistan (SBP) statistics
-    url: https://www.sbp.org.pk
+  - name: SBP EasyData API (easydata.sbp.org.pk)
+    url: https://easydata.sbp.org.pk
     tier: primary
-    use: Policy rate, KIBOR, FX reserves (macro_series)
+    use: >
+      Confirmed working (app/ingestion/sbp_macro.py) — official SBP time-series API,
+      24,102 series. Ingesting: Policy Rate (TS_GP_IR_SIRPR_AH.SBPOL0030), 6-Month KIBOR
+      (TS_GP_BAM_SIRKIBOR_D.KIBOR0030), PKR/USD rate (TS_GP_ER_FAERPKR_M.E00220), SBP Gross
+      Reserves (TS_GP_BOP_BPM6SUM_M.P00730), Current Account Balance
+      (TS_GP_BOP_BPM6SUM_M.P00010), National CPI YoY (TS_GP_PT_CPI_M.P00011516).
+    notes: >
+      Requires a free account + generated API key (90-day validity, 2000 req/day,
+      250 req/hour) — that's an account-creation step for the human operator, not something
+      an agent should do. Set SBP_EASYDATA_API_KEY in backend/.env. National CPI here is
+      itself PBS-compiled data republished by SBP, which is why a separate PBS scraper
+      wasn't built for CPI specifically — GDP/LSM would still need PBS directly if added later.
 
   - name: Pakistan Bureau of Statistics (PBS)
     url: https://www.pbs.gov.pk
     tier: primary
-    use: CPI, GDP/LSM (macro_series)
+    use: GDP/LSM (macro_series) — not yet ingested; CPI is covered via SBP EasyData above instead
 
 licensed_secondary_sources: []
 # Add here only once a signed license exists — see rights_matrix.template.md.

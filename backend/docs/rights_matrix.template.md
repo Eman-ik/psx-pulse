@@ -12,6 +12,16 @@ to `true` until the rows below are actually reviewed and signed off by counsel +
 | Announcements feed | PUCARS / public notices | Public |  |  |  |  |
 | AI signal output | Derived from above | Public |  |  |  |  |
 
+## Note on Capital Stake
+
+PSX's own public portal (dps.psx.com.pk) states its company-page data — including the
+financials, ratios and announcements this pilot scrapes — is "powered by capitalstake.com."
+So even data pulled directly from PSX's site is, in part, Capital Stake-licensed data
+being redistributed by PSX under whatever terms exist between them. Two separate things to
+check before public launch: PSX's own terms of use, **and** Capital Stake's terms of use
+(linked from the PSX page footer) for whatever redistribution this project does beyond
+personal/educational use. Neither has been reviewed yet.
+
 ## How this gets used in the codebase
 
 `app/core/config.py` exposes `public_launch_enabled`, `public_signals_enabled` and

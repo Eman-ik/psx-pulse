@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     app_name: str = "PSX Fertilizer Research Platform"
     environment: str = "development"
 
-    database_url: str = "postgresql+psycopg2://psx:psx@localhost:5432/psx_fertilizer"
+    database_url: str = "postgresql+psycopg2://psx:psx@localhost:55432/psx_fertilizer"
 
     # Compliance gate — see docs/rights_matrix.template.md and docs/research_disclaimer.md
     public_launch_enabled: bool = False
@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     data_delay_disclaimer: str = "Data is end-of-day / delayed public data, not a licensed real-time feed."
 
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    # SBP EasyData API (https://easydata.sbp.org.pk) — free account + generated key required.
+    # Macro ingestion (app/ingestion/sbp_macro.py) no-ops with a warning when unset.
+    sbp_easydata_api_key: str | None = None
+    sbp_easydata_base_url: str = "https://easydata.sbp.org.pk/api/v1"
 
 
 @lru_cache

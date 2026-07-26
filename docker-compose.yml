@@ -7,7 +7,10 @@ services:
       POSTGRES_PASSWORD: psx
       POSTGRES_DB: psx_fertilizer
     ports:
-      - "5432:5432"
+      # Host port 55432, not 5432: many dev machines (including this one) already run a
+      # native PostgreSQL install on 5432, and Docker Desktop on Windows can silently end up
+      # in a half-broken port-forward state rather than a clean bind error when that happens.
+      - "55432:5432"
     volumes:
       - psx_pgdata:/var/lib/postgresql/data
     healthcheck:

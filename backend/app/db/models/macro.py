@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, JSON, Numeric, String, func
+from sqlalchemy import Date, DateTime, ForeignKey, JSON, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -25,6 +25,7 @@ class MacroObservation(Base):
     """A single published data point for a macro series, with its own publication timestamp."""
 
     __tablename__ = "macro_observation"
+    __table_args__ = (UniqueConstraint("macro_series_id", "period", name="uq_macro_observation_series_period"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     macro_series_id: Mapped[int] = mapped_column(ForeignKey("macro_series.id"), index=True)

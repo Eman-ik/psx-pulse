@@ -6,12 +6,14 @@ interface RightPanelProps {
   companies: CompanySummary[];
   sectorMarketCapPkrBn: number;
   sectorMarketCapChangePct: number;
+  isLive: boolean;
 }
 
 export default function RightPanel({
   companies,
   sectorMarketCapPkrBn,
   sectorMarketCapChangePct,
+  isLive,
 }: RightPanelProps) {
   return (
     <aside className="flex w-full flex-col gap-5 lg:w-80 lg:shrink-0">
@@ -23,7 +25,9 @@ export default function RightPanel({
           </span>
           <div>
             <p className="font-medium">Fertilizer Sector Pilot</p>
-            <p className="text-xs text-muted">EOD sample data · updated daily</p>
+            <p className="text-xs text-muted">
+              {isLive ? "Live prices via psxdata · market cap still sample" : "EOD sample data · updated daily"}
+            </p>
           </div>
         </div>
       </div>
@@ -57,7 +61,7 @@ export default function RightPanel({
             View all <ChevronRight size={14} />
           </button>
         </div>
-        <div className="flex flex-col gap-3">
+        <div className="flex max-h-72 flex-col gap-3 overflow-y-auto pr-1">
           {companies.map((c, i) => (
             <div key={c.symbol} className="flex items-center justify-between">
               <div className="flex items-center gap-3">

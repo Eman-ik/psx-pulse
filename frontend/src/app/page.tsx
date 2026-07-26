@@ -6,6 +6,7 @@ import MarketCapDonut, { DONUT_COLORS } from "@/components/dashboard/MarketCapDo
 import RiskPanel from "@/components/dashboard/RiskPanel";
 import AnnouncementsTable from "@/components/dashboard/AnnouncementsTable";
 import RightPanel from "@/components/dashboard/RightPanel";
+import { fetchLiveQuotes } from "@/lib/api";
 import {
   announcements,
   pilotCompanies,
@@ -14,20 +15,32 @@ import {
   sectorMarketCapPkrBn,
   sectorRisk,
 } from "@/lib/mock-data";
+import type { CompanySummary } from "@/lib/types";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const live = await fetchLiveQuotes();
+  const isLive = !!live && live.quotes.length > 0;
+
+  const companies: CompanySummary[] = pilotCompanies.map((company) => {
+    const quote = live?.quotes.find((q) => q.symbol === company.symbol);
+    if (quote && quote.price != null && quote.change_pct != null) {
+      return { ...company, price: quote.price, changePct: quote.change_pct };
+    }
+    return company;
+  });
+
   const latest = sectorIndexHistory[sectorIndexHistory.length - 1];
   const first = sectorIndexHistory[0];
   const sectorIndexChangePct = ((latest.sectorIndex - first.sectorIndex) / first.sectorIndex) * 100;
   const kseChangePct = ((latest.kse100Index - first.kse100Index) / first.kse100Index) * 100;
-  const topGainer = [...pilotCompanies].sort((a, b) => b.changePct - a.changePct)[0];
+  const topGainer = [...companies].sort((a, b) => b.changePct - a.changePct)[0];
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+        <Topbar isLive={isLive} />
 
         <main className="flex flex-1 flex-col gap-6 px-6 py-6 lg:flex-row lg:px-8">
           <div className="flex min-w-0 flex-1 flex-col gap-6">
@@ -68,9 +81,9 @@ export default function DashboardPage() {
                   <button className="text-xs text-accent hover:underline">View more</button>
                 </div>
                 <p className="mb-2 text-xs text-muted">Market cap composition</p>
-                <MarketCapDonut companies={pilotCompanies} />
+                <MarketCapDonut companies={companies} />
                 <div className="mt-3 flex flex-col gap-2">
-                  {pilotCompanies.map((c, i) => (
+                  {companies.map((c, i) => (
                     <div key={c.symbol} className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-2 text-muted">
                         <span
@@ -92,16 +105,20 @@ export default function DashboardPage() {
           </div>
 
           <RightPanel
-            companies={pilotCompanies}
+            companies={companies}
             sectorMarketCapPkrBn={sectorMarketCapPkrBn}
             sectorMarketCapChangePct={sectorMarketCapChangePct}
+            isLive={isLive}
           />
         </main>
 
         <footer className="border-t border-border px-6 py-4 text-center text-[11px] text-muted lg:px-8">
-          Educational research pilot. Sample data shown — not a live PSX feed, not investment
-          advice. Public launch and AI signal output remain disabled pending PSX data licensing
-          and SECP compliance review.
+          Educational research pilot.{" "}
+          {isLive
+            ? `Prices are live-ish via ${live!.data_source}; market cap and the sector index chart are still sample data.`
+            : "Sample data shown — not a live PSX feed."}{" "}
+          Not investment advice. Public launch and AI signal output remain disabled pending PSX
+          data licensing and SECP compliance review.
         </footer>
       </div>
     </div>

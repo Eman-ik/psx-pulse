@@ -3,7 +3,15 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { CompanySummary } from "@/lib/types";
 
-export const DONUT_COLORS = ["#4f7cff", "#ff4d9d", "#ffcd4b", "#22c55e"];
+export const DONUT_COLORS = [
+  "#4f7cff",
+  "#ff4d9d",
+  "#ffcd4b",
+  "#22c55e",
+  "#a78bfa",
+  "#38bdf8",
+  "#fb923c",
+];
 const COLORS = DONUT_COLORS;
 
 export default function MarketCapDonut({ companies }: { companies: CompanySummary[] }) {

@@ -3,10 +3,24 @@
 # Add an entry here (and mark tier) before any ingestion job is allowed to pull from a new source.
 
 primary_sources:
-  - name: PSX historical EOD data portal
+  - name: psxdata (Python library, github.com/mtauha/psxdata)
+    url: https://psxdata.readthedocs.io/
+    tier: primary
+    use: >
+      Live quotes, historical OHLCV, sectors, KSE-100/other index constituents,
+      tickers and (where available) fundamentals for pilot securities.
+    notes: >
+      No API key — it scrapes PSX's own public site under the hood, so it carries
+      the same rights status as pulling from dps.psx.com.pk directly: fine for this
+      development/educational pilot, but recheck PSX's terms of use before any
+      commercial/public launch (does not by itself satisfy the rights_matrix gate).
+      Considered abandoned/no-Finnhub-coverage alternative to Finnhub, which does
+      not cover PSX-listed securities at all.
+
+  - name: PSX historical EOD data portal (fallback / cross-check)
     url: https://dps.psx.com.pk/historical
     tier: primary
-    use: EOD OHLCV for pilot securities
+    use: Manual cross-check / backfill if psxdata is unavailable
     notes: Public download intended for individual/non-commercial use — recheck PSX terms of use before any commercial/public launch.
 
   - name: PSX company announcements / notices

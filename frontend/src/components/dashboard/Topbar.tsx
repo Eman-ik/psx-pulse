@@ -1,6 +1,6 @@
 import { Search, Bell, Sprout } from "lucide-react";
 
-export default function Topbar() {
+export default function Topbar({ isLive }: { isLive: boolean }) {
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-4 lg:px-8">
       <div>
@@ -20,8 +20,14 @@ export default function Topbar() {
           />
         </div>
 
-        <span className="hidden rounded-full border border-accent-yellow/30 bg-accent-yellow/10 px-3 py-1.5 text-xs font-medium text-accent-yellow sm:inline-block">
-          Sample data — not live
+        <span
+          className={`hidden rounded-full border px-3 py-1.5 text-xs font-medium sm:inline-block ${
+            isLive
+              ? "border-positive/30 bg-positive/10 text-positive"
+              : "border-accent-yellow/30 bg-accent-yellow/10 text-accent-yellow"
+          }`}
+        >
+          {isLive ? "Live prices via psxdata" : "Sample data — not live"}
         </span>
 
         <button className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-muted hover:text-foreground">

@@ -1,0 +1,37 @@
+# Machine-readable source registry (spec section "Source policy").
+# Status: DRAFT — free/public sources only, since no PSX data license exists yet.
+# Add an entry here (and mark tier) before any ingestion job is allowed to pull from a new source.
+
+primary_sources:
+  - name: PSX historical EOD data portal
+    url: https://dps.psx.com.pk/historical
+    tier: primary
+    use: EOD OHLCV for pilot securities
+    notes: Public download intended for individual/non-commercial use — recheck PSX terms of use before any commercial/public launch.
+
+  - name: PSX company announcements / notices
+    url: https://dps.psx.com.pk
+    tier: primary
+    use: Corporate announcements, results, board notices (evidence: source_document)
+
+  - name: Company investor-relations pages (FFC, EFERT, FATIMA, DAWH)
+    url: null
+    tier: primary
+    use: Annual/quarterly report PDFs, manually entered into financial_fact per Milestone 3
+
+  - name: State Bank of Pakistan (SBP) statistics
+    url: https://www.sbp.org.pk
+    tier: primary
+    use: Policy rate, KIBOR, FX reserves (macro_series)
+
+  - name: Pakistan Bureau of Statistics (PBS)
+    url: https://www.pbs.gov.pk
+    tier: primary
+    use: CPI, GDP/LSM (macro_series)
+
+licensed_secondary_sources: []
+# Add here only once a signed license exists — see rights_matrix.template.md.
+
+prohibited_sources:
+  - name: Any scraped/derived data from other paid PSX data resellers or terminals
+    reason: Redistribution terms unknown/likely prohibited without their own license.

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Building2,
@@ -14,8 +17,8 @@ import {
 } from "lucide-react";
 
 const mainNav = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "#", active: true },
-  { label: "Companies", icon: Building2, href: "#" },
+  { label: "Dashboard", icon: LayoutDashboard, href: "/" },
+  { label: "Companies", icon: Building2, href: "/companies" },
   { label: "Screener", icon: SlidersHorizontal, href: "#" },
   { label: "Market", icon: LineChart, href: "#" },
   { label: "News & Announcements", icon: Newspaper, href: "#" },
@@ -24,6 +27,8 @@ const mainNav = [
 ];
 
 export default function Sidebar() {
+  const pathname = usePathname();
+
   return (
     <aside className="hidden lg:flex w-64 shrink-0 flex-col justify-between border-r border-border bg-sidebar px-5 py-6">
       <div>
@@ -40,28 +45,31 @@ export default function Sidebar() {
           Main Menu
         </p>
         <nav className="flex flex-col gap-1">
-          {mainNav.map(({ label, icon: Icon, href, active, disabled }) => (
-            <Link
-              key={label}
-              href={href}
-              aria-disabled={disabled}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-                active
-                  ? "bg-accent text-white shadow-lg shadow-accent/20"
-                  : disabled
-                    ? "cursor-not-allowed text-muted/50"
-                    : "text-muted hover:bg-surface hover:text-foreground"
-              }`}
-            >
-              <Icon size={17} />
-              <span>{label}</span>
-              {disabled && (
-                <span className="ml-auto rounded-full bg-surface-alt px-1.5 py-0.5 text-[9px] font-medium text-muted">
-                  soon
-                </span>
-              )}
-            </Link>
-          ))}
+          {mainNav.map(({ label, icon: Icon, href, disabled }) => {
+            const active = href !== "#" && (href === "/" ? pathname === "/" : pathname.startsWith(href));
+            return (
+              <Link
+                key={label}
+                href={href}
+                aria-disabled={disabled}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                  active
+                    ? "bg-accent text-white shadow-lg shadow-accent/20"
+                    : disabled
+                      ? "cursor-not-allowed text-muted/50"
+                      : "text-muted hover:bg-surface hover:text-foreground"
+                }`}
+              >
+                <Icon size={17} />
+                <span>{label}</span>
+                {disabled && (
+                  <span className="ml-auto rounded-full bg-surface-alt px-1.5 py-0.5 text-[9px] font-medium text-muted">
+                    soon
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </nav>
       </div>
 

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -30,6 +30,17 @@ class Issuer(Base):
     ultimate_parent_issuer_id: Mapped[int | None] = mapped_column(ForeignKey("issuer.id"), nullable=True)
     incorporation_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_conglomerate: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Profile fields — sourced from the PSX company page's Company Profile section
+    # (app/ingestion/psx_profile.py) unless the issuer is an unlisted parent/holding
+    # entity stub (e.g. Fauji Foundation), which has none of these.
+    business_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    registrar: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    auditor: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    fiscal_year_end_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_psx_listed: Mapped[bool] = mapped_column(Boolean, default=True)
 
     sector: Mapped[Sector | None] = relationship(back_populates="issuers")
     parent: Mapped["Issuer | None"] = relationship(remote_side="Issuer.id")

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronRight, Lock, Sprout, Wallet } from "lucide-react";
 import type { CompanySummary } from "@/lib/types";
 import { DONUT_COLORS } from "./MarketCapDonut";
@@ -7,6 +8,7 @@ interface RightPanelProps {
   sectorMarketCapPkrBn: number;
   sectorMarketCapChangePct: number;
   isLive: boolean;
+  companyIdBySymbol?: Record<string, number>;
 }
 
 export default function RightPanel({
@@ -14,6 +16,7 @@ export default function RightPanel({
   sectorMarketCapPkrBn,
   sectorMarketCapChangePct,
   isLive,
+  companyIdBySymbol = {},
 }: RightPanelProps) {
   return (
     <aside className="flex w-full flex-col gap-5 lg:w-80 lg:shrink-0">
@@ -57,31 +60,41 @@ export default function RightPanel({
       <div className="rounded-2xl border border-border bg-surface p-5">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm text-muted">Companies</p>
-          <button className="flex items-center text-xs text-accent hover:underline">
+          <Link href="/companies" className="flex items-center text-xs text-accent hover:underline">
             View all <ChevronRight size={14} />
-          </button>
+          </Link>
         </div>
         <div className="flex max-h-72 flex-col gap-3 overflow-y-auto pr-1">
-          {companies.map((c, i) => (
-            <div key={c.symbol} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold text-white"
-                  style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }}
-                >
-                  {c.symbol.slice(0, 2)}
-                </span>
-                <div>
-                  <p className="text-sm font-medium">{c.symbol}</p>
-                  <p className="text-xs text-muted">PKR {c.marketCapPkrBn} bn</p>
+          {companies.map((c, i) => {
+            const issuerId = companyIdBySymbol[c.symbol];
+            const row = (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold text-white"
+                    style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }}
+                  >
+                    {c.symbol.slice(0, 2)}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium">{c.symbol}</p>
+                    <p className="text-xs text-muted">PKR {c.marketCapPkrBn} bn</p>
+                  </div>
                 </div>
+                <span className={`text-xs font-medium ${c.changePct >= 0 ? "text-positive" : "text-negative"}`}>
+                  {c.changePct >= 0 ? "+" : ""}
+                  {c.changePct.toFixed(1)}%
+                </span>
               </div>
-              <span className={`text-xs font-medium ${c.changePct >= 0 ? "text-positive" : "text-negative"}`}>
-                {c.changePct >= 0 ? "+" : ""}
-                {c.changePct.toFixed(1)}%
-              </span>
-            </div>
-          ))}
+            );
+            return issuerId ? (
+              <Link key={c.symbol} href={`/companies/${issuerId}`} className="rounded-lg -m-1 p-1 hover:bg-surface-alt">
+                {row}
+              </Link>
+            ) : (
+              <div key={c.symbol}>{row}</div>
+            );
+          })}
         </div>
       </div>
 

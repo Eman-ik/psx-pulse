@@ -5,6 +5,7 @@ from app.db.models.market import CorporateAction, PriceOHLCV
 from app.db.models.announcements import Announcement, EntityLink
 from app.db.models.macro import MacroObservation, MacroSeries, SectorRiskSnapshot
 from app.db.models.scoring import SignalScore
+from app.db.models.research import CapmAssumption, OperationalMetric, Thesis
 
 __all__ = [
     "Sector",
@@ -27,4 +28,7 @@ __all__ = [
     "MacroObservation",
     "SectorRiskSnapshot",
     "SignalScore",
+    "OperationalMetric",
+    "CapmAssumption",
+    "Thesis",
 ]

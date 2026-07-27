@@ -6,7 +6,7 @@ import MarketCapDonut, { DONUT_COLORS } from "@/components/dashboard/MarketCapDo
 import RiskPanel from "@/components/dashboard/RiskPanel";
 import AnnouncementsTable from "@/components/dashboard/AnnouncementsTable";
 import RightPanel from "@/components/dashboard/RightPanel";
-import { fetchLiveQuotes } from "@/lib/api";
+import { fetchCompanies, fetchLiveQuotes } from "@/lib/api";
 import {
   announcements,
   pilotCompanies,
@@ -18,8 +18,11 @@ import {
 import type { CompanySummary } from "@/lib/types";
 
 export default async function DashboardPage() {
-  const live = await fetchLiveQuotes();
+  const [live, companyList] = await Promise.all([fetchLiveQuotes(), fetchCompanies()]);
   const isLive = !!live && live.quotes.length > 0;
+  const companyIdBySymbol = Object.fromEntries(
+    companyList.filter((c) => c.symbol).map((c) => [c.symbol as string, c.id])
+  );
 
   const companies: CompanySummary[] = pilotCompanies.map((company) => {
     const quote = live?.quotes.find((q) => q.symbol === company.symbol);
@@ -109,6 +112,7 @@ export default async function DashboardPage() {
             sectorMarketCapPkrBn={sectorMarketCapPkrBn}
             sectorMarketCapChangePct={sectorMarketCapChangePct}
             isLive={isLive}
+            companyIdBySymbol={companyIdBySymbol}
           />
         </main>
 

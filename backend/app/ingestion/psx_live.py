@@ -10,6 +10,7 @@ Finnhub was evaluated first and dropped — it does not cover PSX-listed securit
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 import psxdata
@@ -101,10 +102,20 @@ def fetch_live_snapshot(symbol: str) -> dict | None:
 
 
 def fetch_live_snapshots(companies: list[dict[str, str]] = FERTILIZER_SECTOR_COMPANIES) -> list[dict]:
-    """Fetches each symbol independently so one bad/suspended ticker doesn't fail the whole batch."""
+    """Fetches each symbol independently so one bad/suspended ticker doesn't fail the whole batch.
+
+    Runs the (blocking, network-bound) per-symbol fetches concurrently -- psxdata scrapes PSX's
+    own site with no SLA, and each fetch_live_snapshot call makes two sequential HTTP round
+    trips (quote + recent bars); observed serially taking 90+ seconds for all 7 pilot companies
+    on a slow day, which made every page that shows live prices (the dashboard first among them)
+    look broken rather than just slow. A thread pool is enough here since these are I/O-bound
+    calls, not CPU-bound work.
+    """
+    with ThreadPoolExecutor(max_workers=len(companies)) as pool:
+        snapshots = list(pool.map(lambda c: fetch_live_snapshot(c["symbol"]), companies))
+
     results = []
-    for company in companies:
-        snapshot = fetch_live_snapshot(company["symbol"])
+    for company, snapshot in zip(companies, snapshots):
         if snapshot is None:
             logger.info("No live data available for %s, skipping", company["symbol"])
             continue

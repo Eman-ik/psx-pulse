@@ -9,17 +9,19 @@ import type { RiskSnapshot } from "./api";
  * stays illustrative until Milestone 2/3 build real ingestion — keep it clearly labeled.
  *
  * This company list is PSX's actual "FERTILIZER" sector classification (confirmed via
- * psxdata.symbols() on 2026-07-26), not a guess: FFC, EFERT, FATIMA, FFBL, ENGRO, AGL, AHCL.
+ * psxdata.symbols() on 2026-07-26), not a guess: FFC, EFERT, FATIMA, AGL, AHCL.
  * Dawood Hercules (DAWH) was in an earlier draft of this list but is not actually classified
- * under Fertilizer by PSX, so it has been dropped.
+ * under Fertilizer by PSX, so it has been dropped. FFBL and ENGRO were in this list too but
+ * were removed 2026-07-27 after both stopped trading in a Scheme of Arrangement restructuring
+ * (FFBL merged into FFC ~2024-12-20; ENGRO's own restructuring with parent Dawood Hercules
+ * took effect ~2025-01-03) — see the full evidence trail in
+ * backend/app/ingestion/psx_live.py and mark_delisted_securities.py.
  */
 
 export const pilotCompanies: CompanySummary[] = [
   { symbol: "FFC", name: "Fauji Fertilizer Company", marketCapPkrBn: 486, price: 121.4, changePct: 1.8 },
   { symbol: "EFERT", name: "Engro Fertilizers", marketCapPkrBn: 342, price: 258.9, changePct: -0.6 },
   { symbol: "FATIMA", name: "Fatima Fertilizer Company", marketCapPkrBn: 256, price: 47.3, changePct: 2.4 },
-  { symbol: "FFBL", name: "Fauji Fertilizer Bin Qasim", marketCapPkrBn: 96, price: 82.3, changePct: 3.1 },
-  { symbol: "ENGRO", name: "Engro Corporation", marketCapPkrBn: 214, price: 478.6, changePct: 0.9 },
   { symbol: "AGL", name: "Agritech", marketCapPkrBn: 12, price: 46.1, changePct: -0.8 },
   { symbol: "AHCL", name: "Arif Habib Corporation", marketCapPkrBn: 38, price: 14.7, changePct: 1.2 },
 ];

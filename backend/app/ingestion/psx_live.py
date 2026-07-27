@@ -21,14 +21,30 @@ logger = logging.getLogger(__name__)
 # AGLNCPS (Agritech non-voting preference shares) is a second security under the AGL issuer
 # and is intentionally left out of this live-quote list; it belongs in the full identity-master
 # ingestion (Milestone 2), not this quick live-pricing slice. Reconcile this list periodically
-# against psxdata.symbols() — PSX sector membership does change (e.g. FFBL was historically
-# expected to be amalgamated into FFC; as of this check it is still listed separately).
+# against psxdata.symbols() — PSX sector membership does change.
+#
+# FFBL was removed 2026-07-27: it merged into FFC (Scheme of Arrangement sanctioned by the
+# Lahore High Court, 2024-12-13 — see the "Certified True Copy of the Order..." announcement
+# on file) and stopped trading around 2024-12-20 (confirmed: psxdata.stocks("FFBL", ...) returns
+# zero bars for all of 2025-2026, even though psxdata.symbols()/quote() still list it as a stale
+# cached entry).
+#
+# ENGRO was removed the same day: a 3-party "Scheme of Arrangement of Dawood Hercules
+# Corporation Limited, Engro Corporation Limited and DH Partners Limited" (Book Closure Notice
+# published 2024-12-27) and stopped trading after 2025-01-03, independently confirmed the same
+# way (psxdata.stocks("ENGRO", ...) returns zero bars for 2025-2026). Note DAWH (Dawood
+# Hercules, ENGRO's own parent and already an untracked ownership-graph stub) also shows no
+# recent trading via psxdata as of this check — the surviving-entity mechanics of this
+# restructuring aren't independently confirmed from headline announcement titles alone.
+#
+# Both removed companies' historical price/financial/announcement data stays in the DB and
+# their overview pages are still reachable; Security.is_active=False just keeps them out of the
+# pilot's active company lists (see app/api/companies.py, comparison.py, sectors.py,
+# screener.py). Reproducible via app/ingestion/mark_delisted_securities.py.
 FERTILIZER_SECTOR_COMPANIES: list[dict[str, str]] = [
     {"symbol": "FFC", "name": "Fauji Fertilizer Company Limited"},
     {"symbol": "EFERT", "name": "Engro Fertilizers Limited"},
     {"symbol": "FATIMA", "name": "Fatima Fertilizer Company Limited"},
-    {"symbol": "FFBL", "name": "Fauji Fertilizer Bin Qasim Limited"},
-    {"symbol": "ENGRO", "name": "Engro Corporation Limited"},
     {"symbol": "AGL", "name": "Agritech Limited"},
     {"symbol": "AHCL", "name": "Arif Habib Corporation Limited"},
 ]

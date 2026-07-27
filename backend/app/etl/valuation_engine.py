@@ -71,6 +71,23 @@ def compute_cost_of_equity(db: Session, issuer_id: int) -> dict | None:
     )
 
     for definition, value in [(base_def, ke_base), (strict_def, ke_strict)]:
+        # period_type="snapshot": cost of equity is "the current assumption's output", not a
+        # real historical series -- there should only ever be one live value per issuer. Since
+        # the assumption's as_of_date can legitimately move *backward* (e.g. a beta computed
+        # from a security whose price history goes stale in 2024 has an earlier as_of_date than
+        # the market-wide fallback it replaces), comparing/keeping "latest period_end" would
+        # silently resurrect a stale, less-accurate value. Delete every other snapshot for this
+        # (issuer, definition) instead of accumulating a misleading pseudo-history.
+        stale = db.execute(
+            select(RatioValue).where(
+                RatioValue.ratio_definition_id == definition.id,
+                RatioValue.issuer_id == issuer_id,
+                RatioValue.period_end != assumption.as_of_date,
+            )
+        ).scalars().all()
+        for row in stale:
+            db.delete(row)
+
         existing = db.execute(
             select(RatioValue).where(
                 RatioValue.ratio_definition_id == definition.id,
@@ -85,6 +102,8 @@ def compute_cost_of_equity(db: Session, issuer_id: int) -> dict | None:
                     period_type="snapshot", scope="consolidated", value=value, input_fact_ids=[],
                 )
             )
+        else:
+            existing.value = value
     db.commit()
     return {"as_of_date": assumption.as_of_date, "beta": beta, "ke_base": ke_base, "ke_strict": ke_strict}
 

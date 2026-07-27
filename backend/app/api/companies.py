@@ -18,6 +18,7 @@ from app.db.models import (
     SourceDocument,
     Thesis,
 )
+from app.etl.valuation_engine import _get_assumption
 from app.ingestion.psx_live import fetch_live_snapshot
 
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -29,7 +30,13 @@ def list_companies(db: Session = Depends(get_db)) -> list[dict]:
     # the ownership graph — they have no Security/symbol, so they don't belong in a company
     # list meant for navigation. Issuer.securities.any() is the correct filter, not
     # is_psx_listed, since Dawood Hercules is genuinely PSX-listed but untracked here.
-    issuers = db.execute(select(Issuer).where(Issuer.securities.any())).scalars().all()
+    # Also excludes delisted securities (e.g. FFBL, merged into FFC Dec 2024 per its own
+    # Scheme-of-Arrangement announcements) via Security.is_active — historical FFBL data stays
+    # in the DB and its overview page is still reachable directly, it just isn't offered as one
+    # of the pilot's active/current companies anymore.
+    issuers = db.execute(
+        select(Issuer).where(Issuer.securities.any(Security.is_active.is_(True)))
+    ).scalars().all()
     return [
         {
             "id": i.id,
@@ -271,6 +278,16 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
 
     settings = get_settings()
 
+    capm = _get_assumption(db, issuer.id)
+    beta = None
+    if capm is not None:
+        beta = {
+            "value": float(capm.beta),
+            "as_of_date": capm.as_of_date.isoformat(),
+            "is_issuer_specific": capm.issuer_id is not None,
+            "source_note": capm.source_note,
+        }
+
     return {
         "issuer": {
             "id": issuer.id,
@@ -289,7 +306,9 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
         "data_delay_notice": settings.data_delay_disclaimer,
         "symbol": security.symbol if security else None,
         "security_id": security.id if security else None,
+        "listing_status": security.listing_status if security else None,
         "free_float_pct": float(security.free_float_pct) if security and security.free_float_pct else None,
+        "beta": beta,
         "parent_chain": _parent_chain(db, issuer),
         "subsidiaries": [{"id": s.id, "name": s.name} for s in subsidiaries],
         "board": [{"full_name": p.full_name, "role": bm.role} for bm, p in board],

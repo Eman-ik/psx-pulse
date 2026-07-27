@@ -51,7 +51,7 @@ export default function SectorBreadth({ companies, totalVolume }: { companies: C
           </p>
         </div>
         <div className="col-span-2">
-          <p className="mb-1 text-muted">Total Volume (last session, 7 names)</p>
+          <p className="mb-1 text-muted">Total Volume (last session, {companies.length} names)</p>
           <p className="font-medium">{totalVolume != null ? totalVolume.toLocaleString() : "not available"}</p>
         </div>
       </div>

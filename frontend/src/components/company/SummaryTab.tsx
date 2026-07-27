@@ -6,6 +6,7 @@ interface Metric {
   label: string;
   value: string | null;
   caption?: string;
+  title?: string;
 }
 
 export default function SummaryTab({ data }: { data: CompanyOverview }) {
@@ -40,13 +41,19 @@ export default function SummaryTab({ data }: { data: CompanyOverview }) {
     { label: "Current Ratio", value: currentRatio != null ? `${currentRatio.toFixed(2)}x` : null, caption: "calculated" },
     { label: "Free Float", value: data.free_float_pct != null ? `${data.free_float_pct.toFixed(1)}%` : null, caption: "reported" },
     { label: "Volume (last session)", value: volume != null ? volume.toLocaleString() : null, caption: "psxdata live" },
+    {
+      label: "Beta (vs KSE-100)",
+      value: data.beta != null ? data.beta.value.toFixed(2) : null,
+      caption: data.beta ? `as of ${data.beta.as_of_date}` : undefined,
+      title: data.beta?.source_note,
+    },
   ];
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {metrics.map((m) => (
-          <div key={m.label} className="rounded-2xl border border-border bg-surface p-4">
+          <div key={m.label} className="rounded-2xl border border-border bg-surface p-4" title={m.title}>
             <p className="mb-1 text-xs text-muted">{m.label}</p>
             <p className="text-lg font-semibold">{m.value ?? "—"}</p>
             {m.value != null && m.caption && <p className="mt-1 text-[10px] text-muted">{m.caption}</p>}

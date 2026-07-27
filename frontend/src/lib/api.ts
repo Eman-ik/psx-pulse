@@ -66,7 +66,14 @@ export interface CompanyOverview {
   data_delay_notice: string;
   symbol: string | null;
   security_id: number | null;
+  listing_status: string | null;
   free_float_pct: number | null;
+  beta: {
+    value: number;
+    as_of_date: string;
+    is_issuer_specific: boolean;
+    source_note: string;
+  } | null;
   parent_chain: { id: number; name: string; is_psx_listed: boolean }[];
   subsidiaries: { id: number; name: string }[];
   board: { full_name: string; role: string }[];

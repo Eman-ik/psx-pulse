@@ -71,8 +71,10 @@ def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
     the latest reconciled financial_fact/ratio_value on file — nothing here is fabricated;
     a field is null when no such record exists yet for that company.
     """
-    issuers = db.execute(select(Issuer).where(Issuer.securities.any())).scalars().all()
-    securities = db.execute(select(Security)).scalars().all()
+    issuers = db.execute(
+        select(Issuer).where(Issuer.securities.any(Security.is_active.is_(True)))
+    ).scalars().all()
+    securities = db.execute(select(Security).where(Security.is_active.is_(True))).scalars().all()
     security_by_issuer = {s.issuer_id: s for s in securities}
 
     live_quotes = fetch_live_snapshots(FERTILIZER_SECTOR_COMPANIES)

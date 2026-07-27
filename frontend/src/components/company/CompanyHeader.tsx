@@ -44,6 +44,14 @@ export default function CompanyHeader({ data, weekRange }: { data: CompanyOvervi
                 Conglomerate
               </span>
             )}
+            {data.listing_status && data.listing_status !== "listed" && (
+              <span
+                className="rounded-full bg-negative/10 px-2 py-0.5 text-[10px] font-medium capitalize text-negative"
+                title="No longer one of the pilot's active companies — see Payouts & Announcements below for the corporate action that ended its listing. Figures on this page are historical."
+              >
+                {data.listing_status}
+              </span>
+            )}
           </div>
           <h1 className="text-2xl font-semibold">{issuer.name}</h1>
           {issuer.website && (

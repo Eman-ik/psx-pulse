@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.db.models import Issuer, OperationalMetric, Sector
+from app.db.models import Issuer, OperationalMetric, Sector, Security
 
 router = APIRouter(prefix="/sectors", tags=["sectors"])
 
@@ -34,15 +34,18 @@ def _latest_metric_by_issuer(db: Session, metric_key: str, product: str | None) 
 @router.get("/fertilizer")
 def fertilizer_sector(db: Session = Depends(get_db)) -> dict:
     """Fertilizer sector overview built only from data already ingested for the pilot's
-    7 companies: real company count, real aggregate market cap (sum of latest financial_fact
-    market_cap per issuer), and real average/aggregate operational KPIs. Fields the docx
-    describes but we have no ingested source for are listed under not_available instead of
-    being guessed.
+    currently-listed companies: real company count, real aggregate market cap (sum of latest
+    financial_fact market_cap per issuer), and real average/aggregate operational KPIs. Fields
+    the docx describes but we have no ingested source for are listed under not_available
+    instead of being guessed. Delisted issuers (e.g. FFBL, merged into FFC Dec 2024) are
+    excluded via Security.is_active, same as /companies.
     """
     from app.api.comparison import _latest_by_issuer
 
     sector = db.execute(select(Sector).where(Sector.name == "Fertilizer")).scalar_one_or_none()
-    issuers = db.execute(select(Issuer).where(Issuer.securities.any())).scalars().all()
+    issuers = db.execute(
+        select(Issuer).where(Issuer.securities.any(Security.is_active.is_(True)))
+    ).scalars().all()
 
     market_cap_by_issuer = _latest_by_issuer(db, "market_cap")
     aggregate_market_cap_pkr = sum(market_cap_by_issuer.values()) if market_cap_by_issuer else None

@@ -56,3 +56,34 @@ class PriceOHLCV(Base):
     circuit_upper: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
     circuit_lower: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
     is_delayed: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class MarketIndex(Base):
+    """A PSX benchmark index (e.g. KSE-100). Deliberately separate from Issuer/Security —
+    an index is not a company, so it doesn't belong in the identity master.
+    """
+
+    __tablename__ = "market_index"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(20), unique=True, index=True)  # e.g. "KSE100", psxdata's symbol
+    name: Mapped[str] = mapped_column(String(120))
+
+
+class IndexOHLCV(Base):
+    """Daily OHLCV bar for a market index. Same shape as PriceOHLCV; kept as a separate table
+    rather than reusing security_id, since an index isn't a Security.
+    """
+
+    __tablename__ = "index_ohlcv"
+    __table_args__ = (UniqueConstraint("market_index_id", "trade_date", name="uq_index_ohlcv_index_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    market_index_id: Mapped[int] = mapped_column(ForeignKey("market_index.id"), index=True)
+    trade_date: Mapped[date] = mapped_column(Date, index=True)
+    open: Mapped[float] = mapped_column(Numeric(14, 4))
+    high: Mapped[float] = mapped_column(Numeric(14, 4))
+    low: Mapped[float] = mapped_column(Numeric(14, 4))
+    close: Mapped[float] = mapped_column(Numeric(14, 4))
+    volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_delayed: Mapped[bool] = mapped_column(Boolean, default=True)

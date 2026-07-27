@@ -263,3 +263,20 @@ export async function fetchPrices(securityId: number): Promise<{ delayed_data_no
     return { delayed_data_notice: "", bars: [] };
   }
 }
+
+export interface IndexPrices {
+  code: string;
+  name: string;
+  delayed_data_notice: string;
+  bars: PriceBar[];
+}
+
+export async function fetchIndexPrices(code: string): Promise<IndexPrices | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/market/index/${code}/prices`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as IndexPrices | null;
+  } catch {
+    return null;
+  }
+}

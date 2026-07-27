@@ -7,7 +7,7 @@ import RiskPanel from "@/components/dashboard/RiskPanel";
 import SectorBreadth from "@/components/dashboard/SectorBreadth";
 import AnnouncementsTable from "@/components/dashboard/AnnouncementsTable";
 import RightPanel from "@/components/dashboard/RightPanel";
-import { fetchCompanies, fetchLiveQuotes, fetchNewsAnnouncements, fetchRiskSnapshot } from "@/lib/api";
+import { fetchCompanies, fetchIndexPrices, fetchLiveQuotes, fetchNewsAnnouncements, fetchRiskSnapshot } from "@/lib/api";
 import {
   announcements as mockAnnouncements,
   pilotCompanies,
@@ -26,11 +26,12 @@ function sentimentLabel(score: number | null): string | null {
 }
 
 export default async function DashboardPage() {
-  const [live, companyList, riskSnapshot, newsAnnouncements] = await Promise.all([
+  const [live, companyList, riskSnapshot, newsAnnouncements, kse100] = await Promise.all([
     fetchLiveQuotes(),
     fetchCompanies(),
     fetchRiskSnapshot(),
     fetchNewsAnnouncements(),
+    fetchIndexPrices("KSE100"),
   ]);
   const isLive = !!live && live.quotes.length > 0;
   const companyIdBySymbol = Object.fromEntries(
@@ -72,8 +73,27 @@ export default async function DashboardPage() {
   const latest = sectorIndexHistory[sectorIndexHistory.length - 1];
   const first = sectorIndexHistory[0];
   const sectorIndexChangePct = ((latest.sectorIndex - first.sectorIndex) / first.sectorIndex) * 100;
-  const kseChangePct = ((latest.kse100Index - first.kse100Index) / first.kse100Index) * 100;
   const topGainer = [...companies].sort((a, b) => b.changePct - a.changePct)[0];
+
+  const kseBars = kse100?.bars ?? [];
+  const isKseLive = kseBars.length >= 2;
+  const kseLatestBar = kseBars[kseBars.length - 1];
+  const kseChangePct = isKseLive
+    ? ((kseLatestBar.close - kseBars[kseBars.length - 2].close) / kseBars[kseBars.length - 2].close) * 100
+    : ((latest.kse100Index - first.kse100Index) / first.kse100Index) * 100;
+  const kseLevel = isKseLive ? kseLatestBar.close : latest.kse100Index;
+
+  // Chart: pair real recent KSE-100 closes (rebased to 100 at the window start, for a
+  // comparable scale to the still-illustrative Fertilizer Sector Index) with the mock sector
+  // series by position — dates on the x-axis are always the real KSE-100 trading dates.
+  const recentKseBars = kseBars.slice(-sectorIndexHistory.length);
+  const chartData = isKseLive
+    ? recentKseBars.map((bar, i) => ({
+        date: bar.date.slice(5),
+        kse100Index: (bar.close / recentKseBars[0].close) * 100,
+        sectorIndex: (sectorIndexHistory[i] ?? sectorIndexHistory[sectorIndexHistory.length - 1]).sectorIndex,
+      }))
+    : sectorIndexHistory;
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
@@ -90,7 +110,7 @@ export default async function DashboardPage() {
                 value={latest.sectorIndex.toFixed(1)}
                 changePct={sectorIndexChangePct}
               />
-              <StatCard label="KSE-100 Index" value={latest.kse100Index.toFixed(1)} changePct={kseChangePct} />
+              <StatCard label="KSE-100 Index" value={kseLevel.toLocaleString(undefined, { maximumFractionDigits: 1 })} changePct={kseChangePct} />
               <StatCard
                 label={`Top Mover — ${topGainer.symbol}`}
                 value={topGainer.price.toFixed(1)}
@@ -105,14 +125,14 @@ export default async function DashboardPage() {
                   <h3 className="font-semibold">Statistics</h3>
                   <div className="flex items-center gap-4 text-xs text-muted">
                     <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-accent" /> Sector Index
+                      <span className="h-2 w-2 rounded-full bg-accent" /> Sector Index (sample)
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-accent-pink" /> KSE-100
+                      <span className="h-2 w-2 rounded-full bg-accent-pink" /> KSE-100{isKseLive ? " (real, rebased to 100)" : " (sample)"}
                     </span>
                   </div>
                 </div>
-                <SectorChart data={sectorIndexHistory} />
+                <SectorChart data={chartData} />
               </div>
 
               <div className="rounded-2xl border border-border bg-surface p-5">
@@ -159,8 +179,11 @@ export default async function DashboardPage() {
         <footer className="border-t border-border px-6 py-4 text-center text-[11px] text-muted lg:px-8">
           Educational research pilot.{" "}
           {isLive
-            ? `Prices are live-ish via ${live!.data_source}; market cap and the sector index chart are still sample data.`
-            : "Sample data shown — not a live PSX feed."}{" "}
+            ? `Prices are live-ish via ${live!.data_source}.`
+            : "Sample company prices shown — not a live PSX feed."}{" "}
+          {isKseLive
+            ? "KSE-100 is ingested EOD data via psxdata; market cap and the Fertilizer Sector Index remain sample data (no published PSX fertilizer sub-index exists to source)."
+            : "KSE-100 and market cap figures are still sample data."}{" "}
           Not investment advice. Public launch and AI signal output remain disabled pending PSX
           data licensing and SECP compliance review.
         </footer>

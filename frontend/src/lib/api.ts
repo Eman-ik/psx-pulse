@@ -254,13 +254,24 @@ export async function fetchFertilizerSector(): Promise<FertilizerSector | null> 
   }
 }
 
-export async function fetchPrices(securityId: number): Promise<{ delayed_data_notice: string; bars: PriceBar[] }> {
+export interface PricesResponse {
+  adjusted: boolean;
+  adjustment_methodology?: string;
+  corporate_actions_on_file?: number;
+  delayed_data_notice: string;
+  bars: PriceBar[];
+}
+
+export async function fetchPrices(securityId: number, adjusted = false): Promise<PricesResponse> {
+  const empty: PricesResponse = { adjusted, delayed_data_notice: "", bars: [] };
   try {
-    const res = await fetch(`${API_BASE_URL}/market/${securityId}/prices`, { cache: "no-store" });
-    if (!res.ok) return { delayed_data_notice: "", bars: [] };
-    return (await res.json()) as { delayed_data_notice: string; bars: PriceBar[] };
+    const res = await fetch(`${API_BASE_URL}/market/${securityId}/prices?adjusted=${adjusted}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return empty;
+    return (await res.json()) as PricesResponse;
   } catch {
-    return { delayed_data_notice: "", bars: [] };
+    return empty;
   }
 }
 

@@ -16,7 +16,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const [comparison, benchmarks, priceData] = await Promise.all([
     fetchComparison(),
     fetchRatioBenchmarks(),
-    data.security_id != null ? fetchPrices(data.security_id) : Promise.resolve({ delayed_data_notice: "", bars: [] }),
+    data.security_id != null
+      ? fetchPrices(data.security_id)
+      : Promise.resolve({ adjusted: false, delayed_data_notice: "", bars: [] }),
   ]);
 
   const oneYearAgo = new Date();
@@ -35,7 +37,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         <main className="flex-1 px-6 py-6 lg:px-8">
           <CompanyHeader data={data} weekRange={weekRange} />
 
-          <CompanyTabs data={data} comparison={comparison} benchmarks={benchmarks} prices={priceData.bars} />
+          <CompanyTabs
+            data={data}
+            comparison={comparison}
+            benchmarks={benchmarks}
+            prices={priceData.bars}
+            securityId={data.security_id}
+          />
         </main>
 
         <footer className="border-t border-border px-6 py-4 text-center text-[11px] text-muted lg:px-8">

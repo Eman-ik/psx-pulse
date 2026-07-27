@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.core.config import get_settings
-from app.db.models import IndexOHLCV, MarketIndex, PriceOHLCV
+from app.db.models import CorporateAction, IndexOHLCV, MarketIndex, PriceOHLCV
+from app.etl.price_adjustment import apply_adjustment
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -16,6 +17,7 @@ def list_prices(
     security_id: int,
     start: date | None = None,
     end: date | None = None,
+    adjusted: bool = False,
     db: Session = Depends(get_db),
 ) -> dict:
     settings = get_settings()
@@ -25,20 +27,38 @@ def list_prices(
     if end:
         stmt = stmt.where(PriceOHLCV.trade_date <= end)
     bars = db.execute(stmt.order_by(PriceOHLCV.trade_date)).scalars().all()
+
+    if not adjusted:
+        return {
+            "adjusted": False,
+            "delayed_data_notice": settings.data_delay_disclaimer,
+            "bars": [
+                {
+                    "date": b.trade_date.isoformat(),
+                    "open": float(b.open),
+                    "high": float(b.high),
+                    "low": float(b.low),
+                    "close": float(b.close),
+                    "volume": b.volume,
+                    "is_delayed": b.is_delayed,
+                }
+                for b in bars
+            ],
+        }
+
+    actions = db.execute(
+        select(CorporateAction).where(CorporateAction.security_id == security_id)
+    ).scalars().all()
     return {
+        "adjusted": True,
+        "adjustment_methodology": (
+            "Backward-adjusted for cash dividends only (PSX PKR_PCT convention, PKR 10 face "
+            "value). No bonus/rights/split events are on file for this pilot yet — see "
+            "app/etl/price_adjustment.py for the exact formula and what it deliberately skips."
+        ),
+        "corporate_actions_on_file": len(actions),
         "delayed_data_notice": settings.data_delay_disclaimer,
-        "bars": [
-            {
-                "date": b.trade_date.isoformat(),
-                "open": float(b.open),
-                "high": float(b.high),
-                "low": float(b.low),
-                "close": float(b.close),
-                "volume": b.volume,
-                "is_delayed": b.is_delayed,
-            }
-            for b in bars
-        ],
+        "bars": apply_adjustment(bars, actions),
     }
 
 

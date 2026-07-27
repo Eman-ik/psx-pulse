@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { PriceBar } from "@/lib/api";
+import { fetchPrices, type PriceBar } from "@/lib/api";
 import { computeTechnicals, type IndicatorResult } from "@/lib/technicals";
 
 function IndicatorCard({ label, unit, result }: { label: string; unit?: string; result: IndicatorResult }) {
@@ -23,14 +23,50 @@ function IndicatorCard({ label, unit, result }: { label: string; unit?: string; 
   );
 }
 
-export default function TechnicalsTab({ bars, dataDelayNotice }: { bars: PriceBar[]; dataDelayNotice: string }) {
-  const technicals = useMemo(() => computeTechnicals(bars), [bars]);
+export default function TechnicalsTab({
+  bars,
+  dataDelayNotice,
+  securityId,
+}: {
+  bars: PriceBar[];
+  dataDelayNotice: string;
+  securityId: number | null;
+}) {
+  const [adjusted, setAdjusted] = useState(false);
+  const [adjustedBars, setAdjustedBars] = useState<PriceBar[] | null>(null);
+  const [actionsOnFile, setActionsOnFile] = useState<number | null>(null);
+  const [adjustError, setAdjustError] = useState(false);
+  const fetchAttempted = adjustedBars !== null || adjustError;
+  const loading = adjusted && !fetchAttempted && securityId != null;
+
+  useEffect(() => {
+    if (!adjusted || fetchAttempted || securityId == null) return;
+    let cancelled = false;
+    fetchPrices(securityId, true).then((res) => {
+      if (cancelled) return;
+      // An empty bars array with no reported actions count means the request failed (e.g. the
+      // backend rejected the cross-origin call) rather than that the company genuinely has no
+      // corporate actions on file — those are very different facts and must not be conflated.
+      if (res.bars.length === 0 && res.corporate_actions_on_file === undefined) {
+        setAdjustError(true);
+        return;
+      }
+      setAdjustedBars(res.bars);
+      setActionsOnFile(res.corporate_actions_on_file ?? 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [adjusted, fetchAttempted, securityId]);
+
+  const activeBars = adjusted && adjustedBars ? adjustedBars : bars;
+  const technicals = useMemo(() => computeTechnicals(activeBars), [activeBars]);
 
   if (bars.length === 0) {
     return <p className="text-xs text-muted">No price history on file for this company yet.</p>;
   }
 
-  const chartData = [...bars]
+  const chartData = [...activeBars]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((b) => ({ date: b.date.slice(5), close: b.close }));
 
@@ -38,9 +74,39 @@ export default function TechnicalsTab({ bars, dataDelayNotice }: { bars: PriceBa
     <div className="flex flex-col gap-6">
       <div className="rounded-2xl border border-border bg-surface p-5">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="font-semibold">Price ({bars.length} sessions)</h3>
-          <span className="text-[10px] text-muted">{dataDelayNotice}</span>
+          <h3 className="font-semibold">Price ({activeBars.length} sessions)</h3>
+          <div className="flex items-center gap-3">
+            {securityId != null && (
+              <div className="flex items-center gap-1 rounded-full bg-surface-alt p-0.5 text-xs">
+                <button
+                  onClick={() => setAdjusted(false)}
+                  className={`rounded-full px-2.5 py-1 ${!adjusted ? "bg-accent text-white" : "text-muted"}`}
+                >
+                  Raw
+                </button>
+                <button
+                  onClick={() => setAdjusted(true)}
+                  className={`rounded-full px-2.5 py-1 ${adjusted ? "bg-accent text-white" : "text-muted"}`}
+                >
+                  {loading ? "Loading…" : "Adjusted"}
+                </button>
+              </div>
+            )}
+            <span className="text-[10px] text-muted">{dataDelayNotice}</span>
+          </div>
         </div>
+        {adjusted && adjustedBars && (
+          <p className="mb-2 text-[10px] text-muted">
+            {actionsOnFile
+              ? `Backward-adjusted for ${actionsOnFile} cash dividend${actionsOnFile === 1 ? "" : "s"} on file (PSX face-value % convention). No bonus/rights/split events are on file for this pilot yet.`
+              : "No corporate actions on file for this company — adjusted series is identical to raw."}
+          </p>
+        )}
+        {adjusted && adjustError && (
+          <p className="mb-2 text-[10px] text-negative">
+            Couldn&apos;t load the adjusted series — showing raw prices instead.
+          </p>
+        )}
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

@@ -32,11 +32,13 @@ export default function CompanyTabs({
   comparison,
   benchmarks,
   prices,
+  securityId,
 }: {
   data: CompanyOverview;
   comparison: ComparisonRow[];
   benchmarks: Record<string, RatioBenchmark>;
   prices: PriceBar[];
+  securityId: number | null;
 }) {
   const [active, setActive] = useState<Tab>("Summary");
 
@@ -82,7 +84,9 @@ export default function CompanyTabs({
 
       {active === "Ratios" && <RatioGrid ratios={data.ratios} benchmarks={benchmarks} />}
 
-      {active === "Technicals" && <TechnicalsTab bars={prices} dataDelayNotice={data.data_delay_notice} />}
+      {active === "Technicals" && (
+        <TechnicalsTab bars={prices} dataDelayNotice={data.data_delay_notice} securityId={securityId} />
+      )}
 
       {active === "Announcements" && <PayoutsAndAnnouncements data={data} />}
 

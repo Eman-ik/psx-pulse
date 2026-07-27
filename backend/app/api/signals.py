@@ -37,4 +37,5 @@ def get_signal(issuer_id: int, db: Session = Depends(get_db)) -> dict:
         "catalyst_risk_score": float(row.catalyst_risk_score),
         "composite_signal": row.composite_signal,
         "policy_version": row.policy_version,
+        "suppression_reasons": row.suppression_reasons,
     }

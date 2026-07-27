@@ -1,8 +1,6 @@
+import { Lock } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
-
-function fmt(v: number | null, suffix = "", digits = 2) {
-  return v != null ? `${v.toFixed(digits)}${suffix}` : "—";
-}
+import { formatLiveRatio, formatMarketCap, formatMultiple, formatPct, formatPercent, formatPrice } from "@/lib/format";
 
 function rankLine(rows: ComparisonRow[], issuerId: number, key: keyof ComparisonRow, label: string) {
   const ranked = rows
@@ -35,6 +33,11 @@ export default function CompetitorsTab({ rows, issuerId }: { rows: ComparisonRow
               <th className="px-4 py-3 font-medium">ROE</th>
               <th className="px-4 py-3 font-medium">Div. Yield</th>
               <th className="px-4 py-3 font-medium">D/E</th>
+              <th className="px-4 py-3 font-medium">
+                <span className="inline-flex items-center gap-1">
+                  <Lock size={11} /> AI Signal
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -50,17 +53,23 @@ export default function CompetitorsTab({ rows, issuerId }: { rows: ComparisonRow
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">{fmt(row.price)}</td>
-                  <td className={`px-4 py-3 ${( row.change_pct ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>
-                    {fmt(row.change_pct, "%")}
+                  <td className="px-4 py-3">{formatPrice(row.price)}</td>
+                  <td className={`px-4 py-3 ${(row.change_pct ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>
+                    {formatPct(row.change_pct)}
                   </td>
+                  <td className="px-4 py-3">{formatMarketCap(row.market_cap)}</td>
+                  <td className="px-4 py-3">{formatLiveRatio(row.pe_ratio, 2, "x")}</td>
+                  <td className="px-4 py-3">{row.roe != null ? formatPercent(row.roe) : "—"}</td>
+                  <td className="px-4 py-3">{formatLiveRatio(row.dividend_yield, 2, "%")}</td>
+                  <td className="px-4 py-3">{formatMultiple(row.debt_to_equity)}</td>
                   <td className="px-4 py-3">
-                    {row.market_cap != null ? `PKR ${(row.market_cap / 1_000_000).toFixed(1)} bn` : "—"}
+                    <span
+                      title="AI signal output is built but hidden pending SECP/PSX compliance review — not a fabricated rating."
+                      className="inline-flex cursor-help items-center gap-1 rounded-full bg-surface-alt px-2 py-1 text-[10px] font-medium text-muted"
+                    >
+                      <Lock size={10} /> Locked
+                    </span>
                   </td>
-                  <td className="px-4 py-3">{row.pe_ratio ? fmt(row.pe_ratio, "x") : "—"}</td>
-                  <td className="px-4 py-3">{fmt(row.roe, "%", 1)}</td>
-                  <td className="px-4 py-3">{row.dividend_yield ? fmt(row.dividend_yield, "%") : "—"}</td>
-                  <td className="px-4 py-3">{fmt(row.debt_to_equity, "x")}</td>
                 </tr>
               );
             })}

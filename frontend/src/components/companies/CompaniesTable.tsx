@@ -4,21 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Lock, Search } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
-
-function fmtPrice(v: number | null) {
-  return v != null ? `PKR ${v.toFixed(2)}` : "—";
-}
-function fmtPct(v: number | null) {
-  return v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%` : "—";
-}
-function fmtMarketCap(v: number | null) {
-  return v != null ? `PKR ${(v / 1_000_000).toFixed(1)} bn` : "—";
-}
-// pe_ratio/dividend_yield of exactly 0 from the live source usually means "not available",
-// not a genuine zero — treat it the same as null rather than showing a misleading 0.00.
-function fmtRatio(v: number | null, suffix = "") {
-  return v != null && v !== 0 ? `${v.toFixed(2)}${suffix}` : "—";
-}
+import { formatLiveRatio, formatMarketCap, formatPct, formatPercent, formatPrice } from "@/lib/format";
 
 export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
   const [query, setQuery] = useState("");
@@ -80,14 +66,14 @@ export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
                     <span className="font-medium hover:text-accent">{row.name}</span>
                   </Link>
                 </td>
-                <td className="px-4 py-3">{fmtPrice(row.price)}</td>
+                <td className="px-4 py-3">{formatPrice(row.price)}</td>
                 <td className={`px-4 py-3 font-medium ${(row.change_pct ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>
-                  {fmtPct(row.change_pct)}
+                  {formatPct(row.change_pct)}
                 </td>
-                <td className="px-4 py-3">{fmtMarketCap(row.market_cap)}</td>
-                <td className="px-4 py-3">{fmtRatio(row.pe_ratio, "x")}</td>
-                <td className="px-4 py-3">{fmtRatio(row.roe, "%")}</td>
-                <td className="px-4 py-3">{fmtRatio(row.dividend_yield, "%")}</td>
+                <td className="px-4 py-3">{formatMarketCap(row.market_cap)}</td>
+                <td className="px-4 py-3">{formatLiveRatio(row.pe_ratio, 2, "x")}</td>
+                <td className="px-4 py-3">{row.roe != null ? formatPercent(row.roe) : "—"}</td>
+                <td className="px-4 py-3">{formatLiveRatio(row.dividend_yield, 2, "%")}</td>
                 <td className="px-4 py-3">
                   <span
                     title="AI signal output is built but hidden pending SECP/PSX compliance review — not a fabricated rating."

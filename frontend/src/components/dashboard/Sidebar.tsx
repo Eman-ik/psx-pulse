@@ -19,7 +19,7 @@ import {
 const mainNav = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },
   { label: "Companies", icon: Building2, href: "/companies" },
-  { label: "Screener", icon: SlidersHorizontal, href: "#" },
+  { label: "Screener", icon: SlidersHorizontal, href: "/screener" },
   { label: "Fertilizer Sector", icon: LineChart, href: "/sector/fertilizer" },
   { label: "News & Announcements", icon: Newspaper, href: "/news" },
   { label: "Academy", icon: GraduationCap, href: "#" },

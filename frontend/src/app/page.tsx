@@ -16,14 +16,8 @@ import {
   sectorMarketCapPkrBn,
   sectorRisk as mockSectorRisk,
 } from "@/lib/mock-data";
+import { sentimentLabel } from "@/lib/sentiment";
 import type { AnnouncementRow, CompanySummary } from "@/lib/types";
-
-function sentimentLabel(score: number | null): string | null {
-  if (score == null) return null;
-  if (score > 0.2) return "Positive";
-  if (score < -0.2) return "Negative";
-  return "Neutral";
-}
 
 export default async function DashboardPage() {
   const [live, companyList, riskSnapshot, newsAnnouncements, kse100] = await Promise.all([

@@ -135,7 +135,9 @@ export interface NewsAnnouncement {
   title: string;
   category: string;
   published_at: string;
+  summary: string | null;
   sentiment_score: number | null;
+  source_url: string | null;
 }
 
 export interface FertilizerSector {

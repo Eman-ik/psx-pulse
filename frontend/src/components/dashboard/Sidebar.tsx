@@ -21,7 +21,7 @@ const mainNav = [
   { label: "Companies", icon: Building2, href: "/companies" },
   { label: "Screener", icon: SlidersHorizontal, href: "#" },
   { label: "Fertilizer Sector", icon: LineChart, href: "/sector/fertilizer" },
-  { label: "News & Announcements", icon: Newspaper, href: "#" },
+  { label: "News & Announcements", icon: Newspaper, href: "/news" },
   { label: "Academy", icon: GraduationCap, href: "#" },
   { label: "Watchlists & Alerts", icon: Bell, href: "#", disabled: true },
 ];

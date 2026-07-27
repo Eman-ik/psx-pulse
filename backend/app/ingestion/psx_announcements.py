@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Announcement, Issuer, SourceDocument
+from app.etl.sentiment import classify_sentiment
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,7 @@ def ingest_company_announcements(db: Session, issuer: Issuer, symbol: str) -> di
                 title=row["title"],
                 category=row["category"],
                 published_at=published_at,
+                sentiment_score=classify_sentiment(row["title"]),
             )
         )
         inserted += 1

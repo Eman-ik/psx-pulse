@@ -1,19 +1,20 @@
+import Link from "next/link";
 import { Eye } from "lucide-react";
+import { SENTIMENT_TONE } from "@/lib/sentiment";
 import type { AnnouncementRow } from "@/lib/types";
-
-const SENTIMENT_TONE: Record<string, string> = {
-  Positive: "bg-positive/10 text-positive",
-  Negative: "bg-negative/10 text-negative",
-  Mixed: "bg-accent-yellow/10 text-accent-yellow",
-  Neutral: "bg-muted/10 text-muted",
-};
 
 export default function AnnouncementsTable({ rows, isSample }: { rows: AnnouncementRow[]; isSample: boolean }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-semibold">Recent Announcements &amp; Results</h3>
-        {isSample && <span className="text-xs text-muted">Sample data — backend unreachable</span>}
+        {isSample ? (
+          <span className="text-xs text-muted">Sample data — backend unreachable</span>
+        ) : (
+          <Link href="/news" className="text-xs text-accent hover:underline">
+            View all
+          </Link>
+        )}
       </div>
 
       <div className="overflow-x-auto">

@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import type { CompanyOverview } from "@/lib/api";
+import { SENTIMENT_TONE, sentimentLabel } from "@/lib/sentiment";
 
 const ACTION_LABELS: Record<string, string> = {
   dividend: "Dividend",
@@ -17,13 +18,6 @@ const CATEGORY_TONE: Record<string, string> = {
   other: "bg-muted/10 text-muted",
   general: "bg-muted/10 text-muted",
 };
-
-function sentimentLabel(score: number | null): string | null {
-  if (score == null) return null;
-  if (score > 0.2) return "Positive";
-  if (score < -0.2) return "Negative";
-  return "Neutral";
-}
 
 export default function PayoutsAndAnnouncements({ data }: { data: CompanyOverview }) {
   return (
@@ -64,7 +58,9 @@ export default function PayoutsAndAnnouncements({ data }: { data: CompanyOvervie
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
                       {sentiment && (
-                        <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[10px] font-medium text-muted">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SENTIMENT_TONE[sentiment] ?? SENTIMENT_TONE.Neutral}`}
+                        >
                           {sentiment}
                         </span>
                       )}

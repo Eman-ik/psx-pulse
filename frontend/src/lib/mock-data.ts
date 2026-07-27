@@ -1,9 +1,5 @@
-import type {
-  AnnouncementRow,
-  CompanySummary,
-  IndexPoint,
-  SectorRiskSnapshot,
-} from "./types";
+import type { AnnouncementRow, CompanySummary, IndexPoint } from "./types";
+import type { RiskSnapshot } from "./api";
 
 /**
  * SAMPLE / PLACEHOLDER DATA — market cap figures only.
@@ -41,31 +37,33 @@ export const sectorIndexHistory: IndexPoint[] = [
   { date: "26 Jul", sectorIndex: 109.5, kse100Index: 105.0 },
 ];
 
-export const sectorRisk: SectorRiskSnapshot = {
-  overallRisk: "HIGH",
+/** Fallback only — rendered when GET /macro/risk-snapshot is unreachable, always labeled as sample. */
+export const sectorRisk: RiskSnapshot = {
+  overall_risk: "HIGH",
   geopolitical: "HIGH TENSION",
   economy: "STRESSED",
-  imfProgram: "UNKNOWN",
-  currencyPkr: "MODERATE",
-  asOfDate: "26 Jul 2026",
-  keyPositives: [
+  imf_program: "UNKNOWN",
+  currency_pkr: "MODERATE",
+  as_of_date: "26 Jul 2026",
+  key_positives: [
     "Gas price relief proposals under discussion for the fertilizer sector",
     "Stable urea offtake into the Kharif season",
     "Rupee has held a narrow band over the last 4 weeks",
   ],
-  keyNegatives: [
+  key_negatives: [
     "IMF program status unconfirmed — funding-gap risk",
     "Persistent circular debt exposure across the energy chain",
     "Elevated regional geopolitical tension affecting import costs",
   ],
 };
 
+/** Fallback only — rendered when GET /news/announcements is unreachable, always labeled as sample. */
 export const announcements: AnnouncementRow[] = [
-  { date: "24 Jul", company: "Fauji Fertilizer Company", symbol: "FFC", category: "Results", title: "Q2 CY26 financial results", status: "analyst_reviewed" },
-  { date: "22 Jul", company: "Engro Fertilizers", symbol: "EFERT", category: "Dividend", title: "Interim cash dividend announcement", status: "analyst_reviewed" },
-  { date: "20 Jul", company: "Fatima Fertilizer Company", symbol: "FATIMA", category: "Production", title: "Plant utilization update", status: "pending_review" },
-  { date: "18 Jul", company: "Fauji Fertilizer Bin Qasim", symbol: "FFBL", category: "Board Meeting", title: "Board meeting notice", status: "ingested" },
-  { date: "15 Jul", company: "Fauji Fertilizer Company", symbol: "FFC", category: "Contract", title: "Gas supply agreement update", status: "pending_review" },
+  { date: "24 Jul", company: "Fauji Fertilizer Company", symbol: "FFC", category: "results", title: "Q2 CY26 financial results", sentimentLabel: null },
+  { date: "22 Jul", company: "Engro Fertilizers", symbol: "EFERT", category: "payout", title: "Interim cash dividend announcement", sentimentLabel: null },
+  { date: "20 Jul", company: "Fatima Fertilizer Company", symbol: "FATIMA", category: "operations", title: "Plant utilization update", sentimentLabel: null },
+  { date: "18 Jul", company: "Fauji Fertilizer Bin Qasim", symbol: "FFBL", category: "leadership", title: "Board meeting notice", sentimentLabel: null },
+  { date: "15 Jul", company: "Fauji Fertilizer Company", symbol: "FFC", category: "general", title: "Gas supply agreement update", sentimentLabel: null },
 ];
 
 export const sectorMarketCapPkrBn = pilotCompanies.reduce((sum, c) => sum + c.marketCapPkrBn, 0);

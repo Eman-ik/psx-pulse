@@ -1,7 +1,11 @@
 "use client";
 
 import { Line, LineChart, ResponsiveContainer } from "recharts";
-import type { RatioSeries } from "@/lib/api";
+import type { RatioBenchmark, RatioSeries } from "@/lib/api";
+
+// Ratios where a HIGHER value is worse (e.g. leverage) — used to flip the Healthy/Elevated
+// direction relative to the peer mean instead of always treating "above average" as good.
+const LOWER_IS_BETTER = new Set(["debt_to_equity", "debt_to_assets", "price_to_earnings", "price_to_book", "price_to_sales"]);
 
 const CATEGORY_LABELS: Record<string, string> = {
   profitability: "Profitability",
@@ -31,7 +35,30 @@ function formatValue(value: number, unit: string) {
   return value.toFixed(2) + "x";
 }
 
-export default function RatioGrid({ ratios }: { ratios: Record<string, RatioSeries> }) {
+function benchmarkBadge(key: string, latestValue: number, benchmark: RatioBenchmark | undefined) {
+  if (!benchmark || benchmark.count < 2) return null;
+  const diffPct = (latestValue - benchmark.mean) / (Math.abs(benchmark.mean) || 1);
+  const better = LOWER_IS_BETTER.has(key) ? diffPct < 0 : diffPct > 0;
+  const label = Math.abs(diffPct) < 0.1 ? "Average" : better ? "Healthy" : "Watch";
+  const tone =
+    label === "Average" ? "bg-surface-alt text-muted" : label === "Healthy" ? "bg-positive/10 text-positive" : "bg-accent-yellow/10 text-accent-yellow";
+  return (
+    <span
+      title={`Peer mean across ${benchmark.count} companies: ${benchmark.mean.toFixed(2)}`}
+      className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${tone}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+export default function RatioGrid({
+  ratios,
+  benchmarks = {},
+}: {
+  ratios: Record<string, RatioSeries>;
+  benchmarks?: Record<string, RatioBenchmark>;
+}) {
   const grouped: Record<string, { key: string; series: RatioSeries }[]> = {};
   for (const [key, series] of Object.entries(ratios)) {
     grouped[series.category] ??= [];
@@ -56,7 +83,9 @@ export default function RatioGrid({ ratios }: { ratios: Record<string, RatioSeri
               return (
                 <div key={key} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-xs text-muted">{series.name}</p>
+                    <p className="truncate text-xs text-muted" title={series.formula}>
+                      {series.name}
+                    </p>
                     <p className="text-sm font-medium">
                       {latest ? formatValue(latest.value, series.unit) : "—"}
                       {isReported && (
@@ -64,7 +93,9 @@ export default function RatioGrid({ ratios }: { ratios: Record<string, RatioSeri
                           reported
                         </span>
                       )}
+                      {latest && !isReported && benchmarkBadge(key, latest.value, benchmarks[key])}
                     </p>
+                    {series.formula && <p className="truncate text-[10px] text-muted/70">{series.formula}</p>}
                   </div>
                   {sorted.length > 1 && (
                     <div className="h-8 w-20 shrink-0">

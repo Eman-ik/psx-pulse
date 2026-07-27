@@ -34,8 +34,18 @@ export default function FinancialsChart({ revenue, profitAfterTax, eps }: Financ
     return <p className="text-xs text-muted">No financial time series available for this company yet.</p>;
   }
 
+  const scopes = new Set([...(revenue ?? []), ...(profitAfterTax ?? [])].map((r) => r.scope));
+  const units = new Set([...(revenue ?? []), ...(profitAfterTax ?? [])].map((r) => r.unit));
+
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
+    <div className="flex flex-col gap-2">
+      {(scopes.size > 0 || units.size > 0) && (
+        <p className="text-[10px] text-muted">
+          Scope: {scopes.size > 0 ? [...scopes].join(", ") : "—"} · Unit: {units.size > 0 ? [...units].join(", ") : "—"}
+          {scopes.size > 1 && " — mixed scope across years, compare with care"}
+        </p>
+      )}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
       {data.length > 0 && (
         <div className="h-56 w-full">
           <p className="mb-1 text-xs text-muted">Revenue &amp; Profit After Tax (PKR bn)</p>
@@ -82,6 +92,7 @@ export default function FinancialsChart({ revenue, profitAfterTax, eps }: Financ
           </ResponsiveContainer>
         </div>
       )}
+      </div>
     </div>
   );
 }

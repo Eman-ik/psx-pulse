@@ -1,24 +1,19 @@
-import { Eye, Download } from "lucide-react";
-import type { AnnouncementRow, AnnouncementStatus } from "@/lib/types";
+import { Eye } from "lucide-react";
+import type { AnnouncementRow } from "@/lib/types";
 
-const STATUS_LABEL: Record<AnnouncementStatus, string> = {
-  analyst_reviewed: "Analyst Reviewed",
-  pending_review: "Pending Review",
-  ingested: "Ingested",
+const SENTIMENT_TONE: Record<string, string> = {
+  Positive: "bg-positive/10 text-positive",
+  Negative: "bg-negative/10 text-negative",
+  Mixed: "bg-accent-yellow/10 text-accent-yellow",
+  Neutral: "bg-muted/10 text-muted",
 };
 
-const STATUS_TONE: Record<AnnouncementStatus, string> = {
-  analyst_reviewed: "bg-positive/10 text-positive",
-  pending_review: "bg-accent-yellow/10 text-accent-yellow",
-  ingested: "bg-muted/10 text-muted",
-};
-
-export default function AnnouncementsTable({ rows }: { rows: AnnouncementRow[] }) {
+export default function AnnouncementsTable({ rows, isSample }: { rows: AnnouncementRow[]; isSample: boolean }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-semibold">Recent Announcements &amp; Results</h3>
-        <button className="text-xs text-accent hover:underline">Newest first</button>
+        {isSample && <span className="text-xs text-muted">Sample data — backend unreachable</span>}
       </div>
 
       <div className="overflow-x-auto">
@@ -28,13 +23,20 @@ export default function AnnouncementsTable({ rows }: { rows: AnnouncementRow[] }
               <th className="pb-3 font-medium">Date</th>
               <th className="pb-3 font-medium">Company</th>
               <th className="pb-3 font-medium">Type</th>
-              <th className="pb-3 font-medium">Status</th>
-              <th className="pb-3 font-medium text-right">Evidence</th>
+              <th className="pb-3 font-medium">Sentiment</th>
+              <th className="pb-3 font-medium text-right">Source</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map((row) => (
-              <tr key={`${row.symbol}-${row.title}`} className="text-sm">
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-4 text-center text-xs text-muted">
+                  No announcements on file yet.
+                </td>
+              </tr>
+            )}
+            {rows.map((row, i) => (
+              <tr key={`${row.symbol}-${row.title}-${i}`} className="text-sm">
                 <td className="py-3 text-muted">{row.date}</td>
                 <td className="py-3">
                   <p className="font-medium">{row.title}</p>
@@ -42,17 +44,20 @@ export default function AnnouncementsTable({ rows }: { rows: AnnouncementRow[] }
                     {row.company} · {row.symbol}
                   </p>
                 </td>
-                <td className="py-3 text-muted">{row.category}</td>
+                <td className="py-3 text-muted capitalize">{row.category}</td>
                 <td className="py-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_TONE[row.status]}`}>
-                    {STATUS_LABEL[row.status]}
-                  </span>
+                  {row.sentimentLabel ? (
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${SENTIMENT_TONE[row.sentimentLabel] ?? SENTIMENT_TONE.Neutral}`}
+                    >
+                      {row.sentimentLabel}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted">Not classified</span>
+                  )}
                 </td>
-                <td className="py-3">
-                  <div className="flex items-center justify-end gap-3 text-muted">
-                    <Eye size={15} className="cursor-pointer hover:text-foreground" />
-                    <Download size={15} className="cursor-pointer hover:text-foreground" />
-                  </div>
+                <td className="py-3 text-right text-muted">
+                  <Eye size={15} className="ml-auto" />
                 </td>
               </tr>
             ))}

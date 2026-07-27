@@ -14,7 +14,7 @@ export default function CompanyProfile({ issuer }: { issuer: CompanyOverview["is
       ) : (
         <p className="mb-4 text-xs text-muted">No business description on file yet.</p>
       )}
-      <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-5">
         <div>
           <p className="mb-1 text-muted">Address</p>
           <p>{issuer.address ?? "—"}</p>
@@ -30,6 +30,10 @@ export default function CompanyProfile({ issuer }: { issuer: CompanyOverview["is
         <div>
           <p className="mb-1 text-muted">Fiscal Year End</p>
           <p>{issuer.fiscal_year_end_month ? MONTH_NAMES[issuer.fiscal_year_end_month] : "—"}</p>
+        </div>
+        <div>
+          <p className="mb-1 text-muted">Established</p>
+          <p>{issuer.establishment_year ?? "—"}</p>
         </div>
       </div>
     </div>

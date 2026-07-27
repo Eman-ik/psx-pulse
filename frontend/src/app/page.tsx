@@ -4,25 +4,39 @@ import StatCard from "@/components/dashboard/StatCard";
 import SectorChart from "@/components/dashboard/SectorChart";
 import MarketCapDonut, { DONUT_COLORS } from "@/components/dashboard/MarketCapDonut";
 import RiskPanel from "@/components/dashboard/RiskPanel";
+import SectorBreadth from "@/components/dashboard/SectorBreadth";
 import AnnouncementsTable from "@/components/dashboard/AnnouncementsTable";
 import RightPanel from "@/components/dashboard/RightPanel";
-import { fetchCompanies, fetchLiveQuotes } from "@/lib/api";
+import { fetchCompanies, fetchLiveQuotes, fetchNewsAnnouncements, fetchRiskSnapshot } from "@/lib/api";
 import {
-  announcements,
+  announcements as mockAnnouncements,
   pilotCompanies,
   sectorIndexHistory,
   sectorMarketCapChangePct,
   sectorMarketCapPkrBn,
-  sectorRisk,
+  sectorRisk as mockSectorRisk,
 } from "@/lib/mock-data";
-import type { CompanySummary } from "@/lib/types";
+import type { AnnouncementRow, CompanySummary } from "@/lib/types";
+
+function sentimentLabel(score: number | null): string | null {
+  if (score == null) return null;
+  if (score > 0.2) return "Positive";
+  if (score < -0.2) return "Negative";
+  return "Neutral";
+}
 
 export default async function DashboardPage() {
-  const [live, companyList] = await Promise.all([fetchLiveQuotes(), fetchCompanies()]);
+  const [live, companyList, riskSnapshot, newsAnnouncements] = await Promise.all([
+    fetchLiveQuotes(),
+    fetchCompanies(),
+    fetchRiskSnapshot(),
+    fetchNewsAnnouncements(),
+  ]);
   const isLive = !!live && live.quotes.length > 0;
   const companyIdBySymbol = Object.fromEntries(
     companyList.filter((c) => c.symbol).map((c) => [c.symbol as string, c.id])
   );
+  const companyById = Object.fromEntries(companyList.map((c) => [c.id, c]));
 
   const companies: CompanySummary[] = pilotCompanies.map((company) => {
     const quote = live?.quotes.find((q) => q.symbol === company.symbol);
@@ -31,6 +45,29 @@ export default async function DashboardPage() {
     }
     return company;
   });
+
+  const totalVolume = live
+    ? live.quotes.reduce<number | null>((sum, q) => (q.volume != null ? (sum ?? 0) + q.volume : sum), null)
+    : null;
+
+  const risk = riskSnapshot ?? mockSectorRisk;
+  const isRiskSample = riskSnapshot == null;
+
+  const announcementRows: AnnouncementRow[] =
+    newsAnnouncements.length > 0
+      ? newsAnnouncements.slice(0, 8).map((a) => {
+          const company = a.issuer_id != null ? companyById[a.issuer_id] : undefined;
+          return {
+            date: a.published_at.slice(0, 10),
+            company: company?.name ?? "Unknown company",
+            symbol: company?.symbol ?? "—",
+            category: a.category,
+            title: a.title,
+            sentimentLabel: sentimentLabel(a.sentiment_score),
+          };
+        })
+      : mockAnnouncements;
+  const isAnnouncementsSample = newsAnnouncements.length === 0;
 
   const latest = sectorIndexHistory[sectorIndexHistory.length - 1];
   const first = sectorIndexHistory[0];
@@ -102,9 +139,12 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <RiskPanel risk={sectorRisk} />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1fr]">
+              <RiskPanel risk={risk} isSample={isRiskSample} />
+              <SectorBreadth companies={companies} totalVolume={totalVolume} />
+            </div>
 
-            <AnnouncementsTable rows={announcements} />
+            <AnnouncementsTable rows={announcementRows} isSample={isAnnouncementsSample} />
           </div>
 
           <RightPanel

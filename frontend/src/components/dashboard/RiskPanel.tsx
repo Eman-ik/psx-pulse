@@ -1,7 +1,7 @@
 import { TriangleAlert, TrendingDown, TrendingUp } from "lucide-react";
-import type { SectorRiskSnapshot } from "@/lib/types";
+import type { RiskSnapshot } from "@/lib/api";
 
-const RISK_TONE: Record<SectorRiskSnapshot["overallRisk"], string> = {
+const RISK_TONE: Record<RiskSnapshot["overall_risk"], string> = {
   LOW: "text-positive bg-positive/10",
   MODERATE: "text-accent-yellow bg-accent-yellow/10",
   ELEVATED: "text-accent-yellow bg-accent-yellow/10",
@@ -15,13 +15,13 @@ function badgeTone(text: string) {
   return "text-positive bg-positive/10";
 }
 
-export default function RiskPanel({ risk }: { risk: SectorRiskSnapshot }) {
+export default function RiskPanel({ risk, isSample }: { risk: RiskSnapshot; isSample: boolean }) {
   const rows: [string, string][] = [
-    ["Overall Risk", risk.overallRisk],
+    ["Overall Risk", risk.overall_risk],
     ["Geopolitical", risk.geopolitical],
     ["Economy", risk.economy],
-    ["IMF Program", risk.imfProgram],
-    ["Currency (PKR)", risk.currencyPkr],
+    ["IMF Program", risk.imf_program],
+    ["Currency (PKR)", risk.currency_pkr],
   ];
 
   return (
@@ -31,8 +31,8 @@ export default function RiskPanel({ risk }: { risk: SectorRiskSnapshot }) {
           <TriangleAlert size={16} className="text-negative" />
           <h3 className="font-semibold">Macro &amp; Geopolitical Risk</h3>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${RISK_TONE[risk.overallRisk]}`}>
-          {risk.overallRisk}
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${RISK_TONE[risk.overall_risk]}`}>
+          {risk.overall_risk}
         </span>
       </div>
 
@@ -53,7 +53,7 @@ export default function RiskPanel({ risk }: { risk: SectorRiskSnapshot }) {
             <TrendingUp size={13} /> Key Positives
           </p>
           <ul className="space-y-1.5 text-xs text-muted">
-            {risk.keyPositives.map((item) => (
+            {risk.key_positives.map((item) => (
               <li key={item} className="flex gap-2">
                 <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-positive" />
                 {item}
@@ -66,7 +66,7 @@ export default function RiskPanel({ risk }: { risk: SectorRiskSnapshot }) {
             <TrendingDown size={13} /> Key Negatives
           </p>
           <ul className="space-y-1.5 text-xs text-muted">
-            {risk.keyNegatives.map((item) => (
+            {risk.key_negatives.map((item) => (
               <li key={item} className="flex gap-2">
                 <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-negative" />
                 {item}
@@ -77,7 +77,8 @@ export default function RiskPanel({ risk }: { risk: SectorRiskSnapshot }) {
       </div>
 
       <p className="mt-4 text-[10px] text-muted">
-        As of {risk.asOfDate} · analyst-maintained snapshot, sample data for this pilot build
+        As of {risk.as_of_date} · analyst-maintained snapshot
+        {isSample ? " · sample data (backend snapshot unavailable)" : ""}
       </p>
     </div>
   );

@@ -1,13 +1,27 @@
 import Link from "next/link";
 import { ArrowLeft, Globe } from "lucide-react";
 import type { CompanyOverview } from "@/lib/api";
+import { latestValue } from "@/lib/financials";
 
-export default function CompanyHeader({ data }: { data: CompanyOverview }) {
+export default function CompanyHeader({ data, weekRange }: { data: CompanyOverview; weekRange: { low: number; high: number } | null }) {
   const { issuer, symbol, live_quote, free_float_pct } = data;
   const price = live_quote?.price;
   const changePct = live_quote?.change_pct;
   const positive = (changePct ?? 0) >= 0;
   const marketCapFact = data.financials["market_cap"]?.[data.financials["market_cap"].length - 1];
+
+  const eps = latestValue(data.financials["eps"]);
+  const pe = latestValue(data.ratios["price_to_earnings"]?.values);
+  const roe = latestValue(data.ratios["roe"]?.values);
+  const dividendYield = live_quote?.dividend_yield && live_quote.dividend_yield !== 0 ? live_quote.dividend_yield : null;
+
+  const headline: { label: string; value: string }[] = [
+    { label: "Trailing P/E", value: pe != null ? `${pe.toFixed(2)}x` : "—" },
+    { label: "Dividend Yield", value: dividendYield != null ? `${dividendYield.toFixed(2)}%` : "—" },
+    { label: "EPS", value: eps != null ? `PKR ${eps.toFixed(2)}` : "—" },
+    { label: "ROE", value: roe != null ? `${roe.toFixed(1)}%` : "—" },
+    { label: "52-Week Range", value: weekRange ? `${weekRange.low.toFixed(1)} – ${weekRange.high.toFixed(1)}` : "—" },
+  ];
 
   return (
     <div className="mb-6">
@@ -22,6 +36,9 @@ export default function CompanyHeader({ data }: { data: CompanyOverview }) {
               {symbol ?? "—"}
             </span>
             <span className="text-xs text-muted">Fertilizer sector</span>
+            {issuer.establishment_year && (
+              <span className="text-xs text-muted">· Est. {issuer.establishment_year}</span>
+            )}
             {issuer.is_conglomerate && (
               <span className="rounded-full bg-accent-yellow/10 px-2 py-0.5 text-[10px] font-medium text-accent-yellow">
                 Conglomerate
@@ -69,6 +86,18 @@ export default function CompanyHeader({ data }: { data: CompanyOverview }) {
             <p className="text-xl font-semibold">{live_quote?.as_of_date ?? "—"}</p>
           </div>
         </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-6 py-3">
+        <div className="flex flex-wrap gap-6">
+          {headline.map((m) => (
+            <div key={m.label}>
+              <p className="text-[10px] text-muted">{m.label}</p>
+              <p className="text-sm font-medium">{m.value}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted">{data.data_delay_notice}</p>
       </div>
     </div>
   );

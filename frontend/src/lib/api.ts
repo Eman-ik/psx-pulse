@@ -34,6 +34,7 @@ export interface CompanyListItem {
 export interface FinancialFactPoint {
   period_end: string;
   period_type: string;
+  scope: string;
   value: number;
   unit: string;
   is_restated: boolean;
@@ -43,6 +44,7 @@ export interface RatioSeries {
   name: string;
   category: string;
   unit: string;
+  formula: string;
   values: { period_end: string; value: number }[];
 }
 
@@ -59,8 +61,11 @@ export interface CompanyOverview {
     auditor: string | null;
     fiscal_year_end_month: number | null;
     is_conglomerate: boolean;
+    establishment_year: number | null;
   };
+  data_delay_notice: string;
   symbol: string | null;
+  security_id: number | null;
   free_float_pct: number | null;
   parent_chain: { id: number; name: string; is_psx_listed: boolean }[];
   subsidiaries: { id: number; name: string }[];
@@ -69,7 +74,15 @@ export interface CompanyOverview {
   financials: Record<string, FinancialFactPoint[]>;
   ratios: Record<string, RatioSeries>;
   payouts: { action_type: string; effective_date: string; ratio_or_amount: number | null }[];
-  announcements: { id: number; title: string; category: string; published_at: string }[];
+  announcements: {
+    id: number;
+    title: string;
+    category: string;
+    published_at: string;
+    summary: string | null;
+    sentiment_score: number | null;
+    source_url: string | null;
+  }[];
   sources: { document_type: string; source_tier: string; url: string | null; fetched_at: string }[];
   operational_metrics: Record<string, { product: string | null; period_end: string; value: number; unit: string }[]>;
   thesis: {
@@ -90,6 +103,63 @@ export interface CompanyOverview {
     parent_value: number;
     contribution_pct: number;
   }[];
+}
+
+export interface ComparisonRow {
+  id: number;
+  symbol: string | null;
+  name: string;
+  price: number | null;
+  change_pct: number | null;
+  market_cap: number | null;
+  pe_ratio: number | null;
+  dividend_yield: number | null;
+  roe: number | null;
+  debt_to_equity: number | null;
+}
+
+export interface RiskSnapshot {
+  as_of_date: string;
+  overall_risk: "LOW" | "MODERATE" | "ELEVATED" | "HIGH";
+  geopolitical: string;
+  economy: string;
+  imf_program: string;
+  currency_pkr: string;
+  key_positives: string[];
+  key_negatives: string[];
+}
+
+export interface NewsAnnouncement {
+  id: number;
+  issuer_id: number | null;
+  title: string;
+  category: string;
+  published_at: string;
+  sentiment_score: number | null;
+}
+
+export interface FertilizerSector {
+  sector_name: string;
+  psx_sector_code: string | null;
+  company_count: number;
+  companies: string[];
+  aggregate_market_cap_pkr: number | null;
+  companies_with_market_cap: number;
+  avg_capacity_utilization_pct: number | null;
+  companies_with_utilization_data: number;
+  total_production_volume: number | null;
+  companies_with_production_data: number;
+  not_available: string[];
+}
+
+export interface PriceBar {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number | null;
+  is_delayed: boolean;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -126,5 +196,70 @@ export async function fetchCompanyOverview(issuerId: number): Promise<CompanyOve
     return (await res.json()) as CompanyOverview;
   } catch {
     return null;
+  }
+}
+
+export interface RatioBenchmark {
+  mean: number;
+  count: number;
+}
+
+export async function fetchRatioBenchmarks(): Promise<Record<string, RatioBenchmark>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/companies/ratio-benchmarks`, { cache: "no-store" });
+    if (!res.ok) return {};
+    return (await res.json()) as Record<string, RatioBenchmark>;
+  } catch {
+    return {};
+  }
+}
+
+export async function fetchComparison(): Promise<ComparisonRow[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/companies/comparison`, { cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()) as ComparisonRow[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchRiskSnapshot(): Promise<RiskSnapshot | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/macro/risk-snapshot`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as RiskSnapshot | null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchNewsAnnouncements(): Promise<NewsAnnouncement[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/news/announcements`, { cache: "no-store" });
+    if (!res.ok) return [];
+    return (await res.json()) as NewsAnnouncement[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchFertilizerSector(): Promise<FertilizerSector | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/sectors/fertilizer`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as FertilizerSector;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchPrices(securityId: number): Promise<{ delayed_data_notice: string; bars: PriceBar[] }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/market/${securityId}/prices`, { cache: "no-store" });
+    if (!res.ok) return { delayed_data_notice: "", bars: [] };
+    return (await res.json()) as { delayed_data_notice: string; bars: PriceBar[] };
+  } catch {
+    return { delayed_data_notice: "", bars: [] };
   }
 }

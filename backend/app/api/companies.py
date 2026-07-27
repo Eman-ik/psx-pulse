@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.core.config import get_settings
 from app.db.models import (
     Announcement,
     BoardMembership,
@@ -189,6 +190,7 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
             {
                 "period_end": f.period_end.isoformat(),
                 "period_type": f.period_type,
+                "scope": f.scope,
                 "value": float(f.value),
                 "unit": f.unit,
                 "is_restated": f.is_restated,
@@ -206,7 +208,13 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
     for ratio_value, definition in ratio_rows:
         bucket = ratios_by_key.setdefault(
             definition.key,
-            {"name": definition.name, "category": definition.category, "unit": definition.unit, "values": []},
+            {
+                "name": definition.name,
+                "category": definition.category,
+                "unit": definition.unit,
+                "formula": definition.formula_description,
+                "values": [],
+            },
         )
         bucket["values"].append({"period_end": ratio_value.period_end.isoformat(), "value": float(ratio_value.value)})
     for bucket in ratios_by_key.values():
@@ -227,19 +235,24 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
             ).scalars()
         ]
 
+    announcement_rows = db.execute(
+        select(Announcement, SourceDocument)
+        .join(SourceDocument, SourceDocument.id == Announcement.source_document_id)
+        .where(Announcement.issuer_id == issuer.id)
+        .order_by(Announcement.published_at.desc())
+        .limit(10)
+    ).all()
     announcements = [
         {
             "id": a.id,
             "title": a.title,
             "category": a.category,
             "published_at": a.published_at.isoformat(),
+            "summary": a.summary,
+            "sentiment_score": a.sentiment_score,
+            "source_url": sd.url,
         }
-        for a in db.execute(
-            select(Announcement)
-            .where(Announcement.issuer_id == issuer.id)
-            .order_by(Announcement.published_at.desc())
-            .limit(10)
-        ).scalars()
+        for a, sd in announcement_rows
     ]
 
     # Every SourceDocument carries its own issuer_id, so this picks up financial-fact,
@@ -256,6 +269,8 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
         ).scalars()
     ]
 
+    settings = get_settings()
+
     return {
         "issuer": {
             "id": issuer.id,
@@ -269,8 +284,11 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
             "auditor": issuer.auditor,
             "fiscal_year_end_month": issuer.fiscal_year_end_month,
             "is_conglomerate": issuer.is_conglomerate,
+            "establishment_year": issuer.incorporation_date.year if issuer.incorporation_date else None,
         },
+        "data_delay_notice": settings.data_delay_disclaimer,
         "symbol": security.symbol if security else None,
+        "security_id": security.id if security else None,
         "free_float_pct": float(security.free_float_pct) if security and security.free_float_pct else None,
         "parent_chain": _parent_chain(db, issuer),
         "subsidiaries": [{"id": s.id, "name": s.name} for s in subsidiaries],

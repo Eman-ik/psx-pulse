@@ -60,7 +60,7 @@ export default function CompanyTabs({
         ))}
       </div>
 
-      {active === "Summary" && <SummaryTab data={data} />}
+      {active === "Summary" && <SummaryTab data={data} prices={prices} />}
 
       {active === "Profile" && (
         <div className="flex flex-col gap-6">

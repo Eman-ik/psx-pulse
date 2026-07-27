@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowLeft, Globe } from "lucide-react";
+import { ArrowLeft, Globe, Info } from "lucide-react";
 import type { CompanyOverview } from "@/lib/api";
 import { latestValue } from "@/lib/financials";
+import { GLOSSARY } from "@/lib/glossary";
 
 export default function CompanyHeader({ data, weekRange }: { data: CompanyOverview; weekRange: { low: number; high: number } | null }) {
   const { issuer, symbol, live_quote, free_float_pct } = data;
@@ -99,8 +100,11 @@ export default function CompanyHeader({ data, weekRange }: { data: CompanyOvervi
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-6 py-3">
         <div className="flex flex-wrap gap-6">
           {headline.map((m) => (
-            <div key={m.label}>
-              <p className="text-[10px] text-muted">{m.label}</p>
+            <div key={m.label} title={GLOSSARY[m.label]}>
+              <p className="flex items-center gap-1 text-[10px] text-muted">
+                {m.label}
+                {GLOSSARY[m.label] && <Info size={10} className="opacity-60" />}
+              </p>
               <p className="text-sm font-medium">{m.value}</p>
             </div>
           ))}

@@ -28,13 +28,18 @@ def get_signal(issuer_id: int, db: Session = Depends(get_db)) -> dict:
     ).scalars().first()
     if row is None or row.suppressed:
         return {"composite_signal": "no_signal", "reason": "no eligible score for this issuer"}
+    def _float_or_none(v) -> float | None:
+        return float(v) if v is not None else None
+
     return {
         "as_of_date": row.as_of_date.isoformat(),
-        "quality_score": float(row.quality_score),
-        "growth_score": float(row.growth_score),
-        "financial_health_score": float(row.financial_health_score),
-        "valuation_score": float(row.valuation_score),
-        "catalyst_risk_score": float(row.catalyst_risk_score),
+        "quality_score": _float_or_none(row.quality_score),
+        "growth_score": _float_or_none(row.growth_score),
+        "financial_health_score": _float_or_none(row.financial_health_score),
+        "valuation_score": _float_or_none(row.valuation_score),
+        "catalyst_risk_score": _float_or_none(row.catalyst_risk_score),
+        "momentum_score": _float_or_none(row.momentum_score),
+        "risk_score": _float_or_none(row.risk_score),
         "composite_signal": row.composite_signal,
         "policy_version": row.policy_version,
         "suppression_reasons": row.suppression_reasons,

@@ -12,6 +12,12 @@ to `true` until the rows below are actually reviewed and signed off by counsel +
 | Announcements feed | PUCARS / public notices | Public |  |  |  |  |
 | AI signal output | Derived from above | Public |  |  |  |  |
 
+Note: "AI signal output"'s "derived from above" now explicitly includes the price momentum and
+beta dimensions added to the signal engine — both computed only from the "price snapshot" /
+"historical chart" / "index level" rows already in this matrix, no new data source. No new row
+needed, but flagging for whoever reviews this matrix so the signal engine's actual inputs are
+traceable to a specific row above.
+
 ## Note on Capital Stake
 
 PSX's own public portal (dps.psx.com.pk) states its company-page data — including the

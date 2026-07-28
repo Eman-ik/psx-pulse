@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ComparisonRow, CompanyOverview, PriceBar, RatioBenchmark } from "@/lib/api";
+import type { ComparisonRow, CompanyOverview, PriceBar, RatioBenchmark, SignalResearch } from "@/lib/api";
 import SummaryTab from "./SummaryTab";
 import CompanyProfile from "./CompanyProfile";
 import OwnershipAndGovernance from "./OwnershipAndGovernance";
@@ -14,6 +14,8 @@ import TechnicalsTab from "./TechnicalsTab";
 import PayoutsAndAnnouncements from "./PayoutsAndAnnouncements";
 import CompetitorsTab from "./CompetitorsTab";
 import DataQualityPanel from "./DataQualityPanel";
+import AISignalTab from "./AISignalTab";
+import FinancialStatementsPanel from "./FinancialStatementsPanel";
 
 const TABS = [
   "Summary",
@@ -24,6 +26,7 @@ const TABS = [
   "Technicals",
   "Announcements",
   "Competitors",
+  "AI Signal",
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -33,12 +36,14 @@ export default function CompanyTabs({
   benchmarks,
   prices,
   securityId,
+  signal,
 }: {
   data: CompanyOverview;
   comparison: ComparisonRow[];
   benchmarks: Record<string, RatioBenchmark>;
   prices: PriceBar[];
   securityId: number | null;
+  signal: SignalResearch | null;
 }) {
   const [active, setActive] = useState<Tab>("Summary");
 
@@ -75,11 +80,14 @@ export default function CompanyTabs({
       {active === "Operations" && <OperationalKpis metrics={data.operational_metrics} />}
 
       {active === "Financials" && (
-        <FinancialsChart
-          revenue={data.financials["revenue"]}
-          profitAfterTax={data.financials["profit_after_tax"]}
-          eps={data.financials["eps"]}
-        />
+        <div>
+          <FinancialsChart
+            revenue={data.financials["revenue"]}
+            profitAfterTax={data.financials["profit_after_tax"]}
+            eps={data.financials["eps"]}
+          />
+          <FinancialStatementsPanel financials={data.financials} />
+        </div>
       )}
 
       {active === "Ratios" && <RatioGrid ratios={data.ratios} benchmarks={benchmarks} />}
@@ -91,6 +99,8 @@ export default function CompanyTabs({
       {active === "Announcements" && <PayoutsAndAnnouncements data={data} />}
 
       {active === "Competitors" && <CompetitorsTab rows={comparison} issuerId={data.issuer.id} />}
+
+      {active === "AI Signal" && <AISignalTab signal={signal} />}
     </div>
   );
 }

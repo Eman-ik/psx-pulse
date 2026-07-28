@@ -16,6 +16,8 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import math
+
 from app.db.models import FinancialFact, Issuer, RatioDefinition, RatioValue
 
 logger = logging.getLogger(__name__)
@@ -465,6 +467,156 @@ def reconcile_balance_sheet(db: Session, issuer_id: int, tolerance_pct: float = 
     return flags
 
 
+def _latest_ratio_value_for_key(db: Session, issuer_id: int, key: str) -> RatioValue | None:
+    defn = db.execute(select(RatioDefinition).where(RatioDefinition.key == key)).scalar_one_or_none()
+    if defn is None:
+        return None
+    return db.execute(
+        select(RatioValue)
+        .where(RatioValue.ratio_definition_id == defn.id, RatioValue.issuer_id == issuer_id)
+        .order_by(RatioValue.period_end.desc())
+    ).scalars().first()
+
+
+def compute_graham_number(db: Session, issuer_id: int) -> int:
+    """Graham Number = sqrt(22.5 × EPS × Book Value Per Share).
+
+    A price-anchored intrinsic value estimate per Benjamin Graham. Using EPS as the per-share
+    earnings anchor and BVPS as the asset anchor. The result is in PKR (same unit as the
+    live price, so it's directly comparable). Only computed where both inputs are positive —
+    a negative EPS or BVPS would produce an imaginary number, not a meaningful value.
+
+    Inputs reused from existing FinancialFact + already-computed book_value_per_share ratio:
+    nothing new needs to be ingested.
+    """
+    eps_fact = _latest_fact(db, issuer_id, "eps", "annual")
+    bvps_rv = _latest_ratio_value_for_key(db, issuer_id, "book_value_per_share")
+    if eps_fact is None or bvps_rv is None:
+        return 0
+    eps = float(eps_fact.value)
+    bvps = float(bvps_rv.value)
+    if eps <= 0 or bvps <= 0:
+        return 0
+    value = math.sqrt(22.5 * eps * bvps)
+    definition = _get_or_create_ratio_definition(
+        db, "graham_number", "Graham Number", "valuation",
+        "sqrt(22.5 × eps × book_value_per_share) — Benjamin Graham's per-share intrinsic value anchor",
+    )
+    definition.unit = "PKR"
+    inserted = int(_store_ratio_value(db, definition, issuer_id, eps_fact.period_end, value, [eps_fact.id]))
+    db.commit()
+    return inserted
+
+
+def compute_tobin_q(db: Session, issuer_id: int, live_price: float | None) -> int:
+    """Tobin's Q (simplified) = market_cap / total_assets.
+
+    Proper Tobin's Q uses replacement cost of assets (not book value), which PSX filings
+    don't easily surface. This simplified version uses book-value total_assets as the
+    denominator — a common practical approximation, labeled explicitly as 'simplified' so
+    nobody mistakes it for the academically precise form.
+
+    market_cap (PKR) = live_price × shares_outstanding (raw count)
+    total_assets (PKR) = total_assets_fact × 1000 (FinancialFact values are in PKR '000)
+    """
+    if live_price is None:
+        return 0
+    shares = _latest_fact(db, issuer_id, "shares_outstanding", "snapshot")
+    total_assets = _latest_fact(db, issuer_id, "total_assets", "annual")
+    if shares is None or total_assets is None or shares.value == 0 or total_assets.value == 0:
+        return 0
+    market_cap_pkr = live_price * float(shares.value)
+    total_assets_pkr = float(total_assets.value) * 1000
+    value = market_cap_pkr / total_assets_pkr
+    definition = _get_or_create_ratio_definition(
+        db, "tobin_q", "Tobin's Q (Simplified)", "valuation",
+        "(live_price × shares_outstanding) / (total_assets × 1000) — simplified; uses book total_assets",
+    )
+    definition.unit = "ratio"
+    inserted = int(_store_ratio_value(db, definition, issuer_id, total_assets.period_end, value, [shares.id, total_assets.id]))
+    db.commit()
+    return inserted
+
+
+def compute_sustainable_growth_rate(db: Session, issuer_id: int) -> int:
+    """Sustainable Growth Rate = ROE × (1 − payout_ratio / 100).
+
+    The maximum growth rate a company can achieve without external financing — i.e. funded
+    entirely by retained earnings. For high-dividend Pakistani fertilizer companies, this
+    is typically modest (ROE 20-30%, payout 80-90% → SGR ~3-6%), which is consistent
+    with the sector's relatively stable, low-growth character.
+
+    Inputs from existing RatioValues — no new data needed.
+    Result expressed as a percentage (e.g. 4.2 for 4.2% growth).
+    """
+    roe_rv = _latest_ratio_value_for_key(db, issuer_id, "roe")
+    payout_rv = _latest_ratio_value_for_key(db, issuer_id, "dividend_payout_ratio")
+    if roe_rv is None or payout_rv is None:
+        return 0
+    roe = float(roe_rv.value)
+    payout = float(payout_rv.value)
+    retention = max(0.0, 1.0 - payout / 100.0)
+    value = roe * retention
+    period_end = max(roe_rv.period_end, payout_rv.period_end)
+    definition = _get_or_create_ratio_definition(
+        db, "sustainable_growth_rate", "Sustainable Growth Rate", "growth",
+        "roe × (1 − dividend_payout_ratio / 100)",
+    )
+    definition.unit = "percent"
+    inserted = int(_store_ratio_value(db, definition, issuer_id, period_end, value, []))
+    db.commit()
+    return inserted
+
+
+def compute_dividend_coverage(db: Session, issuer_id: int) -> int:
+    """Dividend Coverage = EPS / DPS (or PAT / total_dividends_paid on aggregate basis).
+
+    How many times over earnings cover the dividend. Coverage < 1 signals a dividend
+    being paid from reserves or debt — a sustainability concern. Coverage ≥ 1.5 is
+    generally considered comfortable. Pakistani fertilizer companies typically run
+    high payouts (70-100%) so coverage of 1.0-1.3× is common and not necessarily alarming
+    in a mature, cash-generative sector, but the trend matters.
+    """
+    inserted = 0
+    definition = None
+
+    dps_facts = {f.period_end: f for f in _facts_by_period(db, issuer_id, "dividend_per_share")}
+    eps_facts = {f.period_end: f for f in _facts_by_period(db, issuer_id, "eps")}
+    for period_end in sorted(set(dps_facts) & set(eps_facts)):
+        dps, eps = dps_facts[period_end], eps_facts[period_end]
+        if dps.value == 0:
+            continue
+        if definition is None:
+            definition = _get_or_create_ratio_definition(
+                db, "dividend_coverage", "Dividend Coverage", "cash_flow",
+                "eps / dividend_per_share",
+            )
+            definition.unit = "ratio"
+        value = float(eps.value / dps.value)
+        if _store_ratio_value(db, definition, issuer_id, period_end, value, [eps.id, dps.id]):
+            inserted += 1
+
+    # Fallback: aggregate PAT vs total dividends paid (for issuers where only aggregate data exists)
+    total_div = {f.period_end: f for f in _facts_by_period(db, issuer_id, "dividends_paid_total")}
+    pat_facts = {f.period_end: f for f in _facts_by_period(db, issuer_id, "profit_after_tax")}
+    for period_end in sorted(set(total_div) & set(pat_facts)):
+        div, pat = total_div[period_end], pat_facts[period_end]
+        if div.value == 0:
+            continue
+        if definition is None:
+            definition = _get_or_create_ratio_definition(
+                db, "dividend_coverage", "Dividend Coverage", "cash_flow",
+                "eps / dividend_per_share",
+            )
+            definition.unit = "ratio"
+        value = float(pat.value / div.value)
+        if _store_ratio_value(db, definition, issuer_id, period_end, value, [pat.id, div.id]):
+            inserted += 1
+
+    db.commit()
+    return inserted
+
+
 def compute_all_ratios(db: Session, issuer_id: int, live_price: float | None = None) -> dict[str, int]:
     return {
         "growth_ratios_inserted": compute_growth_ratios(db, issuer_id),
@@ -475,6 +627,10 @@ def compute_all_ratios(db: Session, issuer_id: int, live_price: float | None = N
         "cash_flow_ratios_inserted": compute_cash_flow_ratios(db, issuer_id),
         "dividend_payout_ratio_inserted": compute_dividend_payout_ratio(db, issuer_id),
         "per_share_and_valuation_inserted": compute_per_share_and_valuation_ratios(db, issuer_id, live_price),
+        "graham_number_inserted": compute_graham_number(db, issuer_id),
+        "tobin_q_inserted": compute_tobin_q(db, issuer_id, live_price),
+        "sustainable_growth_rate_inserted": compute_sustainable_growth_rate(db, issuer_id),
+        "dividend_coverage_inserted": compute_dividend_coverage(db, issuer_id),
     }
 
 

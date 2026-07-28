@@ -11,21 +11,23 @@ import { fetchCompanies, fetchIndexPrices, fetchLiveQuotes, fetchNewsAnnouncemen
 import {
   announcements as mockAnnouncements,
   pilotCompanies,
-  sectorIndexHistory,
   sectorMarketCapChangePct,
   sectorMarketCapPkrBn,
   sectorRisk as mockSectorRisk,
 } from "@/lib/mock-data";
 import { sentimentLabel } from "@/lib/sentiment";
-import type { AnnouncementRow, CompanySummary } from "@/lib/types";
+import type { AnnouncementRow, CompanySummary, IndexPoint } from "@/lib/types";
+
+const CHART_WINDOW = 250; // ~1 year of trading days
 
 export default async function DashboardPage() {
-  const [live, companyList, riskSnapshot, newsAnnouncements, kse100] = await Promise.all([
+  const [live, companyList, riskSnapshot, newsAnnouncements, kse100, fertix] = await Promise.all([
     fetchLiveQuotes(),
     fetchCompanies(),
     fetchRiskSnapshot(),
     fetchNewsAnnouncements(),
     fetchIndexPrices("KSE100"),
+    fetchIndexPrices("FERTIX"),
   ]);
   const isLive = !!live && live.quotes.length > 0;
   const companyIdBySymbol = Object.fromEntries(
@@ -64,9 +66,6 @@ export default async function DashboardPage() {
       : mockAnnouncements;
   const isAnnouncementsSample = newsAnnouncements.length === 0;
 
-  const latest = sectorIndexHistory[sectorIndexHistory.length - 1];
-  const first = sectorIndexHistory[0];
-  const sectorIndexChangePct = ((latest.sectorIndex - first.sectorIndex) / first.sectorIndex) * 100;
   const topGainer = [...companies].sort((a, b) => b.changePct - a.changePct)[0];
 
   const kseBars = kse100?.bars ?? [];
@@ -74,20 +73,43 @@ export default async function DashboardPage() {
   const kseLatestBar = kseBars[kseBars.length - 1];
   const kseChangePct = isKseLive
     ? ((kseLatestBar.close - kseBars[kseBars.length - 2].close) / kseBars[kseBars.length - 2].close) * 100
-    : ((latest.kse100Index - first.kse100Index) / first.kse100Index) * 100;
-  const kseLevel = isKseLive ? kseLatestBar.close : latest.kse100Index;
+    : 0;
+  const kseLevel = isKseLive ? kseLatestBar.close : null;
 
-  // Chart: pair real recent KSE-100 closes (rebased to 100 at the window start, for a
-  // comparable scale to the still-illustrative Fertilizer Sector Index) with the mock sector
-  // series by position — dates on the x-axis are always the real KSE-100 trading dates.
-  const recentKseBars = kseBars.slice(-sectorIndexHistory.length);
-  const chartData = isKseLive
-    ? recentKseBars.map((bar, i) => ({
-        date: bar.date.slice(5),
-        kse100Index: (bar.close / recentKseBars[0].close) * 100,
-        sectorIndex: (sectorIndexHistory[i] ?? sectorIndexHistory[sectorIndexHistory.length - 1]).sectorIndex,
-      }))
-    : sectorIndexHistory;
+  const fertixBars = fertix?.bars ?? [];
+  const isFertixReal = fertixBars.length >= 2;
+  const fertixLatestBar = isFertixReal ? fertixBars[fertixBars.length - 1] : null;
+  const fertixFirstBar = isFertixReal ? fertixBars[0] : null;
+  const fertixLevel = fertixLatestBar?.close ?? 1000;
+  const sectorIndexChangePct = fertixLatestBar && fertixFirstBar
+    ? ((fertixLatestBar.close - fertixFirstBar.close) / fertixFirstBar.close) * 100
+    : 0;
+
+  // Chart: align FERTIX and KSE-100 bars by date, rebase both to 100 at the chart window start.
+  // Only include dates where both series have a bar (same PSX trading calendar).
+  const recentFertix = fertixBars.slice(-CHART_WINDOW);
+  const kseByDate = new Map(kseBars.map((b) => [b.date, b.close]));
+  const alignedPairs = recentFertix
+    .map((fb) => ({ date: fb.date, fertixClose: fb.close, kseClose: kseByDate.get(fb.date) ?? null }))
+    .filter((p): p is { date: string; fertixClose: number; kseClose: number } => p.kseClose !== null);
+
+  let chartData: IndexPoint[];
+  if (alignedPairs.length >= 2) {
+    const baseF = alignedPairs[0].fertixClose;
+    const baseK = alignedPairs[0].kseClose;
+    chartData = alignedPairs.map((p) => ({
+      date: p.date.slice(5),
+      sectorIndex: (p.fertixClose / baseF) * 100,
+      kse100Index: (p.kseClose / baseK) * 100,
+    }));
+  } else {
+    // No overlap yet — show each series independently rebased to 100
+    chartData = recentFertix.map((fb) => ({
+      date: fb.date.slice(5),
+      sectorIndex: (fb.close / (recentFertix[0]?.close ?? 1000)) * 100,
+      kse100Index: 100,
+    }));
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
@@ -100,11 +122,15 @@ export default async function DashboardPage() {
           <div className="flex min-w-0 flex-1 flex-col gap-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <StatCard
-                label="Fertilizer Sector Index"
-                value={latest.sectorIndex.toFixed(1)}
+                label={`FERTIX${isFertixReal ? " (real)" : " (sample)"}`}
+                value={fertixLevel.toFixed(1)}
                 changePct={sectorIndexChangePct}
               />
-              <StatCard label="KSE-100 Index" value={kseLevel.toLocaleString(undefined, { maximumFractionDigits: 1 })} changePct={kseChangePct} />
+              <StatCard
+                label={`KSE-100 Index${isKseLive ? " (EOD)" : ""}`}
+                value={kseLevel != null ? kseLevel.toLocaleString(undefined, { maximumFractionDigits: 1 }) : "—"}
+                changePct={kseChangePct}
+              />
               <StatCard
                 label={`Top Mover — ${topGainer.symbol}`}
                 value={topGainer.price.toFixed(1)}
@@ -119,7 +145,7 @@ export default async function DashboardPage() {
                   <h3 className="font-semibold">Statistics</h3>
                   <div className="flex items-center gap-4 text-xs text-muted">
                     <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-accent" /> Sector Index (sample)
+                      <span className="h-2 w-2 rounded-full bg-accent" /> FERTIX{isFertixReal ? " (real, rebased to 100)" : " (sample)"}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-accent-pink" /> KSE-100{isKseLive ? " (real, rebased to 100)" : " (sample)"}
@@ -175,11 +201,14 @@ export default async function DashboardPage() {
           {isLive
             ? `Prices are live-ish via ${live!.data_source}.`
             : "Sample company prices shown — not a live PSX feed."}{" "}
+          {isFertixReal
+            ? `FERTIX is a custom equal-weighted price-return index computed from ${fertix!.bars.length} trading days of PriceOHLCV data (no published PSX fertilizer sub-index exists). `
+            : "Fertilizer Sector Index is sample data. "}
           {isKseLive
-            ? "KSE-100 is ingested EOD data via psxdata; market cap and the Fertilizer Sector Index remain sample data (no published PSX fertilizer sub-index exists to source)."
-            : "KSE-100 and market cap figures are still sample data."}{" "}
-          Not investment advice. Public launch and AI signal output remain disabled pending PSX
-          data licensing and SECP compliance review.
+            ? "KSE-100 is ingested EOD data via psxdata. "
+            : "KSE-100 figures are still sample data. "}
+          Market cap figures remain sample data. Not investment advice. Public launch and AI signal
+          output remain disabled pending PSX data licensing and SECP compliance review.
         </footer>
       </div>
     </div>

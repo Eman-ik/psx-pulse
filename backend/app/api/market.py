@@ -8,6 +8,7 @@ from app.api.deps import get_db
 from app.core.config import get_settings
 from app.db.models import CorporateAction, IndexOHLCV, MarketIndex, PriceOHLCV
 from app.etl.price_adjustment import apply_adjustment
+from app.etl.sector_index import compute_fertix
 
 router = APIRouter(prefix="/market", tags=["market"])
 

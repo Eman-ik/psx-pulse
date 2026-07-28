@@ -3,7 +3,7 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import CompanyHeader from "@/components/company/CompanyHeader";
 import CompanyTabs from "@/components/company/CompanyTabs";
-import { fetchComparison, fetchCompanyOverview, fetchPrices, fetchRatioBenchmarks } from "@/lib/api";
+import { fetchComparison, fetchCompanyOverview, fetchPrices, fetchRatioBenchmarks, fetchSignalResearch } from "@/lib/api";
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,12 +13,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const data = await fetchCompanyOverview(issuerId);
   if (!data) notFound();
 
-  const [comparison, benchmarks, priceData] = await Promise.all([
+  const [comparison, benchmarks, priceData, signal] = await Promise.all([
     fetchComparison(),
     fetchRatioBenchmarks(),
     data.security_id != null
       ? fetchPrices(data.security_id)
       : Promise.resolve({ adjusted: false, delayed_data_notice: "", bars: [] }),
+    fetchSignalResearch(issuerId),
   ]);
 
   const oneYearAgo = new Date();
@@ -43,6 +44,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             benchmarks={benchmarks}
             prices={priceData.bars}
             securityId={data.security_id}
+            signal={signal}
           />
         </main>
 

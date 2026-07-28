@@ -55,6 +55,14 @@ export default function SummaryTab({ data, prices }: { data: CompanyOverview; pr
   const dividendYield = data.live_quote?.dividend_yield ?? null;
   const volume = data.live_quote?.volume ?? null;
 
+  const sharesLatest = latest(data.financials["shares_outstanding"]);
+  const freeFloatShares =
+    sharesLatest != null && data.free_float_pct != null
+      ? sharesLatest * (data.free_float_pct / 100)
+      : null;
+  const fmtShares = (n: number | null) =>
+    n == null ? null : n >= 1e9 ? `${(n / 1e9).toFixed(2)} bn` : `${(n / 1e6).toFixed(1)} mn`;
+
   const longTermMetrics: Metric[] = [
     { label: "Market Cap", value: marketCap != null ? `PKR ${(marketCap / 1_000_000).toFixed(1)} bn` : null, caption: "reported" },
     { label: "Trailing P/E", value: pe != null ? `${pe.toFixed(2)}x` : null, caption: "calculated" },
@@ -68,7 +76,9 @@ export default function SummaryTab({ data, prices }: { data: CompanyOverview; pr
     { label: "ROA", value: roa != null ? `${roa.toFixed(1)}%` : null, caption: "calculated" },
     { label: "Debt-to-Equity", value: debtToEquity != null ? `${debtToEquity.toFixed(2)}x` : null, caption: "calculated" },
     { label: "Current Ratio", value: currentRatio != null ? `${currentRatio.toFixed(2)}x` : null, caption: "calculated" },
+    { label: "Shares Outstanding", value: fmtShares(sharesLatest), caption: "PSX snapshot" },
     { label: "Free Float", value: data.free_float_pct != null ? `${data.free_float_pct.toFixed(1)}%` : null, caption: "reported" },
+    { label: "Free Float Shares", value: fmtShares(freeFloatShares), caption: "derived" },
     {
       label: "Beta (vs KSE-100)",
       value: data.beta != null ? data.beta.value.toFixed(2) : null,

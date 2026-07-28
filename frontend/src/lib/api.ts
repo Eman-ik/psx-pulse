@@ -300,3 +300,31 @@ export async function fetchIndexPrices(code: string): Promise<IndexPrices | null
     return null;
   }
 }
+
+export interface SignalResearch {
+  is_research_only: true;
+  composite_signal: string;
+  disclaimer?: string;
+  reason?: string;
+  as_of_date?: string;
+  quality_score: number | null;
+  growth_score: number | null;
+  financial_health_score: number | null;
+  valuation_score: number | null;
+  catalyst_risk_score: number | null;
+  momentum_score: number | null;
+  risk_score: number | null;
+  policy_version?: number;
+  suppressed?: boolean;
+  suppression_reasons?: string[] | null;
+}
+
+export async function fetchSignalResearch(issuerId: number): Promise<SignalResearch | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/signals/research/${issuerId}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as SignalResearch;
+  } catch {
+    return null;
+  }
+}

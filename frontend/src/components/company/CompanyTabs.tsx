@@ -100,7 +100,7 @@ export default function CompanyTabs({
 
       {active === "Competitors" && <CompetitorsTab rows={comparison} issuerId={data.issuer.id} />}
 
-      {active === "AI Signal" && <AISignalTab signal={signal} />}
+      {active === "AI Signal" && <AISignalTab signal={signal} prices={prices} data={data} />}
     </div>
   );
 }

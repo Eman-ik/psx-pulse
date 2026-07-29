@@ -211,7 +211,17 @@ function adx(bars: PriceBar[], period = 14): AdxResult {
     const dSum = pDI + mDI;
     dxArr.push(dSum > 0 ? 100 * Math.abs(pDI - mDI) / dSum : 0);
   }
-  const adxArr = wilder(dxArr);
+  // ADX smoothing: initial value is AVERAGE of first `period` DX values (not sum).
+  // TR/DM can use sum-based wilder because the DI ratio cancels the scale factor;
+  // ADX (smoothed DX) has no such cancellation, so the sum must be divided here.
+  function wilderAvg(arr: number[]): number[] {
+    if (arr.length < period) return [];
+    let val = arr.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    const out = [val];
+    for (let i = period; i < arr.length; i++) { val = (val * (period - 1) + arr[i]) / period; out.push(val); }
+    return out;
+  }
+  const adxArr = wilderAvg(dxArr);
 
   // Date alignment: adxArr[i] → bars[2*period - 1 + i]; pDIArr offset = period-1+i
   const series: AdxResult["series"] = [];

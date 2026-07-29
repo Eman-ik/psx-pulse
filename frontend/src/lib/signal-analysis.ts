@@ -364,9 +364,9 @@ export function detectPatterns(bars: PriceBar[], lookbackBars = 21): DetectedPat
         direction: "BEARISH",
         confidence: 70,
         implications: [
-          "The crossover below zero is the most decisive — still positive histogram here, monitor closely.",
-          "Price below the 20-day SMA alongside this crossover compounds the downside signal.",
-          "Watch for histogram contraction as a first sign of bearish momentum fading.",
+          `MACD histogram is now negative (${macd.histogram.toFixed(2)}) — momentum has shifted bearish; the crossover is confirmed, not pending.`,
+          "Price below the 20-day SMA alongside a bearish MACD crossover compounds the downside signal.",
+          "Watch for histogram contraction (values moving toward zero) as the first sign bearish momentum is fading.",
           "Supports trimming positions or tightening stop-losses on existing longs.",
         ],
       }, 2.0, 1.0);

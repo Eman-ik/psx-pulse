@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ComparisonRow, CompanyOverview, PriceBar, RatioBenchmark, SignalResearch } from "@/lib/api";
+import type { ComparisonRow, CompanyOverview, IndexPrices, PriceBar, RatioBenchmark, SignalResearch } from "@/lib/api";
 import SummaryTab from "./SummaryTab";
 import CompanyProfile from "./CompanyProfile";
 import OwnershipAndGovernance from "./OwnershipAndGovernance";
@@ -37,6 +37,8 @@ export default function CompanyTabs({
   prices,
   securityId,
   signal,
+  kseIndex,
+  fertixIndex,
 }: {
   data: CompanyOverview;
   comparison: ComparisonRow[];
@@ -44,6 +46,8 @@ export default function CompanyTabs({
   prices: PriceBar[];
   securityId: number | null;
   signal: SignalResearch | null;
+  kseIndex: IndexPrices | null;
+  fertixIndex: IndexPrices | null;
 }) {
   const [active, setActive] = useState<Tab>("Summary");
 
@@ -100,7 +104,9 @@ export default function CompanyTabs({
 
       {active === "Competitors" && <CompetitorsTab rows={comparison} issuerId={data.issuer.id} />}
 
-      {active === "AI Signal" && <AISignalTab signal={signal} prices={prices} data={data} />}
+      {active === "AI Signal" && (
+        <AISignalTab signal={signal} prices={prices} data={data} kseIndex={kseIndex} fertixIndex={fertixIndex} />
+      )}
     </div>
   );
 }

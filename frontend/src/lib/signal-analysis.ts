@@ -272,7 +272,10 @@ export interface DetectedPattern {
   implications: string[];
 }
 
-export function detectPatterns(bars: PriceBar[]): DetectedPattern[] {
+// lookbackBars controls how far back MACD crossover & SMA-slope checks scan.
+// Always pass the FULL sorted price history — never a sliced subset — so that
+// RSI and SMA20 values computed here stay consistent with the indicators panel.
+export function detectPatterns(bars: PriceBar[], lookbackBars = 21): DetectedPattern[] {
   const sorted = [...bars].sort((a, b) => a.date.localeCompare(b.date));
   if (sorted.length < 15) return [];
 
@@ -330,9 +333,10 @@ export function detectPatterns(bars: PriceBar[]): DetectedPattern[] {
     }, 1.5, 0.8);
   }
 
-  // 3. MACD Bullish Crossover (within last 3 bars of signal series)
+  // 3. MACD Bullish Crossover (histogram flipped positive within the lookback window)
   if (macd != null && t.macd.series.length >= 4) {
-    const prev = t.macd.series[t.macd.series.length - 4];
+    const lookback = Math.min(lookbackBars, t.macd.series.length - 1);
+    const prev = t.macd.series[t.macd.series.length - 1 - lookback];
     if (prev && prev.histogram < 0 && macd.histogram > 0) {
       add({
         name: "MACD Bullish Crossover",
@@ -351,7 +355,8 @@ export function detectPatterns(bars: PriceBar[]): DetectedPattern[] {
 
   // 4. MACD Bearish Crossover
   if (macd != null && t.macd.series.length >= 4) {
-    const prev = t.macd.series[t.macd.series.length - 4];
+    const lookback = Math.min(lookbackBars, t.macd.series.length - 1);
+    const prev = t.macd.series[t.macd.series.length - 1 - lookback];
     if (prev && prev.histogram > 0 && macd.histogram < 0) {
       add({
         name: "MACD Bearish Crossover",

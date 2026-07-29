@@ -131,50 +131,103 @@ export default function TechnicalsTab({
 
       <div>
         <h4 className="mb-3 text-sm font-semibold">Moving Averages</h4>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <IndicatorCard label="SMA 20" unit="PKR" result={technicals.sma20} />
           <IndicatorCard label="SMA 50" unit="PKR" result={technicals.sma50} />
           <IndicatorCard label="SMA 200" unit="PKR" result={technicals.sma200} />
           <IndicatorCard label="EMA 20" unit="PKR" result={technicals.ema20} />
           <IndicatorCard label="EMA 50" unit="PKR" result={technicals.ema50} />
+          <IndicatorCard label="EMA 200" unit="PKR" result={technicals.ema200} />
         </div>
       </div>
 
       <div>
-        <h4 className="mb-3 text-sm font-semibold">Momentum &amp; Volatility</h4>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <h4 className="mb-3 text-sm font-semibold">Momentum &amp; Oscillators</h4>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <IndicatorCard label="RSI (14)" result={technicals.rsi14} />
           <div className="rounded-2xl border border-border bg-surface p-4">
-            <p className="mb-1 text-xs text-muted">MACD</p>
+            <p className="mb-1 text-xs text-muted">MACD (12/26/9)</p>
             {technicals.macd.available ? (
-              <p className="text-sm font-semibold">
-                {technicals.macd.latest!.macd.toFixed(2)} / sig {technicals.macd.latest!.signal.toFixed(2)}
-              </p>
+              <>
+                <p className="text-sm font-semibold">{technicals.macd.latest!.macd.toFixed(2)}</p>
+                <p className="mt-0.5 text-[10px] text-muted">
+                  Signal {technicals.macd.latest!.signal.toFixed(2)} · Hist {technicals.macd.latest!.histogram.toFixed(2)}
+                </p>
+              </>
             ) : (
-              <p className="text-xs text-muted">
-                Insufficient history ({technicals.macd.availableBars}/{technicals.macd.requiredBars} days)
-              </p>
+              <p className="text-xs text-muted">Needs {technicals.macd.requiredBars} days ({technicals.macd.availableBars} on file)</p>
             )}
           </div>
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <p className="mb-1 text-xs text-muted">Stoch RSI (14/14/3/3)</p>
+            {technicals.stochRsi.available ? (
+              <>
+                <p className="text-sm font-semibold">%K {technicals.stochRsi.latest!.k.toFixed(1)}</p>
+                <p className="mt-0.5 text-[10px] text-muted">%D {technicals.stochRsi.latest!.d.toFixed(1)}</p>
+              </>
+            ) : (
+              <p className="text-xs text-muted">Needs {technicals.stochRsi.requiredBars} days ({technicals.stochRsi.availableBars} on file)</p>
+            )}
+          </div>
+          <IndicatorCard label="MFI (14)" result={technicals.mfi} />
+        </div>
+      </div>
+
+      <div>
+        <h4 className="mb-3 text-sm font-semibold">Volatility &amp; Volume</h4>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <div className="rounded-2xl border border-border bg-surface p-4">
             <p className="mb-1 text-xs text-muted">Bollinger (20, 2σ)</p>
             {technicals.bollinger.available ? (
-              <p className="text-sm font-semibold">
-                {technicals.bollinger.latest!.lower.toFixed(1)} – {technicals.bollinger.latest!.upper.toFixed(1)}
-              </p>
+              <>
+                <p className="text-sm font-semibold">
+                  {technicals.bollinger.latest!.lower.toFixed(1)} – {technicals.bollinger.latest!.upper.toFixed(1)}
+                </p>
+                <p className="mt-0.5 text-[10px] text-muted">Mid {technicals.bollinger.latest!.middle.toFixed(1)}</p>
+              </>
             ) : (
-              <p className="text-xs text-muted">
-                Insufficient history ({technicals.bollinger.availableBars}/{technicals.bollinger.requiredBars} days)
-              </p>
+              <p className="text-xs text-muted">Needs {technicals.bollinger.requiredBars} days ({technicals.bollinger.availableBars} on file)</p>
             )}
           </div>
           <IndicatorCard label="ATR (14)" unit="PKR" result={technicals.atr14} />
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <p className="mb-1 text-xs text-muted">ADX (14)</p>
+            {technicals.adx.available ? (
+              <>
+                <p className="text-sm font-semibold">{technicals.adx.latest!.adx.toFixed(1)}</p>
+                <p className="mt-0.5 text-[10px] text-muted">
+                  +DI {technicals.adx.latest!.plusDI.toFixed(1)} · −DI {technicals.adx.latest!.minusDI.toFixed(1)}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted">Needs {technicals.adx.requiredBars} days ({technicals.adx.availableBars} on file)</p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <p className="mb-1 text-xs text-muted">VWAP (20-day rolling)</p>
+            {technicals.vwap.available ? (
+              <p className="text-sm font-semibold">PKR {technicals.vwap.latest!.toFixed(2)}</p>
+            ) : (
+              <p className="text-xs text-muted">No volume data on file</p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <p className="mb-1 text-xs text-muted">OBV</p>
+            {technicals.obv.available ? (
+              <p className="text-sm font-semibold tabular-nums">
+                {technicals.obv.latest! >= 0 ? "+" : ""}{(technicals.obv.latest! / 1_000_000).toFixed(1)} mn
+              </p>
+            ) : (
+              <p className="text-xs text-muted">No volume data on file</p>
+            )}
+          </div>
         </div>
       </div>
 
       <p className="text-[10px] text-muted">
-        Indicators computed from delayed EOD closes on file for this company. Fewer trading
-        sessions than an indicator&apos;s window means it is marked unavailable rather than
+        All indicators computed from delayed EOD OHLCV data on file. Volume-based indicators
+        (OBV, VWAP, MFI) are marked unavailable when volume data is absent. Fewer trading
+        sessions than an indicator&apos;s window means it is reported unavailable rather than
         computed on a shortened window.
       </p>
     </div>

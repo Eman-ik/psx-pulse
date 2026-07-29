@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CompanyOverview, PriceBar, SignalResearch } from "@/lib/api";
+import type { CompanyOverview, IndexPrices, PriceBar, SignalResearch } from "@/lib/api";
 import { computeTechnicals } from "@/lib/technicals";
 import {
   computeConfidence,
@@ -86,14 +86,27 @@ function DimBar({ label, score, desc }: { label: string; score: number | null; d
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+function indexReturn(index: IndexPrices | null, days: number): number | null {
+  if (!index || index.bars.length < 2) return null;
+  const sorted = [...index.bars].sort((a, b) => a.date.localeCompare(b.date));
+  const latest = sorted[sorted.length - 1];
+  const anchor = sorted[Math.max(0, sorted.length - 1 - days)];
+  if (!latest || !anchor || anchor.close === 0) return null;
+  return ((latest.close - anchor.close) / anchor.close) * 100;
+}
+
 export default function AISignalTab({
   signal,
   prices,
   data,
+  kseIndex,
+  fertixIndex,
 }: {
   signal: SignalResearch | null;
   prices: PriceBar[];
   data: CompanyOverview;
+  kseIndex: IndexPrices | null;
+  fertixIndex: IndexPrices | null;
 }) {
   const [timeframe, setTimeframe] = useState<string>("1M");
   const [watchlisted, setWatchlisted] = useState(false);
@@ -113,14 +126,19 @@ export default function AISignalTab({
   }
 
   const sortedBars = useMemo(() => [...prices].sort((a, b) => a.date.localeCompare(b.date)), [prices]);
-  const patternBars = useMemo(() => sortedBars.slice(-TIMEFRAME_BARS[timeframe]), [sortedBars, timeframe]);
-
+  // Always compute technicals on the full history so indicators panel and
+  // pattern detection use the same RSI/SMA20/MACD values (fixes the inconsistency
+  // where a short timeframe slice produced different indicator readings).
   const tech = useMemo(() => computeTechnicals(sortedBars), [sortedBars]);
   const linReg = useMemo(() => computeLinearRegression(sortedBars), [sortedBars]);
   const logistic = useMemo(() => signal ? computeLogisticModel(signal) : null, [signal]);
   const knn = useMemo(() => computeKnnModel(sortedBars), [sortedBars]);
   const neural = useMemo(() => signal ? computeNeuralModel(signal) : null, [signal]);
-  const patterns = useMemo(() => detectPatterns(patternBars), [patternBars]);
+  // Pass full history; timeframe controls the MACD crossover lookback window
+  const patterns = useMemo(
+    () => detectPatterns(sortedBars, TIMEFRAME_BARS[timeframe]),
+    [sortedBars, timeframe],
+  );
   const tradeSetup = useMemo(() =>
     signal ? computeTradeSetup(sortedBars, signal, signal.composite_signal) : null,
     [sortedBars, signal]);
@@ -445,7 +463,10 @@ export default function AISignalTab({
       {/* ── 8. Technical Indicators ─────────────────────────────────────────── */}
       <div className="rounded-2xl border border-border bg-surface p-5">
         <h4 className="mb-4 text-sm font-semibold">Technical Indicators</h4>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+
+        {/* Momentum row */}
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted/60">Momentum &amp; Oscillators</p>
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {[
             {
               label: "RSI (14)",
@@ -456,28 +477,120 @@ export default function AISignalTab({
             {
               label: "MACD",
               value: macd != null ? macd.macd.toFixed(2) : null,
-              sub: macd == null ? null : `Signal: ${macd.signal.toFixed(2)}`,
+              sub: macd == null ? null : `Hist: ${macd.histogram > 0 ? "+" : ""}${macd.histogram.toFixed(2)}`,
               color: macd == null ? undefined : macd.histogram > 0 ? "#22c55e" : "#ef4444",
             },
             {
-              label: "SMA 20",
-              value: sma20 != null ? `PKR ${sma20.toFixed(2)}` : null,
-              sub: price != null && sma20 != null ? (price > sma20 ? "Price above" : "Price below") : null,
-              color: price != null && sma20 != null ? (price > sma20 ? "#22c55e" : "#ef4444") : undefined,
+              label: "Stoch RSI %K",
+              value: tech.stochRsi.latest != null ? tech.stochRsi.latest.k.toFixed(1) : null,
+              sub: tech.stochRsi.latest == null ? null
+                : tech.stochRsi.latest.k > 80 ? "Overbought"
+                : tech.stochRsi.latest.k < 20 ? "Oversold" : `%D ${tech.stochRsi.latest.d.toFixed(1)}`,
+              color: tech.stochRsi.latest == null ? undefined
+                : tech.stochRsi.latest.k > 80 ? "#ef4444"
+                : tech.stochRsi.latest.k < 20 ? "#22c55e" : "#f59e0b",
             },
             {
-              label: "Volatility (ATR)",
-              value: volPct != null ? `${volPct.toFixed(2)}%` : null,
-              sub: volPct == null ? null : volPct > 3 ? "High" : volPct > 1.5 ? "Moderate" : "Low",
-              color: volPct == null ? undefined : volPct > 3 ? "#ef4444" : volPct > 1.5 ? "#f59e0b" : "#22c55e",
+              label: "MFI (14)",
+              value: tech.mfi.latest != null ? tech.mfi.latest.toFixed(1) : null,
+              sub: tech.mfi.latest == null ? null
+                : tech.mfi.latest > 80 ? "Overbought"
+                : tech.mfi.latest < 20 ? "Oversold" : "Neutral",
+              color: tech.mfi.latest == null ? undefined
+                : tech.mfi.latest > 80 ? "#ef4444"
+                : tech.mfi.latest < 20 ? "#22c55e" : "#f59e0b",
+            },
+            {
+              label: "ADX (14)",
+              value: tech.adx.latest != null ? tech.adx.latest.adx.toFixed(1) : null,
+              sub: tech.adx.latest == null ? null
+                : tech.adx.latest.adx > 25 ? `Trending · +DI ${tech.adx.latest.plusDI.toFixed(0)} −DI ${tech.adx.latest.minusDI.toFixed(0)}`
+                : "Weak trend",
+              color: tech.adx.latest == null ? undefined
+                : tech.adx.latest.adx > 25 ? (tech.adx.latest.plusDI > tech.adx.latest.minusDI ? "#22c55e" : "#ef4444")
+                : "#f59e0b",
             },
           ].map(({ label, value, sub, color }) => (
             <div key={label} className="rounded-xl bg-surface-alt p-4">
               <p className="mb-2 text-xs text-muted">{label}</p>
-              <p className="text-lg font-bold tabular-nums" style={{ color: color ?? "inherit" }}>
-                {value ?? "—"}
-              </p>
-              {sub && <p className="mt-1 text-[10px] font-medium" style={{ color: color ?? "#6b7280" }}>{sub}</p>}
+              <p className="text-lg font-bold tabular-nums" style={{ color: color ?? "inherit" }}>{value ?? "—"}</p>
+              {sub && <p className="mt-1 text-[10px]" style={{ color: color ?? "#6b7280" }}>{sub}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* Moving averages row */}
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted/60">Moving Averages vs Price</p>
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {(["sma20","sma50","sma200","ema20","ema50","ema200"] as const).map((key) => {
+            const result = tech[key];
+            const val = result.latest;
+            const above = price != null && val != null && price > val;
+            const color = val == null ? undefined : above ? "#22c55e" : "#ef4444";
+            return (
+              <div key={key} className="rounded-xl bg-surface-alt p-3">
+                <p className="mb-1 text-[10px] text-muted uppercase">{key.replace("sma","SMA ").replace("ema","EMA ")}</p>
+                <p className="text-sm font-bold tabular-nums" style={{ color }}>
+                  {val != null ? `PKR ${val.toFixed(1)}` : "—"}
+                </p>
+                {val != null && price != null && (
+                  <p className="mt-0.5 text-[10px]" style={{ color }}>{above ? "▲ above" : "▼ below"}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Volume / volatility row */}
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted/60">Volatility &amp; Volume</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            {
+              label: "ATR Volatility",
+              value: volPct != null ? `${volPct.toFixed(2)}%` : null,
+              sub: volPct == null ? null : volPct > 3 ? "High" : volPct > 1.5 ? "Moderate" : "Low",
+              color: volPct == null ? undefined : volPct > 3 ? "#ef4444" : volPct > 1.5 ? "#f59e0b" : "#22c55e",
+            },
+            {
+              label: "Bollinger Band",
+              value: tech.bollinger.latest != null
+                ? `${tech.bollinger.latest.lower.toFixed(1)} – ${tech.bollinger.latest.upper.toFixed(1)}`
+                : null,
+              sub: tech.bollinger.latest != null && price != null
+                ? price > tech.bollinger.latest.upper ? "Above upper band"
+                  : price < tech.bollinger.latest.lower ? "Below lower band"
+                  : `Mid ${tech.bollinger.latest.middle.toFixed(1)}`
+                : null,
+              color: tech.bollinger.latest != null && price != null
+                ? price > tech.bollinger.latest.upper ? "#ef4444"
+                  : price < tech.bollinger.latest.lower ? "#22c55e"
+                  : "#f59e0b"
+                : undefined,
+            },
+            {
+              label: "VWAP (20-day)",
+              value: tech.vwap.latest != null ? `PKR ${tech.vwap.latest.toFixed(2)}` : null,
+              sub: tech.vwap.latest != null && price != null
+                ? price > tech.vwap.latest ? "Price above VWAP" : "Price below VWAP"
+                : null,
+              color: tech.vwap.latest != null && price != null
+                ? price > tech.vwap.latest ? "#22c55e" : "#ef4444"
+                : undefined,
+            },
+            {
+              label: "OBV",
+              value: tech.obv.latest != null
+                ? `${tech.obv.latest >= 0 ? "+" : ""}${(tech.obv.latest / 1_000_000).toFixed(1)} mn`
+                : null,
+              sub: tech.obv.latest == null ? null
+                : tech.obv.latest > 0 ? "Buying pressure" : "Selling pressure",
+              color: tech.obv.latest == null ? undefined : tech.obv.latest > 0 ? "#22c55e" : "#ef4444",
+            },
+          ].map(({ label, value, sub, color }) => (
+            <div key={label} className="rounded-xl bg-surface-alt p-4">
+              <p className="mb-2 text-xs text-muted">{label}</p>
+              <p className="text-sm font-bold tabular-nums" style={{ color: color ?? "inherit" }}>{value ?? "—"}</p>
+              {sub && <p className="mt-1 text-[10px]" style={{ color: color ?? "#6b7280" }}>{sub}</p>}
             </div>
           ))}
         </div>
@@ -556,6 +669,62 @@ export default function AISignalTab({
           </div>
         )}
       </div>
+
+      {/* ── Market Context ───────────────────────────────────────────────────── */}
+      {(kseIndex || fertixIndex) && (() => {
+        const kse20d  = indexReturn(kseIndex,    20);
+        const kse90d  = indexReturn(kseIndex,    90);
+        const kse180d = indexReturn(kseIndex,   180);
+        const fx20d   = indexReturn(fertixIndex,  20);
+        const fx90d   = indexReturn(fertixIndex,  90);
+        const fx180d  = indexReturn(fertixIndex, 180);
+        const fmtPct = (v: number | null) =>
+          v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+        const retColor = (v: number | null) =>
+          v == null ? undefined : v > 0 ? "#22c55e" : "#ef4444";
+        return (
+          <div className="rounded-2xl border border-border bg-surface p-5">
+            <h4 className="mb-1 text-sm font-semibold">Market Context</h4>
+            <p className="mb-4 text-xs text-muted">Index returns over rolling windows — shows the macro tailwind or headwind for this sector.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left">
+                    <th className="pb-2 pr-6 text-xs font-normal text-muted">Index</th>
+                    <th className="pb-2 px-4 text-xs font-normal text-muted text-right">20-day</th>
+                    <th className="pb-2 px-4 text-xs font-normal text-muted text-right">90-day</th>
+                    <th className="pb-2 px-4 text-xs font-normal text-muted text-right">180-day</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kseIndex && (
+                    <tr className="border-b border-border/40">
+                      <td className="py-2.5 pr-6 font-medium">KSE-100 (EOD)</td>
+                      {[kse20d, kse90d, kse180d].map((v, i) => (
+                        <td key={i} className="py-2.5 px-4 text-right tabular-nums font-semibold" style={{ color: retColor(v) }}>{fmtPct(v)}</td>
+                      ))}
+                    </tr>
+                  )}
+                  {fertixIndex && (
+                    <tr>
+                      <td className="py-2.5 pr-6 font-medium">FERTIX (custom)</td>
+                      {[fx20d, fx90d, fx180d].map((v, i) => (
+                        <td key={i} className="py-2.5 px-4 text-right tabular-nums font-semibold" style={{ color: retColor(v) }}>{fmtPct(v)}</td>
+                      ))}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-[10px] text-muted">
+              KSE-100 and FERTIX returns help contextualise company-specific signals. A stock declining
+              alongside the index requires less concern than one underperforming a rising index.
+              Data for USD/PKR, policy rate, and gas/urea prices is not yet wired — these will be
+              added when macroeconomic data feeds are integrated.
+            </p>
+          </div>
+        );
+      })()}
 
       {/* ── Footer note ─────────────────────────────────────────────────────── */}
       <p className="text-[11px] text-muted leading-relaxed">

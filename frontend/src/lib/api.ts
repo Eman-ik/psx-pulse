@@ -161,6 +161,18 @@ export interface FertilizerSector {
   not_available: string[];
 }
 
+export interface CementSector {
+  sector_name: string;
+  psx_sector_code: string | null;
+  company_count: number;
+  companies: string[];
+  aggregate_market_cap_pkr: number | null;
+  companies_with_market_cap: number;
+  avg_capacity_utilization_pct: number | null;
+  companies_with_utilization_data: number;
+  not_available: string[];
+}
+
 export interface PriceBar {
   date: string;
   open: number;
@@ -258,6 +270,26 @@ export async function fetchFertilizerSector(): Promise<FertilizerSector | null> 
     const res = await fetch(`${API_BASE_URL}/sectors/fertilizer`, { cache: "no-store" });
     if (!res.ok) return null;
     return (await res.json()) as FertilizerSector;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCementSector(): Promise<CementSector | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/sectors/cement`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as CementSector;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCementLiveQuotes(): Promise<LiveQuotesResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/market/live/cement`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as LiveQuotesResponse;
   } catch {
     return null;
   }

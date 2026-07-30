@@ -92,16 +92,24 @@ if __name__ == "__main__":
     from datetime import timedelta
 
     from app.db.session import SessionLocal
-    from app.ingestion.seed_identity import seed_fertilizer_sector
+    from app.ingestion.seed_identity import seed_cement_sector, seed_fertilizer_sector
 
     logging.basicConfig(level=logging.INFO)
 
+    # Usage: python -m app.ingestion.psx_prices [years] [sector]
+    # sector: "fertilizer" (default), "cement", or "all"
     years = int(sys.argv[1]) if len(sys.argv) > 1 else 2
+    sector_arg = sys.argv[2] if len(sys.argv) > 2 else "fertilizer"
     end_date = date.today()
     start_date = end_date - timedelta(days=365 * years)
 
     with SessionLocal() as session:
-        securities = seed_fertilizer_sector(session)
+        securities: list[Security] = []
+        if sector_arg in ("fertilizer", "all"):
+            securities += seed_fertilizer_sector(session)
+        if sector_arg in ("cement", "all"):
+            securities += seed_cement_sector(session)
+
         summary = backfill_all(session, securities, start_date, end_date)
         for symbol, stats in summary.items():
             print(f"{symbol}: {stats}")

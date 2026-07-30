@@ -113,14 +113,24 @@ def peer_relative_score(value: float, peer_mean: float, higher_is_better: bool) 
     return 50.0 + deviation * 50.0
 
 
-def _latest_ratio_values(db: Session, ratio_key: str) -> dict[int, float]:
-    """issuer_id -> latest value on file for this ratio key, across ALL issuers (used both to
-    get one company's value and to compute the peer mean from the same query).
+def _latest_ratio_values(db: Session, ratio_key: str, sector_id: int | None = None) -> dict[int, float]:
+    """issuer_id -> latest value on file for this ratio key.
+
+    When sector_id is supplied, only issuers in that sector are included so peer-relative
+    scores compare within-sector (cement vs cement, fertilizer vs fertilizer). Without a
+    sector_id, all issuers are included — useful for cross-sector benchmarks.
     """
-    rows = db.execute(
-        select(RatioValue, RatioDefinition).join(RatioDefinition, RatioDefinition.id == RatioValue.ratio_definition_id).where(
-            RatioDefinition.key == ratio_key
+    conditions = [RatioDefinition.key == ratio_key]
+    if sector_id is not None:
+        conditions.append(
+            RatioValue.issuer_id.in_(
+                select(Issuer.id).where(Issuer.sector_id == sector_id)
+            )
         )
+    rows = db.execute(
+        select(RatioValue, RatioDefinition)
+        .join(RatioDefinition, RatioDefinition.id == RatioValue.ratio_definition_id)
+        .where(*conditions)
     ).all()
     latest: dict[int, tuple] = {}
     for ratio_value, _definition in rows:
@@ -130,10 +140,12 @@ def _latest_ratio_values(db: Session, ratio_key: str) -> dict[int, float]:
     return {issuer_id: v for issuer_id, (_, v) in latest.items()}
 
 
-def compute_dimension_score(db: Session, issuer_id: int, metrics: list[tuple[str, bool]]) -> float | None:
+def compute_dimension_score(
+    db: Session, issuer_id: int, metrics: list[tuple[str, bool]], sector_id: int | None = None
+) -> float | None:
     sub_scores = []
     for ratio_key, higher_is_better in metrics:
-        by_issuer = _latest_ratio_values(db, ratio_key)
+        by_issuer = _latest_ratio_values(db, ratio_key, sector_id=sector_id)
         value = by_issuer.get(issuer_id)
         if value is None or len(by_issuer) < 2:  # need at least one peer to compare against
             continue
@@ -189,12 +201,14 @@ def compute_momentum_pct(bars: Sequence[tuple[date, float]], as_of: date) -> flo
     return (latest_close - anchor_close) / anchor_close
 
 
-def _latest_momentum_values(db: Session, as_of: date) -> dict[int, float]:
-    """issuer_id -> trailing momentum, across all issuers with a security and enough price
-    history -- same shape/purpose as _latest_ratio_values (one company's value plus the peer mean
-    come from this same dict).
+def _latest_momentum_values(db: Session, as_of: date, sector_id: int | None = None) -> dict[int, float]:
+    """issuer_id -> trailing momentum for issuers within the given sector (or all issuers if
+    sector_id is None). Same shape as _latest_ratio_values.
     """
-    issuers: Sequence[Issuer] = db.execute(select(Issuer).where(Issuer.securities.any())).scalars().all()
+    conditions = [Issuer.securities.any()]
+    if sector_id is not None:
+        conditions.append(Issuer.sector_id == sector_id)
+    issuers: Sequence[Issuer] = db.execute(select(Issuer).where(*conditions)).scalars().all()
     momentum_by_issuer: dict[int, float] = {}
     for issuer in issuers:
         security = issuer.securities[0] if issuer.securities else None
@@ -210,8 +224,8 @@ def _latest_momentum_values(db: Session, as_of: date) -> dict[int, float]:
     return momentum_by_issuer
 
 
-def compute_momentum_score(db: Session, issuer_id: int, as_of: date) -> float | None:
-    by_issuer = _latest_momentum_values(db, as_of)
+def compute_momentum_score(db: Session, issuer_id: int, as_of: date, sector_id: int | None = None) -> float | None:
+    by_issuer = _latest_momentum_values(db, as_of, sector_id=sector_id)
     value = by_issuer.get(issuer_id)
     if value is None or len(by_issuer) < 2:  # need at least one peer to compare against
         return None
@@ -219,13 +233,18 @@ def compute_momentum_score(db: Session, issuer_id: int, as_of: date) -> float | 
     return peer_relative_score(value, peer_mean, higher_is_better=True)
 
 
-def _latest_beta_values(db: Session) -> dict[int, float]:
-    """issuer_id -> latest beta on file (from app/etl/beta.py's CapmAssumption rows), excluding
-    the market-wide issuer_id-is-null default row.
+def _latest_beta_values(db: Session, sector_id: int | None = None) -> dict[int, float]:
+    """issuer_id -> latest beta on file (CapmAssumption rows), within sector when sector_id
+    is provided, excluding the market-wide issuer_id-is-null default row.
     """
-    rows = db.execute(
-        select(CapmAssumption).where(CapmAssumption.issuer_id.is_not(None), CapmAssumption.beta.is_not(None))
-    ).scalars().all()
+    conditions = [CapmAssumption.issuer_id.is_not(None), CapmAssumption.beta.is_not(None)]
+    if sector_id is not None:
+        conditions.append(
+            CapmAssumption.issuer_id.in_(
+                select(Issuer.id).where(Issuer.sector_id == sector_id)
+            )
+        )
+    rows = db.execute(select(CapmAssumption).where(*conditions)).scalars().all()
     latest: dict[int, tuple[date, float]] = {}
     for row in rows:
         if row.issuer_id not in latest or row.as_of_date > latest[row.issuer_id][0]:
@@ -233,11 +252,11 @@ def _latest_beta_values(db: Session) -> dict[int, float]:
     return {issuer_id: v for issuer_id, (_, v) in latest.items()}
 
 
-def compute_risk_score(db: Session, issuer_id: int) -> float | None:
+def compute_risk_score(db: Session, issuer_id: int, sector_id: int | None = None) -> float | None:
     """Peer-relative score on beta -- lower beta than peers scores higher here, i.e. "lower
     measured systematic risk", not a general quality judgment (see module docstring).
     """
-    by_issuer = _latest_beta_values(db)
+    by_issuer = _latest_beta_values(db, sector_id=sector_id)
     value = by_issuer.get(issuer_id)
     if value is None or len(by_issuer) < 2:  # need at least one peer to compare against
         return None
@@ -283,13 +302,18 @@ def compose_signal(dimension_scores: dict[str, float | None], is_delisted: bool)
 
 def compute_signal(db: Session, issuer: Issuer, security: Security | None, as_of: date) -> SignalScore:
     settings = get_settings()
+    # Peer comparison is always within-sector so that cement companies are scored against
+    # other cement companies and fertilizer against fertilizer — cross-sector peer means
+    # are meaningless given the different business models and capital structures.
+    sector_id: int | None = issuer.sector_id
 
     dimension_scores: dict[str, float | None] = {
-        dim: compute_dimension_score(db, issuer.id, metrics) for dim, metrics in DIMENSION_METRICS.items()
+        dim: compute_dimension_score(db, issuer.id, metrics, sector_id=sector_id)
+        for dim, metrics in DIMENSION_METRICS.items()
     }
     dimension_scores["catalyst_risk"] = compute_catalyst_risk_score(db, issuer.id, as_of)
-    dimension_scores["momentum"] = compute_momentum_score(db, issuer.id, as_of)
-    dimension_scores["risk"] = compute_risk_score(db, issuer.id)
+    dimension_scores["momentum"] = compute_momentum_score(db, issuer.id, as_of, sector_id=sector_id)
+    dimension_scores["risk"] = compute_risk_score(db, issuer.id, sector_id=sector_id)
 
     policy = compose_signal(dimension_scores, is_delisted=security is None or not security.is_active)
 

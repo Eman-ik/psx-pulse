@@ -49,6 +49,24 @@ FERTILIZER_SECTOR_COMPANIES: list[dict[str, str]] = [
     {"symbol": "AHCL", "name": "Arif Habib Corporation Limited"},
 ]
 
+# PSX Cement sector pilot universe, confirmed via psxdata.symbols() on 2026-07-30.
+# JVDCPS is Javedan Corporation Limited – Preference Shares (separate PSX listing from JVDC
+# ordinary shares). All symbols verified against PSX's public sector classification.
+# Reconcile periodically against psxdata.symbols() — PSX sector membership does change.
+CEMENT_SECTOR_COMPANIES: list[dict[str, str]] = [
+    {"symbol": "LUCK",   "name": "Lucky Cement Limited"},
+    {"symbol": "MLCF",   "name": "Maple Leaf Cement Factory Limited"},
+    {"symbol": "CHCC",   "name": "Cherat Cement Company Limited"},
+    {"symbol": "DGKC",   "name": "D.G. Khan Cement Company Limited"},
+    {"symbol": "BWCL",   "name": "Bestway Cement Limited"},
+    {"symbol": "DCL",    "name": "Dewan Cement Limited"},
+    {"symbol": "ACPL",   "name": "Attock Cement Pakistan Limited"},
+    {"symbol": "FCCL",   "name": "Fauji Cement Company Limited"},
+    {"symbol": "JVDCPS", "name": "Javedan Corporation Limited"},
+    {"symbol": "GWLC",   "name": "Gharibwal Cement Limited"},
+    {"symbol": "KOHC",   "name": "Kohat Cement Company Limited"},
+]
+
 
 def _clean(value: object) -> object:
     """Convert pandas/numpy NaN to None so the response is valid, serializable JSON."""

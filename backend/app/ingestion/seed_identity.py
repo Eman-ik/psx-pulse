@@ -1,4 +1,4 @@
-"""Identity-master seed for the Fertilizer sector pilot.
+"""Identity-master seed for sector pilots (Fertilizer + Cement).
 
 Idempotent: safe to re-run. Uses get-or-create on Sector.name / Issuer.name / Security.symbol,
 all of which are unique columns, so repeated runs never duplicate rows.
@@ -9,7 +9,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.db.models import Issuer, Sector, Security
-from app.ingestion.psx_live import FERTILIZER_SECTOR_COMPANIES
+from app.ingestion.psx_live import CEMENT_SECTOR_COMPANIES, FERTILIZER_SECTOR_COMPANIES
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +60,26 @@ def seed_fertilizer_sector(db: Session) -> list[Security]:
     return securities
 
 
+def seed_cement_sector(db: Session) -> list[Security]:
+    """Ensures the Cement sector and its pilot issuers/securities exist. Returns the securities."""
+    sector = _get_or_create_sector(db, "Cement")
+    securities = []
+    for company in CEMENT_SECTOR_COMPANIES:
+        issuer = _get_or_create_issuer(db, company["name"], sector)
+        security = _get_or_create_security(db, company["symbol"], issuer)
+        securities.append(security)
+    db.commit()
+    return securities
+
+
 if __name__ == "__main__":
+    import sys
     from app.db.session import SessionLocal
 
+    sector_arg = sys.argv[1] if len(sys.argv) > 1 else "fertilizer"
     with SessionLocal() as session:
-        result = seed_fertilizer_sector(session)
+        if sector_arg == "cement":
+            result = seed_cement_sector(session)
+        else:
+            result = seed_fertilizer_sector(session)
         print(f"Seeded {len(result)} securities: {[s.symbol for s in result]}")

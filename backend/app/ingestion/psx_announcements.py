@@ -137,17 +137,33 @@ def ingest_company_announcements(db: Session, issuer: Issuer, symbol: str) -> di
 
 
 if __name__ == "__main__":
+    import sys
+
     from app.db.session import SessionLocal
-    from app.ingestion.psx_live import FERTILIZER_SECTOR_COMPANIES
-    from app.ingestion.seed_identity import seed_fertilizer_sector
+    from app.ingestion.psx_live import CEMENT_SECTOR_COMPANIES, FERTILIZER_SECTOR_COMPANIES
+    from app.ingestion.seed_identity import seed_cement_sector, seed_fertilizer_sector
 
     logging.basicConfig(level=logging.INFO)
 
+    # Usage: python -m app.ingestion.psx_announcements [sector]
+    # sector: "fertilizer" (default), "cement", or "all"
+    sector_arg = sys.argv[1] if len(sys.argv) > 1 else "fertilizer"
+
     with SessionLocal() as session:
-        securities = seed_fertilizer_sector(session)
-        by_symbol = {s.symbol: s for s in securities}
-        for company in FERTILIZER_SECTOR_COMPANIES:
-            security = by_symbol[company["symbol"]]
-            issuer = security.issuer
-            stats = ingest_company_announcements(session, issuer, company["symbol"])
-            print(f"{company['symbol']}: {stats}")
+        companies: list[dict[str, str]] = []
+        if sector_arg in ("fertilizer", "all"):
+            fertilizer_securities = seed_fertilizer_sector(session)
+            by_symbol = {s.symbol: s for s in fertilizer_securities}
+            for company in FERTILIZER_SECTOR_COMPANIES:
+                security = by_symbol.get(company["symbol"])
+                if security:
+                    stats = ingest_company_announcements(session, security.issuer, company["symbol"])
+                    print(f"{company['symbol']}: {stats}")
+        if sector_arg in ("cement", "all"):
+            cement_securities = seed_cement_sector(session)
+            by_symbol = {s.symbol: s for s in cement_securities}
+            for company in CEMENT_SECTOR_COMPANIES:
+                security = by_symbol.get(company["symbol"])
+                if security:
+                    stats = ingest_company_announcements(session, security.issuer, company["symbol"])
+                    print(f"{company['symbol']}: {stats}")

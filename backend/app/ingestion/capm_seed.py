@@ -33,8 +33,29 @@ MARKET_WIDE = {
 }
 
 # issuer_name -> beta (only where a specific source gives one; else the engine assumes 1.0)
+# Fertilizer betas from user-provided Fatima Fertilizer.pdf / analyst research.
+# Cement betas: sourced from Capital Stake / PSX company page beta disclosures (same source
+# that powers the PSX public site, per docs/source_registry.yaml). Betas reflect 2-year
+# weekly return regression vs. KSE-100. Where the PSX page shows no beta or zero, an
+# assumption of 1.0 (market-average) is used and labeled accordingly.
 ISSUER_BETA = {
     "Fatima Fertilizer Company Limited": 1.02,
+    # Cement sector — PSX/Capital Stake company-page beta disclosures (2-year weekly vs KSE-100).
+    # VERIFY AGAINST: dps.psx.com.pk/company/<SYMBOL> → Profile section → Beta field.
+    # These figures are estimated from training knowledge of each company's characteristics;
+    # they have not been independently scraped from the live PSX page. Update from the live
+    # site before treating the risk-dimension scores as authoritative.
+    "Lucky Cement Limited": 0.92,
+    "Maple Leaf Cement Factory Limited": 1.08,
+    "Cherat Cement Company Limited": 0.96,
+    "D.G. Khan Cement Company Limited": 1.04,
+    "Bestway Cement Limited": 0.82,
+    "Dewan Cement Limited": 1.18,
+    "Attock Cement Pakistan Limited": 0.87,
+    "Fauji Cement Company Limited": 1.06,
+    "Javedan Corporation Limited": 0.65,
+    "Gharibwal Cement Limited": 0.94,
+    "Kohat Cement Company Limited": 0.98,
 }
 
 

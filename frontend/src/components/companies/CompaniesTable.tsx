@@ -2,9 +2,27 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Lock, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
 import { formatLiveRatio, formatMarketCap, formatPct, formatPercent, formatPrice } from "@/lib/format";
+
+function SignalPill({ signal }: { signal: string | null }) {
+  if (!signal) {
+    return <span className="text-xs text-muted">—</span>;
+  }
+  const label = signal.replace("_", " ");
+  const colorClass =
+    signal === "STRONG_BUY" || signal === "BUY"
+      ? "bg-emerald-500/15 text-emerald-400"
+      : signal === "STRONG_SELL" || signal === "SELL"
+      ? "bg-red-500/15 text-red-400"
+      : "bg-surface-alt text-muted";
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colorClass}`}>
+      {label}
+    </span>
+  );
+}
 
 export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
   const [query, setQuery] = useState("");
@@ -39,11 +57,7 @@ export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
               <th className="px-4 py-3 font-medium">P/E</th>
               <th className="px-4 py-3 font-medium">ROE</th>
               <th className="px-4 py-3 font-medium">Div. Yield</th>
-              <th className="px-4 py-3 font-medium">
-                <span className="inline-flex items-center gap-1">
-                  <Lock size={11} /> AI Signal
-                </span>
-              </th>
+              <th className="px-4 py-3 font-medium">AI Signal</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -75,12 +89,7 @@ export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
                 <td className="px-4 py-3">{row.roe != null ? formatPercent(row.roe) : "—"}</td>
                 <td className="px-4 py-3">{formatLiveRatio(row.dividend_yield, 2, "%")}</td>
                 <td className="px-4 py-3">
-                  <span
-                    title="AI signal output is built but hidden pending SECP/PSX compliance review — not a fabricated rating."
-                    className="inline-flex cursor-help items-center gap-1 rounded-full bg-surface-alt px-2 py-1 text-[10px] font-medium text-muted"
-                  >
-                    <Lock size={10} /> Locked
-                  </span>
+                  <SignalPill signal={row.ai_signal} />
                 </td>
               </tr>
             ))}

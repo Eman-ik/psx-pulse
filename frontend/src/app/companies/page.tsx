@@ -13,10 +13,10 @@ export default async function CompaniesPage() {
         <Topbar isLive={!!live} />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
-          <h1 className="mb-1 text-xl font-semibold">Fertilizer Sector Companies</h1>
+          <h1 className="mb-1 text-xl font-semibold">PSX Pilot Companies</h1>
           <p className="mb-6 text-sm text-muted">
-            {rows.length} companies covered — search, compare, and click through for full
-            research pages. AI Signal is locked pending compliance review, not a fabricated rating.
+            {rows.length} companies covered (fertilizer + cement) — search, compare, and click
+            through for full research pages.
           </p>
 
           {rows.length === 0 ? (

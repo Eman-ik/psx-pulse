@@ -123,6 +123,7 @@ export interface ComparisonRow {
   dividend_yield: number | null;
   roe: number | null;
   debt_to_equity: number | null;
+  ai_signal: string | null;
 }
 
 export interface RiskSnapshot {

@@ -322,13 +322,24 @@ def _get_or_create_third_party_ratio_definition(db: Session, key: str, label: st
 
 
 if __name__ == "__main__":
+    import sys
+
     from app.db.session import SessionLocal
-    from app.ingestion.seed_identity import seed_fertilizer_sector
+    from app.ingestion.seed_identity import seed_cement_sector, seed_fertilizer_sector
 
     logging.basicConfig(level=logging.INFO)
 
+    # Usage: python -m app.ingestion.psx_financials [sector]
+    # sector: "fertilizer" (default), "cement", or "all"
+    sector_arg = sys.argv[1] if len(sys.argv) > 1 else "fertilizer"
+
     with SessionLocal() as session:
-        securities = seed_fertilizer_sector(session)
+        securities = []
+        if sector_arg in ("fertilizer", "all"):
+            securities += seed_fertilizer_sector(session)
+        if sector_arg in ("cement", "all"):
+            securities += seed_cement_sector(session)
+
         for security in securities:
             stats = ingest_company_financials(session, security, security.symbol)
             print(f"{security.symbol}: {stats}")

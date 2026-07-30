@@ -1,4 +1,5 @@
-import { AlertTriangle, Building2, Factory, Gauge } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Building2, ChevronRight, Factory, Gauge } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import { fetchFertilizerSector, fetchLiveQuotes } from "@/lib/api";
@@ -73,9 +74,20 @@ export default async function FertilizerSectorPage() {
               <div className="rounded-2xl border border-border bg-surface p-5">
                 <h3 className="mb-3 font-semibold">Companies in Coverage</h3>
                 <ul className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                  {sector.companies.map((name) => (
-                    <li key={name} className="rounded-lg bg-surface-alt px-3 py-2 text-muted">
-                      {name}
+                  {sector.companies.map((company) => (
+                    <li key={company.id}>
+                      <Link
+                        href={`/companies/${company.id}`}
+                        className="group flex items-center justify-between rounded-lg bg-surface-alt px-3 py-2 text-muted hover:bg-surface hover:text-foreground transition-colors"
+                      >
+                        <span>
+                          {company.symbol && (
+                            <span className="mr-2 font-medium text-foreground">{company.symbol}</span>
+                          )}
+                          {company.name}
+                        </span>
+                        <ChevronRight size={13} className="shrink-0 text-muted/40 group-hover:text-accent transition-colors" />
+                      </Link>
                     </li>
                   ))}
                 </ul>

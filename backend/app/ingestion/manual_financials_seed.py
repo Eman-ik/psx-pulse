@@ -23,7 +23,7 @@ this kind of thing rather than silently picking one number.
 
 import hashlib
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -117,6 +117,20 @@ def _get_or_create_source_document(db: Session, issuer: Issuer, label: str) -> S
     return document
 
 
+def _fiscal_period(year: int, fiscal_month: int) -> tuple[date, date]:
+    """Return (period_start, period_end) for a fiscal year that ends in fiscal_month of `year`.
+
+    December FYE: Jan 1 – Dec 31 (calendar year == fiscal year label).
+    Non-December: period ends on the last day of fiscal_month in `year`, starts the
+    following month one year prior (e.g. June 30 FYE → Jul 1 prior year – Jun 30 this year).
+    """
+    if fiscal_month == 12:
+        return date(year, 1, 1), date(year, 12, 31)
+    period_end = (date(year, fiscal_month, 28) + timedelta(days=10)).replace(day=1) - timedelta(days=1)
+    period_start = date(year - 1, fiscal_month + 1, 1)
+    return period_start, period_end
+
+
 def seed_issuer_financials(db: Session, issuer_name: str, data: dict) -> dict[str, int]:
     issuer = db.execute(select(Issuer).where(Issuer.name == issuer_name)).scalar_one_or_none()
     if issuer is None:
@@ -129,9 +143,7 @@ def seed_issuer_financials(db: Session, issuer_name: str, data: dict) -> dict[st
     inserted = skipped = superseded = 0
     for line_item, values_by_year in data["facts"].items():
         for year, value in values_by_year.items():
-            if fiscal_month != 12:
-                raise NotImplementedError("Only December fiscal year ends are handled here — all current data is Dec-FYE")
-            period_start, period_end = date(year, 1, 1), date(year, 12, 31)
+            period_start, period_end = _fiscal_period(year, fiscal_month)
             existing = db.execute(
                 select(FinancialFact).where(
                     FinancialFact.issuer_id == issuer.id,

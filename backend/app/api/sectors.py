@@ -31,6 +31,11 @@ def _latest_metric_by_issuer(db: Session, metric_key: str, product: str | None) 
     return {issuer_id: value for issuer_id, (_, value) in latest.items()}
 
 
+def _company_entry(issuer: Issuer) -> dict:
+    symbol = next((s.symbol for s in issuer.securities if s.is_active), None)
+    return {"id": issuer.id, "name": issuer.name, "symbol": symbol}
+
+
 def _sector_overview(db: Session, sector_name: str) -> dict:
     """Generic sector overview — filters strictly by sector name so multi-sector DB is correct."""
     from app.api.comparison import _latest_by_issuer
@@ -63,7 +68,7 @@ def _sector_overview(db: Session, sector_name: str) -> dict:
         "sector_name": sector_name,
         "psx_sector_code": sector.psx_sector_code,
         "company_count": len(issuers),
-        "companies": [i.name for i in issuers],
+        "companies": [_company_entry(i) for i in issuers],
         "aggregate_market_cap_pkr": aggregate_market_cap_pkr,
         "companies_with_market_cap": len(market_cap_by_issuer),
         "not_available": _NOT_AVAILABLE,
@@ -108,7 +113,7 @@ def fertilizer_sector(db: Session = Depends(get_db)) -> dict:
         "sector_name": "Fertilizer",
         "psx_sector_code": sector.psx_sector_code,
         "company_count": len(issuers),
-        "companies": [i.name for i in issuers],
+        "companies": [_company_entry(i) for i in issuers],
         "aggregate_market_cap_pkr": aggregate_market_cap_pkr,
         "companies_with_market_cap": len(market_cap_by_issuer),
         "avg_capacity_utilization_pct": (
@@ -163,7 +168,7 @@ def cement_sector(db: Session = Depends(get_db)) -> dict:
         "sector_name": "Cement",
         "psx_sector_code": sector.psx_sector_code,
         "company_count": len(issuers),
-        "companies": [i.name for i in issuers],
+        "companies": [_company_entry(i) for i in issuers],
         "aggregate_market_cap_pkr": aggregate_market_cap_pkr,
         "companies_with_market_cap": len(market_cap_by_issuer),
         "avg_capacity_utilization_pct": (

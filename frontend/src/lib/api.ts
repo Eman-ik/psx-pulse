@@ -147,11 +147,17 @@ export interface NewsAnnouncement {
   source_url: string | null;
 }
 
+export interface SectorCompany {
+  id: number;
+  name: string;
+  symbol: string | null;
+}
+
 export interface FertilizerSector {
   sector_name: string;
   psx_sector_code: string | null;
   company_count: number;
-  companies: string[];
+  companies: SectorCompany[];
   aggregate_market_cap_pkr: number | null;
   companies_with_market_cap: number;
   avg_capacity_utilization_pct: number | null;
@@ -165,7 +171,7 @@ export interface CementSector {
   sector_name: string;
   psx_sector_code: string | null;
   company_count: number;
-  companies: string[];
+  companies: SectorCompany[];
   aggregate_market_cap_pkr: number | null;
   companies_with_market_cap: number;
   avg_capacity_utilization_pct: number | null;

@@ -1,6 +1,7 @@
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import NewsFeed from "@/components/news/NewsFeed";
+import WorldMonitorTerminal from "@/components/worldmonitor/WorldMonitorTerminal";
 import { fetchCompanies, fetchNewsAnnouncements } from "@/lib/api";
 
 export default async function NewsPage() {
@@ -31,6 +32,11 @@ export default async function NewsPage() {
             <NewsFeed rows={rows} companyById={companyById} />
           )}
         </main>
+
+        {/* PSX WorldMonitor AI Agent — macro, geopolitical & market intelligence terminal */}
+        <div className="border-t border-border">
+          <WorldMonitorTerminal />
+        </div>
       </div>
     </div>
   );

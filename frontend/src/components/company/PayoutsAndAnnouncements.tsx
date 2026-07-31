@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import type { CompanyOverview } from "@/lib/api";
 import { SENTIMENT_TONE, sentimentLabel } from "@/lib/sentiment";
+import NewsIntelligenceTerminal from "./NewsIntelligenceTerminal";
 
 const ACTION_LABELS: Record<string, string> = {
   dividend: "Dividend",
@@ -21,6 +22,7 @@ const CATEGORY_TONE: Record<string, string> = {
 
 export default function PayoutsAndAnnouncements({ data }: { data: CompanyOverview }) {
   return (
+    <div className="space-y-0">
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="rounded-2xl border border-border bg-surface p-5">
         <h3 className="mb-3 font-semibold">Payouts</h3>
@@ -86,6 +88,8 @@ export default function PayoutsAndAnnouncements({ data }: { data: CompanyOvervie
           </div>
         )}
       </div>
+    </div>
+      <NewsIntelligenceTerminal />
     </div>
   );
 }

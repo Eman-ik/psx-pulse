@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
-import { fetchCementSector, fetchFertilizerSector } from "@/lib/api";
+import { fetchCementSector, fetchFertilizerSector, fetchLiveQuotes } from "@/lib/api";
 
 function fmt(n: number | null | undefined, suffix = "") {
   if (n == null) return "—";
@@ -76,16 +76,18 @@ function SectorCard({
 }
 
 export default async function SectorIntelligencePage() {
-  const [fertilizer, cement] = await Promise.all([
+  const [fertilizer, cement, live] = await Promise.all([
     fetchFertilizerSector(),
     fetchCementSector(),
+    fetchLiveQuotes(),
   ]);
+  const isLive = live != null && live.quotes.length > 0;
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar isLive={false} />
+        <Topbar isLive={isLive} />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
           <h1 className="mb-1 text-xl font-semibold">Sector Intelligence</h1>

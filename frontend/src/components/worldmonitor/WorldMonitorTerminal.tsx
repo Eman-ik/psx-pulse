@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { MacroTickerBanner } from './MacroTickerBanner';
 import { LiveNewsTerminal } from './LiveNewsTerminal';
 import { WorldGeopoliticalMap } from './WorldGeopoliticalMap';
@@ -81,6 +81,129 @@ Ask me any quantitative question or select a preset prompt above to begin.`,
       timestamp: 'System Boot'
     }
   ]);
+
+  useEffect(() => {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+
+    Promise.all([
+      fetch(`${apiBase}/market/index/KSE100/prices`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${apiBase}/macro/live-snapshot`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([kse, macro]) => {
+      setMacroIndicators(prev => prev.map(ind => {
+
+        // KSE-100 from DB (EOD close)
+        if (ind.id === 'kse100' && kse?.bars?.length) {
+          const bars: { date: string; close: number }[] = kse.bars;
+          const lat = bars[bars.length - 1];
+          const pre = bars.length >= 2 ? bars[bars.length - 2] : null;
+          const chg = pre ? lat.close - pre.close : 0;
+          const chgPct = pre ? (chg / pre.close) * 100 : 0;
+          return {
+            ...ind,
+            value: lat.close.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+            change: `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}`,
+            changePercent: chgPct,
+            status: chgPct > 0 ? 'up' : chgPct < 0 ? 'down' : 'flat',
+            lastUpdated: `EOD ${lat.date}`,
+          };
+        }
+
+        if (!macro) return ind;
+
+        // USD/PKR from live currency API; prev from monthly DB if available
+        if (ind.id === 'pkr_usd' && macro.pkr_usd) {
+          const val: number = macro.pkr_usd.value;
+          const prevVal: number | null = macro.pkr_usd_monthly?.prev_value ?? null;
+          const chg = prevVal != null ? val - prevVal : null;
+          return {
+            ...ind,
+            value: val.toFixed(2),
+            ...(chg != null && prevVal != null ? {
+              change: `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}`,
+              changePercent: (chg / prevVal) * 100,
+              status: (chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat') as 'up' | 'down' | 'flat',
+            } : {}),
+            lastUpdated: macro.pkr_usd.source as string,
+          };
+        }
+
+        // Brent Crude from Yahoo Finance
+        if (ind.id === 'brent_crude' && macro.brent_crude) {
+          const val: number = macro.brent_crude.value;
+          const prev: number = macro.brent_crude.prev_close;
+          const chg = val - prev;
+          const chgPct = prev !== 0 ? (chg / prev) * 100 : 0;
+          return {
+            ...ind,
+            value: `$${val.toFixed(2)}`,
+            change: `${chg >= 0 ? '+' : ''}$${Math.abs(chg).toFixed(2)}`,
+            changePercent: chgPct,
+            status: chgPct > 0 ? 'up' : chgPct < 0 ? 'down' : 'flat',
+            lastUpdated: macro.brent_crude.source as string,
+          };
+        }
+
+        // SBP Policy Rate from DB
+        if (ind.id === 'sbp_rate' && macro.sbp_rate) {
+          const val: number = macro.sbp_rate.value;
+          const prevVal: number | null = macro.sbp_rate.prev_value ?? null;
+          const chg = prevVal != null ? val - prevVal : null;
+          return {
+            ...ind,
+            value: `${val.toFixed(2)}%`,
+            ...(chg != null ? {
+              change: `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`,
+              changePercent: chg,
+              status: (chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat') as 'up' | 'down' | 'flat',
+            } : {}),
+            lastUpdated: `SBP · ${(macro.sbp_rate.period as string).slice(0, 7)}`,
+          };
+        }
+
+        // CPI — prefer monthly DB series, fall back to World Bank annual
+        if (ind.id === 'cpi_inflation') {
+          const cpi = macro.cpi_monthly ?? macro.cpi_wb;
+          if (cpi) {
+            const val: number = cpi.value;
+            const prevVal: number | null = cpi.prev_value ?? null;
+            const chg = prevVal != null ? val - prevVal : null;
+            const label = macro.cpi_monthly
+              ? `SBP/PBS · ${(macro.cpi_monthly.period as string).slice(0, 7)}`
+              : `World Bank (annual · ${macro.cpi_wb.period})`;
+            return {
+              ...ind,
+              value: `${val.toFixed(2)}%`,
+              ...(chg != null ? {
+                change: `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`,
+                changePercent: chg,
+                status: (chg > 0 ? 'up' : chg < 0 ? 'down' : 'flat') as 'up' | 'down' | 'flat',
+              } : {}),
+              lastUpdated: label,
+            };
+          }
+        }
+
+        // SBP FX Reserves from DB (value is in million USD)
+        if (ind.id === 'fx_reserves' && macro.fx_reserves) {
+          const valMn: number = macro.fx_reserves.value;
+          const prevMn: number | null = macro.fx_reserves.prev_value ?? null;
+          const chgMn = prevMn != null ? valMn - prevMn : null;
+          return {
+            ...ind,
+            value: `$${(valMn / 1000).toFixed(2)} B`,
+            ...(chgMn != null && prevMn != null ? {
+              change: `${chgMn >= 0 ? '+' : ''}$${Math.round(Math.abs(chgMn))} M`,
+              changePercent: (chgMn / prevMn) * 100,
+              status: (chgMn > 0 ? 'up' : chgMn < 0 ? 'down' : 'flat') as 'up' | 'down' | 'flat',
+            } : {}),
+            lastUpdated: `SBP · ${(macro.fx_reserves.period as string).slice(0, 7)}`,
+          };
+        }
+
+        return ind;
+      }));
+    });
+  }, []);
 
   const evaluateAlertRules = useCallback((itemsToEvaluate: PSXNewsItem[], currentRules: QuantAlertRule[]) => {
     const newAlerts: AlertNotification[] = [];

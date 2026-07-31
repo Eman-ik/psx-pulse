@@ -2,13 +2,15 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import NewsFeed from "@/components/news/NewsFeed";
 import WorldMonitorTerminal from "@/components/worldmonitor/WorldMonitorTerminal";
-import { fetchCompanies, fetchNewsAnnouncements } from "@/lib/api";
+import { fetchCompanies, fetchNewsAnnouncements, fetchLiveQuotes } from "@/lib/api";
 
 export default async function NewsPage() {
-  // Deliberately doesn't fetch live price quotes here (unlike other pages' Topbar) -- a news
-  // feed has nothing to do with price freshness, and psxdata's live-quote endpoint (7
-  // sequential per-symbol fetches) is the slowest call in this app by a wide margin.
-  const [rows, companies] = await Promise.all([fetchNewsAnnouncements(), fetchCompanies()]);
+  const [rows, companies, live] = await Promise.all([
+    fetchNewsAnnouncements(),
+    fetchCompanies(),
+    fetchLiveQuotes(),
+  ]);
+  const isLive = live != null && live.quotes.length > 0;
   const companyById = Object.fromEntries(companies.map((c) => [c.id, { name: c.name, symbol: c.symbol }]));
   const classified = rows.filter((r) => r.sentiment_score != null).length;
 
@@ -16,7 +18,7 @@ export default async function NewsPage() {
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar isLive={false} />
+        <Topbar isLive={isLive} />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
           <h1 className="mb-1 text-xl font-semibold">News &amp; Announcements</h1>

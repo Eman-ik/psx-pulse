@@ -367,3 +367,166 @@ export async function fetchSignalResearch(issuerId: number): Promise<SignalResea
     return null;
   }
 }
+
+// ─── Analyst Agent types ─────────────────────────────────────────────────────
+
+export interface ForensicFlag {
+  flag_code: string;
+  severity: "low" | "medium" | "high" | "critical";
+  status: "clear" | "watch" | "triggered" | "not_applicable" | "insufficient_data";
+  periods: string[];
+  observed_value: string | null;
+  sector_reference: string | null;
+  explanation: string;
+  possible_benign_explanations: string[];
+  confidence: string;
+}
+
+export interface DuPontRow {
+  period_end: string;
+  net_margin: number | null;
+  asset_turnover: number | null;
+  equity_multiplier: number | null;
+  roe_3way: number | null;
+  roe_reported: number | null;
+  ebit_margin: number | null;
+  interest_burden: number | null;
+  tax_burden: number | null;
+}
+
+export interface ForensicsData {
+  issuer_id: number;
+  symbol: string;
+  as_of: string;
+  sub_scores: {
+    operating_health: number | null;
+    earnings_quality: number | null;
+    balance_sheet: number | null;
+    capital_allocation: number | null;
+    governance: number | null;
+  };
+  business_health: string;
+  health_confidence: string;
+  dupont: DuPontRow[];
+  cash_conversion: { period_end: string; profit_after_tax: number; operating_cash_flow: number | null; cfo_pat_ratio: number | null }[];
+  interest_coverage: { period_end: string; ebit_proxy: number | null; finance_cost: number | null; coverage: number | null }[];
+  leverage: { period_end: string; debt_to_equity: number | null; debt_to_assets: number | null; current_ratio: number | null }[];
+  flags: ForensicFlag[];
+  missing_data_items: string[];
+  data_coverage_pct: number;
+  is_research_only: true;
+  disclaimer: string;
+}
+
+export interface CAPMDiagnosticsData {
+  issuer_id: number;
+  symbol: string;
+  benchmark: string;
+  window_label: string;
+  n_obs: number;
+  beta: number | null;
+  alpha_annualised: number | null;
+  r_squared: number | null;
+  residual_vol_annualised: number | null;
+  beta_t_stat: number | null;
+  beta_p_value: number | null;
+  beta_ci_low: number | null;
+  beta_ci_high: number | null;
+  up_market_beta: number | null;
+  down_market_beta: number | null;
+  asymmetry_note: string | null;
+  zero_return_pct: number | null;
+  stale_price_warning: boolean;
+  required_return_pct: number | null;
+  required_return_low_pct: number | null;
+  required_return_high_pct: number | null;
+  risk_free_rate_pct: number | null;
+  erp_pct: number | null;
+  rolling_beta: { window_end: string; beta: number; n_obs: number }[];
+  confidence: string;
+  confidence_notes: string[];
+  is_research_only?: true;
+  disclaimer?: string;
+}
+
+export interface FactorExposure {
+  factor_name: string;
+  beta: number | null;
+  beta_se: number | null;
+  t_stat: number | null;
+  p_value: number | null;
+  ci_low: number | null;
+  ci_high: number | null;
+  interpretation: string;
+  data_available: boolean;
+}
+
+export interface AnalystRunResult {
+  status: string;
+  run_id?: number;
+  message?: string;
+  symbol?: string;
+  created_at?: string;
+  completed_at?: string;
+  error_message?: string | null;
+  packet?: {
+    research_posture: string;
+    business_health: string;
+    confidence: string;
+    one_sentence_view: string | null;
+    decision_hinge: string | null;
+    is_approved: boolean;
+    packet_json: Record<string, unknown>;
+  } | null;
+  is_research_only?: true;
+  disclaimer?: string;
+}
+
+export async function fetchAnalystRun(issuerId: number): Promise<AnalystRunResult | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/companies/${issuerId}/analyst-run/latest`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as AnalystRunResult;
+  } catch {
+    return null;
+  }
+}
+
+export async function triggerAnalystRun(issuerId: number): Promise<AnalystRunResult | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/companies/${issuerId}/analyst-run`, {
+      method: "POST",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as AnalystRunResult;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchForensics(issuerId: number): Promise<ForensicsData | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/companies/${issuerId}/forensics`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as ForensicsData;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCAPMDiagnostics(issuerId: number): Promise<CAPMDiagnosticsData | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/companies/${issuerId}/capm-diagnostics`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as CAPMDiagnosticsData;
+  } catch {
+    return null;
+  }
+}

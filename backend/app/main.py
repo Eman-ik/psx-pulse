@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, comparison, companies, financials, live, macro, market, news, screener, sectors, signals
+from app.api import admin, analyst, comparison, companies, financials, live, macro, market, news, screener, sectors, signals
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -17,6 +17,7 @@ app.add_middleware(
 )
 
 app.include_router(comparison.router)
+app.include_router(analyst.router)
 app.include_router(companies.router)
 app.include_router(sectors.router)
 app.include_router(financials.router)

@@ -6,6 +6,7 @@ from app.db.models.announcements import Announcement, EntityLink
 from app.db.models.macro import MacroObservation, MacroSeries, SectorRiskSnapshot
 from app.db.models.scoring import SignalScore
 from app.db.models.research import CapmAssumption, OperationalMetric, Thesis
+from app.db.models.analyst import AnalystPacket, AnalystRun
 
 __all__ = [
     "Sector",
@@ -33,4 +34,6 @@ __all__ = [
     "OperationalMetric",
     "CapmAssumption",
     "Thesis",
+    "AnalystRun",
+    "AnalystPacket",
 ]

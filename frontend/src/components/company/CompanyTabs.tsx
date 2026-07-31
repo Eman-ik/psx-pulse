@@ -16,6 +16,7 @@ import CompetitorsTab from "./CompetitorsTab";
 import DataQualityPanel from "./DataQualityPanel";
 import AISignalTab from "./AISignalTab";
 import FinancialStatementsPanel from "./FinancialStatementsPanel";
+import AnalystWorkbenchTab from "./AnalystWorkbenchTab";
 
 const TABS = [
   "Summary",
@@ -27,6 +28,7 @@ const TABS = [
   "Announcements",
   "Competitors",
   "AI Signal",
+  "Analyst",
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -106,6 +108,10 @@ export default function CompanyTabs({
 
       {active === "AI Signal" && (
         <AISignalTab signal={signal} prices={prices} data={data} kseIndex={kseIndex} fertixIndex={fertixIndex} />
+      )}
+
+      {active === "Analyst" && (
+        <AnalystWorkbenchTab issuerId={data.issuer.id} />
       )}
     </div>
   );

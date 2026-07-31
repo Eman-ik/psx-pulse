@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     sbp_easydata_api_key: str | None = None
     sbp_easydata_base_url: str = "https://easydata.sbp.org.pk/api/v1"
 
+    # Anthropic API key for the PSX Senior Analyst Agent (LLM synthesis node).
+    # When unset, the analyst endpoint returns all deterministic data (forensics, CAPM,
+    # factor model) but skips the LLM synthesis step with synthesis_status="requires_api_key".
+    # Obtain a key at https://console.anthropic.com.
+    anthropic_api_key: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

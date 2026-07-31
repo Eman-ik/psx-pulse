@@ -181,18 +181,29 @@ def compute_dupont(db: Session, issuer_id: int) -> list[DuPontRow]:
     sorted_assets = sorted(assets.items())
     sorted_equity = sorted(equity.items())
 
+    # Build a lookup: period → prior-period value (keyed by sorted_assets date order)
+    asset_dates = [d for d, _ in sorted_assets]
+    equity_dates = [d for d, _ in sorted_equity]
+
+    def _prior_asset(period):
+        idx = asset_dates.index(period) if period in asset_dates else -1
+        return sorted_assets[idx - 1][1] if idx > 0 else None
+
+    def _prior_equity(period):
+        idx = equity_dates.index(period) if period in equity_dates else -1
+        return sorted_equity[idx - 1][1] if idx > 0 else None
+
     for i, period in enumerate(all_periods):
         rev = revenue.get(period)
         p = pat.get(period)
 
-        # Average assets and equity (use prior period if available)
-        prev_asset = sorted_assets[i - 1][1] if i > 0 and sorted_assets else None
         curr_asset = assets.get(period)
-        avg_assets = _avg(prev_asset, curr_asset) if i > 0 else curr_asset
+        prev_asset = _prior_asset(period)
+        avg_assets = _avg(prev_asset, curr_asset) if prev_asset is not None else curr_asset
 
-        prev_eq = sorted_equity[i - 1][1] if i > 0 and sorted_equity else None
         curr_eq = equity.get(period)
-        avg_equity = _avg(prev_eq, curr_eq) if i > 0 else curr_eq
+        prev_eq = _prior_equity(period)
+        avg_equity = _avg(prev_eq, curr_eq) if prev_eq is not None else curr_eq
 
         nm = _safe_div(p, rev)
         at = _safe_div(rev, avg_assets)

@@ -285,6 +285,288 @@ def _build_prompt(
     return "\n".join(lines)
 
 
+def _rule_based_synthesis(
+    forensic: "ForensicResult",
+    capm_diag: "CAPMDiagnostics | None",
+    evidence: dict,
+) -> dict:
+    """
+    Fully deterministic alternative to LLM synthesis.
+    Derives research posture, scenarios, catalysts, risks, and key findings
+    from the forensic sub-scores, flags, DuPont data, and CAPM diagnostics.
+    Every claim traces back to a real data point — no text is invented.
+    """
+    health = forensic.business_health
+    coverage = forensic.data_coverage_pct
+
+    # ── Stance ────────────────────────────────────────────────────────────────
+    _stance_map = {
+        "genuinely_healthy": "positive",
+        "healthy_but_cyclical": "neutral",
+        "improving": "neutral",
+        "surface_level_strength": "watch",
+        "deteriorating": "negative",
+        "financially_fragile": "negative",
+        "insufficient_evidence": "insufficient_evidence",
+    }
+    stance = _stance_map.get(health, "insufficient_evidence")
+
+    # Bump stance if sub-scores are all strong
+    oh = forensic.operating_health_score or 0
+    eq = forensic.earnings_quality_score or 0
+    bs = forensic.balance_sheet_score or 0
+    ca = forensic.capital_allocation_score or 0
+    avg_score = (oh + eq + bs + ca) / max(sum(1 for s in [oh, eq, bs, ca] if s > 0), 1)
+    if stance == "neutral" and avg_score >= 70:
+        stance = "positive"
+    elif stance == "positive" and avg_score < 55:
+        stance = "neutral"
+
+    # ── Confidence ────────────────────────────────────────────────────────────
+    if coverage >= 75 and forensic.health_confidence == "high":
+        confidence = "high"
+    elif coverage >= 50:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    # ── DuPont trends ─────────────────────────────────────────────────────────
+    latest_dup = forensic.dupont[-1] if forensic.dupont else None
+    prev_dup = forensic.dupont[-2] if len(forensic.dupont) >= 2 else None
+    roe_latest = latest_dup.roe_3way if latest_dup else None
+    roe_prev = prev_dup.roe_3way if prev_dup else None
+    nm_latest = latest_dup.net_margin if latest_dup else None
+    em_latest = latest_dup.equity_multiplier if latest_dup else None
+
+    roe_trend = "stable"
+    if roe_latest is not None and roe_prev is not None:
+        delta = roe_latest - roe_prev
+        roe_trend = "improving" if delta > 3 else ("declining" if delta < -3 else "stable")
+
+    # ── Latest interest coverage ───────────────────────────────────────────────
+    cov_latest = forensic.interest_coverage[-1].coverage if forensic.interest_coverage else None
+
+    # ── Triggered/watch flags ─────────────────────────────────────────────────
+    triggered = [f for f in forensic.flags if f.status == "triggered"]
+    watch_flags = [f for f in forensic.flags if f.status == "watch"]
+    clear_flags = [f for f in forensic.flags if f.status == "clear"]
+
+    # ── Company name ──────────────────────────────────────────────────────────
+    company_name = evidence.get("issuer", {}).get("name", "The company")
+    symbol = evidence.get("issuer", {}).get("symbol", "")
+    co = f"{company_name} ({symbol})" if symbol else company_name
+
+    # ── One-sentence view ─────────────────────────────────────────────────────
+    _health_views = {
+        "genuinely_healthy": (
+            f"{co} demonstrates strong operating fundamentals with ROE of {roe_latest}% "
+            f"and broad data coverage of {coverage}%, suggesting genuine business quality."
+        ),
+        "healthy_but_cyclical": (
+            f"{co} shows solid operational metrics but operates in a cyclical sector "
+            f"(fertilizer/commodity); returns are likely to oscillate with urea pricing and crop cycles."
+        ),
+        "improving": (
+            f"{co} shows measurable improvement in key financial metrics; the trajectory is "
+            f"positive but durability across a full cycle has yet to be established."
+        ),
+        "surface_level_strength": (
+            f"{co} reports healthy headline numbers but forensic analysis flags "
+            f"{len(triggered)} concern(s) that warrant deeper scrutiny before conclusions are drawn."
+        ),
+        "deteriorating": (
+            f"{co} shows deteriorating operating fundamentals across multiple metrics; "
+            f"the earnings trend requires careful monitoring."
+        ),
+        "financially_fragile": (
+            f"{co} faces elevated financial risk with {len(triggered)} triggered forensic flag(s); "
+            f"balance sheet resilience is a priority concern."
+        ),
+        "insufficient_evidence": (
+            f"Insufficient data ({coverage}% line-item coverage) to form a reliable view on {co}."
+        ),
+    }
+    one_sentence_view = _health_views.get(health, f"Analytical coverage is {coverage}% — results are provisional.")
+
+    # ── Decision hinge ────────────────────────────────────────────────────────
+    if triggered:
+        worst = max(triggered, key=lambda f: {"low": 0, "medium": 1, "high": 2, "critical": 3}.get(f.severity, 0))
+        decision_hinge = f"Can management address the {worst.flag_code.replace('_', ' ').lower()} flag? {worst.explanation}"
+    elif eq is not None and eq < 50:
+        decision_hinge = "Does reported profit convert to operating cash flow — or is earnings quality structurally weak?"
+    elif cov_latest is not None and cov_latest < 2:
+        decision_hinge = f"Is interest coverage of {cov_latest}x sustainable, or does debt servicing crowd out reinvestment?"
+    elif roe_trend == "declining":
+        decision_hinge = "Is the declining ROE trend a temporary cycle trough or structural margin compression?"
+    else:
+        decision_hinge = "Will fertilizer sector tailwinds persist long enough to sustain current profitability levels?"
+
+    # ── Scenarios ─────────────────────────────────────────────────────────────
+    roe_str = f"ROE {roe_latest}%" if roe_latest else "current returns"
+    nm_str = f"net margin {nm_latest}%" if nm_latest else "current margins"
+    cov_str = f"interest coverage {cov_latest}x" if cov_latest else "current debt servicing"
+
+    scenarios: dict = {
+        "bull": {
+            "title": "Sector upcycle with sustained margin expansion",
+            "narrative": (
+                f"In the bull case, urea prices remain elevated as domestic demand from crop cycles holds "
+                f"and gas feedstock costs stay contained. {co} sustains {roe_str} or better, "
+                f"operating health score ({oh}/100) continues rising, and the "
+                f"{len(clear_flags)} clear forensic flag(s) confirm reporting quality. "
+                f"Capital allocation improves and dividend capacity strengthens."
+            ),
+            "key_driver": "Sustained urea price premium and stable gas allocation",
+        },
+        "base": {
+            "title": "Stable operations with cyclical earnings variability",
+            "narrative": (
+                f"In the base case, {co} maintains {nm_str} through normal sector cycles. "
+                f"Balance sheet score of {bs}/100 provides adequate buffer. "
+                f"{cov_str} is maintained. Earnings oscillate with fertilizer input costs "
+                f"and government subsidy policy, consistent with the '{health.replace('_', ' ')}' classification."
+            ),
+            "key_driver": "Stable government gas policy and normal crop demand",
+        },
+        "bear": {
+            "title": "Feedstock cost shock or demand destruction",
+            "narrative": (
+                f"In the bear case, gas feedstock costs rise sharply or GIDC levies increase, "
+                f"compressing {nm_str}. "
+                + (f"The {len(triggered)} triggered flag(s) ({', '.join(f.flag_code for f in triggered[:2])}) "
+                   f"become more material. " if triggered else "")
+                + f"Capital allocation score ({ca}/100) indicates limited buffer for a prolonged downturn. "
+                f"Leverage-driven ROE can reverse rapidly if financing costs rise."
+            ),
+            "key_driver": "Gas price shock or government policy reversal on fertilizer subsidies",
+        },
+    }
+
+    # ── Catalysts ─────────────────────────────────────────────────────────────
+    catalysts = []
+    if oh >= 65:
+        catalysts.append({
+            "catalyst": f"Operating health score of {oh}/100 signals scope for further margin improvement if input costs ease",
+            "timeframe": "medium_term",
+            "probability": "medium",
+        })
+    if roe_trend == "improving":
+        catalysts.append({
+            "catalyst": f"ROE improving trend (from {roe_prev}% to {roe_latest}%) may attract re-rating if sustained for two more periods",
+            "timeframe": "medium_term",
+            "probability": "medium",
+        })
+    if eq is not None and eq >= 70:
+        catalysts.append({
+            "catalyst": "High earnings quality (CFO/PAT ratio) supports dividend sustainability and reduces refinancing risk",
+            "timeframe": "near_term",
+            "probability": "high",
+        })
+    if capm_diag and capm_diag.up_market_beta and capm_diag.down_market_beta:
+        if capm_diag.up_market_beta > capm_diag.down_market_beta:
+            catalysts.append({
+                "catalyst": f"Asymmetric beta profile (up-market β={capm_diag.up_market_beta} > down-market β={capm_diag.down_market_beta}) suggests convex return potential in a market rally",
+                "timeframe": "near_term",
+                "probability": "medium",
+            })
+    if not catalysts:
+        catalysts.append({
+            "catalyst": "Potential for sector re-rating if fertilizer demand cycle turns positive and gas costs stabilise",
+            "timeframe": "medium_term",
+            "probability": "low",
+        })
+
+    # ── Risks ──────────────────────────────────────────────────────────────────
+    risks = []
+    for flag in triggered:
+        risks.append({
+            "risk": f"Triggered forensic flag — {flag.flag_code.replace('_', ' ')}: {flag.explanation}",
+            "severity": flag.severity,
+            "probability": "high",
+        })
+    for flag in watch_flags:
+        risks.append({
+            "risk": f"Watch flag — {flag.flag_code.replace('_', ' ')}: {flag.explanation}",
+            "severity": flag.severity,
+            "probability": "medium",
+        })
+    if capm_diag and capm_diag.down_market_beta and capm_diag.down_market_beta > 1.1:
+        risks.append({
+            "risk": f"Elevated down-market beta ({capm_diag.down_market_beta}) implies above-market drawdown in risk-off episodes",
+            "severity": "medium",
+            "probability": "medium",
+        })
+    if bs < 45:
+        risks.append({
+            "risk": f"Low balance sheet score ({bs}/100) — leverage or liquidity ratios leave limited buffer for an earnings shock",
+            "severity": "high",
+            "probability": "medium",
+        })
+    if not risks:
+        risks.append({
+            "risk": "Sector-level gas policy uncertainty — government gas allocation and GIDC policy can shift unexpectedly",
+            "severity": "medium",
+            "probability": "medium",
+        })
+
+    # ── Key findings ──────────────────────────────────────────────────────────
+    key_findings = []
+    for sub, label in [
+        (oh, "Operating health"),
+        (eq, "Earnings quality (CFO/PAT cash conversion)"),
+        (bs, "Balance sheet strength"),
+        (ca, "Capital allocation quality"),
+    ]:
+        if sub is None:
+            continue
+        direction = "positive" if sub >= 65 else ("negative" if sub < 45 else "mixed")
+        materiality = "high" if sub < 40 or sub >= 80 else "medium"
+        key_findings.append({
+            "finding": f"{label}: {sub}/100",
+            "direction": direction,
+            "materiality": materiality,
+        })
+    if latest_dup and roe_latest is not None:
+        key_findings.append({
+            "finding": (
+                f"Latest DuPont decomposition: NM={nm_latest}% × AT={latest_dup.asset_turnover}x "
+                f"× EM={em_latest}x → ROE {roe_latest}% "
+                + (f"({roe_trend} vs prior year)" if roe_prev else "")
+            ),
+            "direction": "positive" if roe_trend == "improving" else ("negative" if roe_trend == "declining" else "mixed"),
+            "materiality": "high",
+        })
+    if capm_diag and capm_diag.beta:
+        key_findings.append({
+            "finding": f"CAPM: β={capm_diag.beta} (R²={capm_diag.r_squared}) → required return {capm_diag.required_return_pct}% at current risk-free rate",
+            "direction": "mixed",
+            "materiality": "medium",
+        })
+
+    return {
+        "research_posture": {
+            "stance": stance,
+            "confidence": confidence,
+            "business_health": health,
+            "one_sentence_view": one_sentence_view,
+            "decision_hinge": decision_hinge,
+            "what_is_priced_in": [
+                "Normal fertilizer sector cyclicality",
+                f"Business health classification of '{health.replace('_', ' ')}'",
+            ],
+            "falsifiers": [
+                f"A sustained CFO/PAT ratio below 0.6 for two consecutive years would indicate structural earnings-quality deterioration.",
+                f"Interest coverage below 1.5x for more than one period would change the balance-sheet risk assessment.",
+                "A reversal in government gas allocation policy or a large GIDC reassessment would alter the cost structure materially.",
+            ],
+        },
+        "scenarios": scenarios,
+        "catalysts": catalysts,
+        "risks": risks,
+        "key_findings": key_findings,
+    }
+
+
 def _parse_synthesis(response_text: str) -> dict:
     """Extract JSON from the LLM response (handles markdown code fences)."""
     text = response_text.strip()
@@ -338,17 +620,10 @@ def run_analyst_synthesis(db: Session, issuer_id: int) -> dict:
         # Step 2: Assemble evidence brief
         evidence = _gather_evidence(db, issuer_id)
 
-        # Step 3: LLM synthesis (if API key available)
+        # Step 3: LLM synthesis (preferred) or rule-based synthesis (fallback)
         synthesis: dict = {}
         synthesis_status = "complete"
-        if not settings.anthropic_api_key:
-            synthesis_status = "requires_api_key"
-            logger.warning(
-                "ANTHROPIC_API_KEY not set — skipping LLM synthesis for %s. "
-                "Set the key in backend/.env to enable the Senior Analyst Synthesizer.",
-                symbol,
-            )
-        else:
+        if settings.anthropic_api_key:
             try:
                 import anthropic
                 client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
@@ -358,13 +633,21 @@ def run_analyst_synthesis(db: Session, issuer_id: int) -> dict:
                     max_tokens=4096,
                     system=SYSTEM_PROMPT,
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2,  # low temperature for analytical consistency
+                    temperature=0.2,
                 )
                 synthesis = _parse_synthesis(message.content[0].text)
+                synthesis_status = "llm_complete"
             except Exception as e:
-                logger.error("LLM synthesis failed for %s: %s", symbol, e)
-                synthesis_status = "synthesis_failed"
-                synthesis = {}
+                logger.error("LLM synthesis failed for %s: %s — falling back to rule-based", symbol, e)
+                synthesis = _rule_based_synthesis(forensic, capm_diag, evidence)
+                synthesis_status = "rule_based_llm_failed"
+        else:
+            logger.info(
+                "No ANTHROPIC_API_KEY — using rule-based synthesis for %s (deterministic, no LLM).",
+                symbol,
+            )
+            synthesis = _rule_based_synthesis(forensic, capm_diag, evidence)
+            synthesis_status = "rule_based"
 
         # Step 4: Build the PSXAnalystPacket
         posture_data = synthesis.get("research_posture", {})

@@ -322,25 +322,37 @@ function CAPMPanel({ capm }: { capm: CAPMDiagnosticsData }) {
   );
 }
 
+const SYNTHESIS_STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  llm_complete: { label: "AI-generated (LLM)", color: "text-green-400" },
+  rule_based: { label: "Rule-based (deterministic)", color: "text-blue-400" },
+  rule_based_llm_failed: { label: "Rule-based (LLM failed)", color: "text-yellow-400" },
+  complete: { label: "Complete", color: "text-muted" },
+};
+
 function ThesisSection({ packet }: { packet: Record<string, unknown> }) {
   const scenarios = packet.scenarios as Record<string, { title: string; narrative: string; key_driver: string }> | undefined;
   const catalysts = packet.catalysts as { catalyst: string; timeframe: string; probability: string }[] | undefined;
   const risks = packet.risks as { risk: string; severity: string; probability: string }[] | undefined;
   const findings = packet.key_findings as { finding: string; direction: string; materiality: string }[] | undefined;
+  const synthesisStatus = packet.synthesis_status as string | undefined;
+  const statusMeta = synthesisStatus ? SYNTHESIS_STATUS_LABEL[synthesisStatus] : null;
 
   if (!scenarios && !catalysts && !risks) {
     return (
       <div className="rounded border border-border bg-bg p-4 text-center">
-        <p className="text-xs text-muted">LLM synthesis not yet run or API key not configured.</p>
-        <p className="mt-1 text-[10px] text-muted">
-          Set <span className="font-mono">ANTHROPIC_API_KEY</span> in <span className="font-mono">backend/.env</span> and re-run the analysis.
-        </p>
+        <p className="text-xs text-muted">No synthesis on file — click "Run Analysis" to generate.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      {statusMeta && (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted">Synthesis method:</span>
+          <span className={`text-[10px] font-medium ${statusMeta.color}`}>{statusMeta.label}</span>
+        </div>
+      )}
       {findings && findings.length > 0 && (
         <div>
           <SectionHeader title="Key Findings" />

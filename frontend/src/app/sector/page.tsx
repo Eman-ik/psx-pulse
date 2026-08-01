@@ -1,86 +1,461 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import {
+  ChevronRight,
+  Landmark,
+  Flame,
+  Monitor,
+  Layers,
+  Sprout,
+  Zap,
+  Building2,
+  Truck,
+  Car,
+  ShoppingCart,
+  TrendingUp,
+  Activity,
+  Droplets,
+  Shield,
+  Leaf,
+  Settings,
+  Home,
+  FileText,
+  Package,
+  Bus,
+  type LucideIcon,
+} from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
-import { fetchCementSector, fetchFertilizerSector, fetchLiveQuotes } from "@/lib/api";
+import { fetchLiveQuotes } from "@/lib/api";
 
-function fmt(n: number | null | undefined, suffix = "") {
-  if (n == null) return "—";
-  return `${n.toLocaleString(undefined, { maximumFractionDigits: 1 })}${suffix}`;
-}
+// ── Color map (full class strings so Tailwind includes them) ──────────────────
+const COLOR: Record<string, { box: string; icon: string }> = {
+  blue:    { box: "bg-blue-500/10",    icon: "text-blue-400"    },
+  emerald: { box: "bg-emerald-500/10", icon: "text-emerald-400" },
+  orange:  { box: "bg-orange-500/10",  icon: "text-orange-400"  },
+  purple:  { box: "bg-purple-500/10",  icon: "text-purple-400"  },
+  amber:   { box: "bg-amber-500/10",   icon: "text-amber-400"   },
+  rose:    { box: "bg-rose-500/10",    icon: "text-rose-400"    },
+  teal:    { box: "bg-teal-500/10",    icon: "text-teal-400"    },
+  gray:    { box: "bg-slate-500/10",   icon: "text-slate-400"   },
+  cyan:    { box: "bg-cyan-500/10",    icon: "text-cyan-400"    },
+  lime:    { box: "bg-lime-500/10",    icon: "text-lime-400"    },
+};
 
-function fmtBn(n: number | null | undefined) {
-  if (n == null) return "—";
-  return `PKR ${(n / 1_000_000).toFixed(0)} bn`;
-}
-
-interface SectorCardProps {
-  href: string;
+// ── Sector data ───────────────────────────────────────────────────────────────
+interface SectorDef {
   name: string;
-  companyCount: number;
-  description: string;
-  marketCap: number | null;
-  avgUtilization: number | null;
-  specializedMetrics: string;
+  href: string;
   ready: boolean;
+  companies: number;
+  icon: LucideIcon;
+  color: string;
+  description: string;
+  gdpSharePct: number;
+  psxWeightPct: number;
+  marketCapPkrBn: number;
+  exportSharePct: number;
+  specializedMetrics: string;
 }
 
-function SectorCard({
-  href,
-  name,
-  companyCount,
-  description,
-  marketCap,
-  avgUtilization,
-  specializedMetrics,
-  ready,
-}: SectorCardProps) {
+const SECTORS: SectorDef[] = [
+  {
+    name: "Commercial Banks",
+    href: "#",
+    ready: false,
+    companies: 21,
+    icon: Landmark,
+    color: "blue",
+    description:
+      "The banking sector is the largest component of the KSE-100, providing credit across the economy. Key drivers include the interest-rate cycle, CASA ratio, PIB/T-bill holdings, and NPL trajectory.",
+    gdpSharePct: 7.8,
+    psxWeightPct: 20.1,
+    marketCapPkrBn: 920,
+    exportSharePct: 0,
+    specializedMetrics: "Deposits, net advances, NIM, ADR, infection ratio, CAR, CASA ratio",
+  },
+  {
+    name: "Oil & Gas E&P",
+    href: "#",
+    ready: false,
+    companies: 4,
+    icon: Flame,
+    color: "orange",
+    description:
+      "Exploration & production of crude oil and natural gas. Key drivers include Brent crude prices, wellhead pricing, production decline curves, and government royalty structure.",
+    gdpSharePct: 4.5,
+    psxWeightPct: 16.2,
+    marketCapPkrBn: 1250,
+    exportSharePct: 0,
+    specializedMetrics: "Production (boe/day), 2P reserves, wellhead price, depletion rate, capex/boe",
+  },
+  {
+    name: "Technology & Communication",
+    href: "#",
+    ready: false,
+    companies: 32,
+    icon: Monitor,
+    color: "purple",
+    description:
+      "IT services, telecom operators, and digital infrastructure. Key drivers include PKR depreciation (IT export tailwind), cellular subscribers, data ARPU, and government digitization spend.",
+    gdpSharePct: 3.5,
+    psxWeightPct: 7.4,
+    marketCapPkrBn: 620,
+    exportSharePct: 4.5,
+    specializedMetrics: "IT exports (USD mn), subscribers, ARPU, data revenue share, headcount growth",
+  },
+  {
+    name: "Textile Composite",
+    href: "#",
+    ready: false,
+    companies: 41,
+    icon: Layers,
+    color: "cyan",
+    description:
+      "Pakistan's largest export sector covering spinning, weaving, and composite mills. Key drivers include cotton prices, energy tariffs, global demand, and SBP TERF/LTFF concessional financing.",
+    gdpSharePct: 8.5,
+    psxWeightPct: 5.8,
+    marketCapPkrBn: 540,
+    exportSharePct: 55.0,
+    specializedMetrics: "Yarn counts, cloth production (m sq m), export volumes, cotton procurement, energy cost",
+  },
+  {
+    name: "Fertilizer",
+    href: "/sector/fertilizer",
+    ready: true,
+    companies: 7,
+    icon: Sprout,
+    color: "emerald",
+    description:
+      "Critical to Pakistan's agriculture economy, producing urea and DAP. Key drivers include gas feedstock pricing, SBP policy rate, government offtake subsidies, and crop-cycle demand.",
+    gdpSharePct: 3.2,
+    psxWeightPct: 4.8,
+    marketCapPkrBn: 485,
+    exportSharePct: 1.8,
+    specializedMetrics: "Capacity (tons/day), production volumes, offtake, gas pricing, urea market share",
+  },
+  {
+    name: "Power Generation & Distribution",
+    href: "#",
+    ready: false,
+    companies: 12,
+    icon: Zap,
+    color: "amber",
+    description:
+      "IPPs and distribution companies supplying electricity via the national grid. Key drivers include capacity payments, fuel cost pass-through, NTDC offtake, and IMF-driven circular debt resolution.",
+    gdpSharePct: 2.8,
+    psxWeightPct: 4.3,
+    marketCapPkrBn: 390,
+    exportSharePct: 0,
+    specializedMetrics: "Generation capacity (MW), plant load factor, fuel mix, NTDC receivables, capacity payments",
+  },
+  {
+    name: "Cement",
+    href: "/sector/cement",
+    ready: true,
+    companies: 18,
+    icon: Building2,
+    color: "gray",
+    description:
+      "Serves domestic construction, infrastructure, and export markets. Key drivers include housing demand, government PSDP spending, coal and gas input costs, and retention pricing.",
+    gdpSharePct: 1.5,
+    psxWeightPct: 3.1,
+    marketCapPkrBn: 312,
+    exportSharePct: 2.1,
+    specializedMetrics: "Dispatches (local+export), capacity utilization, coal cost, retention price, clinker production",
+  },
+  {
+    name: "Oil & Gas Marketing",
+    href: "#",
+    ready: false,
+    companies: 5,
+    icon: Truck,
+    color: "orange",
+    description:
+      "Marketing and distribution of petroleum products. Key metrics include POL volumes, gross margin per litre, and circular-debt government receivables.",
+    gdpSharePct: 2.1,
+    psxWeightPct: 3.4,
+    marketCapPkrBn: 320,
+    exportSharePct: 0,
+    specializedMetrics: "Volumes (m litres), gross margin/litre, circular debt receivables, storage infrastructure",
+  },
+  {
+    name: "Automobile Assembler",
+    href: "#",
+    ready: false,
+    companies: 5,
+    icon: Car,
+    color: "rose",
+    description:
+      "Assembly of passenger cars, LCVs, and trucks under Pakistan's localisation policy regime. Key drivers include consumer financing rates, CKD duty structure, and total industry volumes.",
+    gdpSharePct: 1.8,
+    psxWeightPct: 3.2,
+    marketCapPkrBn: 298,
+    exportSharePct: 0.5,
+    specializedMetrics: "Units assembled, localization %, CKD duty impact, industry volumes, auto financing penetration",
+  },
+  {
+    name: "Food & Personal Care",
+    href: "#",
+    ready: false,
+    companies: 22,
+    icon: ShoppingCart,
+    color: "lime",
+    description:
+      "Consumer staples including packaged food, beverages, and personal care products. Key drivers include commodity input prices, consumer spending power, and organised retail penetration.",
+    gdpSharePct: 2.4,
+    psxWeightPct: 2.8,
+    marketCapPkrBn: 260,
+    exportSharePct: 2.3,
+    specializedMetrics: "Volume growth, commodity input costs, consumer pricing power, gross margin trajectory",
+  },
+  {
+    name: "Investment Companies",
+    href: "#",
+    ready: false,
+    companies: 22,
+    icon: TrendingUp,
+    color: "blue",
+    description:
+      "Closed-end funds and holding companies with cross-sector equity stakes. Key metrics include NAV discount, portfolio composition, dividend payout policy, and leverage.",
+    gdpSharePct: 1.2,
+    psxWeightPct: 2.3,
+    marketCapPkrBn: 214,
+    exportSharePct: 0,
+    specializedMetrics: "NAV, discount to NAV, dividend yield, portfolio composition, leverage ratio",
+  },
+  {
+    name: "Pharmaceutical",
+    href: "#",
+    ready: false,
+    companies: 11,
+    icon: Activity,
+    color: "emerald",
+    description:
+      "Generic and branded drug manufacturing. Key drivers include DRAP price regulation, active pharmaceutical ingredient (API) import costs, and public sector procurement.",
+    gdpSharePct: 1.2,
+    psxWeightPct: 2.1,
+    marketCapPkrBn: 195,
+    exportSharePct: 0.8,
+    specializedMetrics: "Product mix (generics/branded), API import costs, DRAP price regulation, export volumes",
+  },
+  {
+    name: "Chemical",
+    href: "#",
+    ready: false,
+    companies: 19,
+    icon: Droplets,
+    color: "teal",
+    description:
+      "Petrochemicals, industrial chemicals, and specialty products. Key drivers include feedstock (naphtha, natural gas) prices and downstream demand from textiles and agriculture.",
+    gdpSharePct: 1.1,
+    psxWeightPct: 1.8,
+    marketCapPkrBn: 168,
+    exportSharePct: 1.2,
+    specializedMetrics: "Feedstock pricing, product mix, export volumes, capacity utilization, downstream linkage",
+  },
+  {
+    name: "Insurance",
+    href: "#",
+    ready: false,
+    companies: 25,
+    icon: Shield,
+    color: "purple",
+    description:
+      "Life, non-life, and health insurance. Key drivers include gross premium growth, combined ratio, investment income on float, and expansion of bancassurance channels.",
+    gdpSharePct: 0.8,
+    psxWeightPct: 1.5,
+    marketCapPkrBn: 140,
+    exportSharePct: 0,
+    specializedMetrics: "Gross premium, combined ratio, investment income, claims ratio, bancassurance growth",
+  },
+  {
+    name: "Sugar & Allied",
+    href: "#",
+    ready: false,
+    companies: 19,
+    icon: Leaf,
+    color: "lime",
+    description:
+      "Sugar crushing and by-products including ethanol and bagasse-based co-generation. Key drivers include seasonal crushing (Oct–Mar), sugarcane support price, and export/ethanol quota policy.",
+    gdpSharePct: 0.7,
+    psxWeightPct: 0.9,
+    marketCapPkrBn: 84,
+    exportSharePct: 1.5,
+    specializedMetrics: "Crushing season (Oct–Mar), sugarcane procurement price, ethanol production, export quota",
+  },
+  {
+    name: "Engineering",
+    href: "#",
+    ready: false,
+    companies: 15,
+    icon: Settings,
+    color: "gray",
+    description:
+      "Capital goods, electric equipment, and industrial machinery. Key drivers include government PSDP development expenditure, energy sector capex cycles, and construction activity.",
+    gdpSharePct: 0.9,
+    psxWeightPct: 1.1,
+    marketCapPkrBn: 102,
+    exportSharePct: 0.4,
+    specializedMetrics: "Order backlog, PSDP spend exposure, government contracts, capacity utilization, capex trends",
+  },
+  {
+    name: "Real Estate / REITs",
+    href: "#",
+    ready: false,
+    companies: 10,
+    icon: Home,
+    color: "amber",
+    description:
+      "Property developers and listed REITs. Key drivers include the interest rate cycle, rental yields, REIT regulatory development, and government housing schemes.",
+    gdpSharePct: 2.1,
+    psxWeightPct: 1.3,
+    marketCapPkrBn: 121,
+    exportSharePct: 0,
+    specializedMetrics: "Rental yield, occupancy rate, property valuations, development pipeline, REIT NAV",
+  },
+  {
+    name: "Transport",
+    href: "#",
+    ready: false,
+    companies: 5,
+    icon: Bus,
+    color: "cyan",
+    description:
+      "Road, air, and logistics companies. Key drivers include fuel costs, freight rates, Karachi port throughput, and government infrastructure investment under CPEC.",
+    gdpSharePct: 3.8,
+    psxWeightPct: 1.2,
+    marketCapPkrBn: 112,
+    exportSharePct: 0,
+    specializedMetrics: "Fleet utilization, fuel cost/km, freight rates, port throughput, route profitability",
+  },
+  {
+    name: "Paper & Board",
+    href: "#",
+    ready: false,
+    companies: 5,
+    icon: FileText,
+    color: "gray",
+    description:
+      "Paper manufacturing and packaging products. Key drivers include wastepaper import costs, energy tariffs, and downstream packaging demand from FMCG companies.",
+    gdpSharePct: 0.3,
+    psxWeightPct: 0.4,
+    marketCapPkrBn: 37,
+    exportSharePct: 0.2,
+    specializedMetrics: "Production volume (tons), wastepaper input cost, energy intensity, FMCG packaging demand",
+  },
+  {
+    name: "Tobacco",
+    href: "#",
+    ready: false,
+    companies: 2,
+    icon: Package,
+    color: "rose",
+    description:
+      "Cigarette manufacturing under excise-driven revenue models. Key drivers include illicit trade volumes, annual FED revisions, consumer down-trading, and plain-packaging regulation.",
+    gdpSharePct: 0.4,
+    psxWeightPct: 0.7,
+    marketCapPkrBn: 65,
+    exportSharePct: 0.1,
+    specializedMetrics: "Volume (sticks sold), illicit trade share, FED structure, pricing power, regulatory pipeline",
+  },
+];
+
+// ── Card component ────────────────────────────────────────────────────────────
+function SectorCard({ s }: { s: SectorDef }) {
+  const c = COLOR[s.color] ?? COLOR.gray;
+  const Icon = s.icon;
+
   const inner = (
-    <div className={`group relative h-full rounded-2xl border bg-surface p-5 transition-colors ${
-      ready
-        ? "border-border hover:border-accent/40 hover:bg-surface-alt cursor-pointer"
-        : "border-border/50 opacity-60 cursor-not-allowed"
-    }`}>
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div>
-          <h3 className="font-semibold">{name}</h3>
-          <p className="text-xs text-muted">{companyCount} {ready ? "covered" : "listed"} companies</p>
+    <div
+      className={`group relative flex h-full flex-col rounded-2xl border bg-surface p-5 transition-colors ${
+        s.ready
+          ? "cursor-pointer border-border hover:border-accent/40 hover:bg-surface-alt"
+          : "border-border/50"
+      }`}
+    >
+      {!s.ready && (
+        <span className="absolute right-4 top-4 rounded-full bg-surface-alt px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted">
+          Soon
+        </span>
+      )}
+
+      {/* Header */}
+      <div className="mb-3 flex items-start gap-3">
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${c.box} ${c.icon}`}>
+          <Icon size={18} />
         </div>
-        {ready && (
-          <ChevronRight size={16} className="mt-0.5 shrink-0 text-muted group-hover:text-accent transition-colors" />
-        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold leading-tight">{s.name}</h3>
+            {s.ready && (
+              <ChevronRight
+                size={15}
+                className="shrink-0 text-muted transition-colors group-hover:text-accent"
+              />
+            )}
+          </div>
+          <p className="text-[11px] text-muted">{s.companies} listed companies</p>
+        </div>
       </div>
 
-      <p className="mb-4 text-xs text-muted leading-relaxed line-clamp-2">{description}</p>
+      {/* Description */}
+      <p className="mb-4 line-clamp-2 text-xs leading-relaxed text-muted">
+        {s.description}
+      </p>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+      {/* Metrics grid */}
+      <div className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted/60 mb-0.5">Market Cap</p>
-          <p className="font-semibold tabular-nums">{fmtBn(marketCap)}</p>
+          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted/60">
+            GDP Share
+          </p>
+          <p className="text-sm font-bold tabular-nums">{s.gdpSharePct.toFixed(1)}%</p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted/60 mb-0.5">Avg Utilization</p>
-          <p className="font-semibold tabular-nums">{fmt(avgUtilization, "%")}</p>
+          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted/60">
+            PSX Weight
+          </p>
+          <p className="text-sm font-bold tabular-nums">{s.psxWeightPct.toFixed(1)}%</p>
+        </div>
+        <div>
+          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted/60">
+            Market Cap
+          </p>
+          <p className="text-sm font-bold tabular-nums">
+            PKR {s.marketCapPkrBn >= 100
+              ? s.marketCapPkrBn.toFixed(0)
+              : s.marketCapPkrBn.toFixed(1)} B
+          </p>
+        </div>
+        <div>
+          <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted/60">
+            Export Share
+          </p>
+          <p className="text-sm font-bold tabular-nums">{s.exportSharePct.toFixed(1)}%</p>
         </div>
       </div>
 
-      <div className="mt-4 border-t border-border/50 pt-3">
-        <p className="text-[10px] uppercase tracking-wider text-muted/60 mb-1">Specialized Metrics</p>
-        <p className="text-xs text-muted">{specializedMetrics}</p>
+      {/* Specialized metrics */}
+      <div className="mt-auto border-t border-border/50 pt-3">
+        <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-muted/60">
+          Specialized Metrics
+        </p>
+        <p className="text-[11px] leading-relaxed text-muted">{s.specializedMetrics}</p>
       </div>
     </div>
   );
 
-  if (!ready) return <div>{inner}</div>;
-  return <Link href={href} className="block h-full">{inner}</Link>;
+  if (!s.ready) return <div className="h-full opacity-70">{inner}</div>;
+  return (
+    <Link href={s.href} className="block h-full">
+      {inner}
+    </Link>
+  );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default async function SectorIntelligencePage() {
-  const [fertilizer, cement, live] = await Promise.all([
-    fetchFertilizerSector(),
-    fetchCementSector(),
-    fetchLiveQuotes(),
-  ]);
+  const live = await fetchLiveQuotes();
   const isLive = live != null && live.quotes.length > 0;
 
   return (
@@ -92,69 +467,22 @@ export default async function SectorIntelligencePage() {
         <main className="flex-1 px-6 py-6 lg:px-8">
           <h1 className="mb-1 text-xl font-semibold">Sector Intelligence</h1>
           <p className="mb-6 text-sm text-muted">
-            Performance, economics, risks and sector-specific KPIs across the PSX
+            Performance, economics, risks, and sector-specific KPIs across all{" "}
+            {SECTORS.length} PSX sectors. Fertilizer and Cement have full data
+            coverage; all other sectors are coming soon.
           </p>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <SectorCard
-              href="/sector/cement"
-              name="Cement"
-              companyCount={cement?.company_count ?? 11}
-              description="The cement sector serves domestic construction, infrastructure and export markets. Key drivers include housing demand, government PSDP spending, coal and gas input costs, and retention pricing."
-              marketCap={cement?.aggregate_market_cap_pkr ?? null}
-              avgUtilization={cement?.avg_capacity_utilization_pct ?? null}
-              specializedMetrics="Dispatches (local+export), capacity utilization, coal cost, retention price, clinker production"
-              ready={!!cement && cement.company_count > 0}
-            />
-
-            <SectorCard
-              href="/sector/fertilizer"
-              name="Fertilizer"
-              companyCount={fertilizer?.company_count ?? 5}
-              description="The fertilizer sector is critical to Pakistan's agriculture-driven economy, producing urea and DAP. Key drivers include gas feedstock pricing, SBP policy rate, government offtake subsidies and crop-cycle demand."
-              marketCap={fertilizer?.aggregate_market_cap_pkr ?? null}
-              avgUtilization={fertilizer?.avg_capacity_utilization_pct ?? null}
-              specializedMetrics="Capacity (tons/day), production volumes, offtake, gas pricing, market share"
-              ready={!!fertilizer && fertilizer.company_count > 0}
-            />
-
-            <SectorCard
-              href="#"
-              name="Commercial Banks"
-              companyCount={21}
-              description="The banking sector is the largest component of the KSE-100, providing credit to the economy. Key metrics include NIM, ADR, NPL ratio, CAR, and deposit growth."
-              marketCap={null}
-              avgUtilization={null}
-              specializedMetrics="Deposits, advances, NIM, ADR, infection ratio, CAR"
-              ready={false}
-            />
-
-            <SectorCard
-              href="#"
-              name="Oil & Gas E&P"
-              companyCount={4}
-              description="The Oil & Gas Exploration & Production sector involves the exploration, development and production of crude oil and natural gas. Key metrics include production volumes, reserves, and realised prices."
-              marketCap={null}
-              avgUtilization={null}
-              specializedMetrics="Production (boe/day), reserves (2P), wellhead prices, depletion rate"
-              ready={false}
-            />
-
-            <SectorCard
-              href="#"
-              name="Oil & Gas Marketing"
-              companyCount={5}
-              description="The Oil & Gas Marketing sector comprises companies engaged in the marketing and distribution of petroleum products. Key metrics include volumes, gross margin per litre, and receivables from government."
-              marketCap={null}
-              avgUtilization={null}
-              specializedMetrics="Volumes (m litres), gross margin/litre, circular debt receivables"
-              ready={false}
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {SECTORS.map((s) => (
+              <SectorCard key={s.name} s={s} />
+            ))}
           </div>
 
-          <p className="mt-6 text-[11px] text-muted">
-            Sectors marked as coming soon are not yet covered by this pilot. Only Cement and
-            Fertilizer have ingested price history, financial data, and AI signal coverage.
+          <p className="mt-6 text-[11px] text-muted/60">
+            GDP share, PSX weight, market cap, and export share figures are
+            representative estimates based on published PSX sector reports and
+            SBP national accounts — not live data. Fertilizer and Cement
+            figures reflect the pilot universe ingested into this platform.
           </p>
         </main>
       </div>

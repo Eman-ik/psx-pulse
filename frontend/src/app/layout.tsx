@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PSX Fertilizer Research | Dashboard",
+  title: "PSX Research | Dashboard",
   description:
-    "PSX Fertilizer sector research dashboard — fundamentals, market data and sample AI signal scoring for a compliance-gated pilot build.",
+    "Pakistan Stock Exchange research platform — fundamentals, market data, sector intelligence, and compliance-gated AI signal scoring across 20 PSX sectors.",
 };
 
 export default function RootLayout({

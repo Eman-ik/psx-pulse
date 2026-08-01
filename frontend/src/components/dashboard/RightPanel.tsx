@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Lock, Sprout, Wallet } from "lucide-react";
+import { ChevronRight, Lock, BarChart2, Wallet } from "lucide-react";
 import type { CompanySummary } from "@/lib/types";
 import { DONUT_COLORS } from "./MarketCapDonut";
 
@@ -24,12 +24,12 @@ export default function RightPanel({
       <div className="rounded-2xl border border-border bg-surface p-5">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent/15 text-accent">
-            <Sprout size={20} />
+            <BarChart2 size={20} />
           </span>
           <div>
-            <p className="font-medium">Fertilizer Sector Pilot</p>
+            <p className="font-medium">PSX Research Pilot</p>
             <p className="text-xs text-muted">
-              {isLive ? "Live prices via psxdata · market cap still sample" : "EOD sample data · updated daily"}
+              {isLive ? "Live prices via psxdata · market cap est." : "EOD sample data · updated daily"}
             </p>
           </div>
         </div>
@@ -38,7 +38,7 @@ export default function RightPanel({
       {/* Sector market cap summary */}
       <div className="rounded-2xl border border-border bg-surface p-5">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm text-muted">Sector Market Cap</p>
+          <p className="text-sm text-muted">Sector Market Cap <span className="text-[10px] text-muted/60">(est.)</span></p>
           <button className="flex items-center text-xs text-accent hover:underline">
             View more <ChevronRight size={14} />
           </button>
@@ -78,7 +78,7 @@ export default function RightPanel({
                   </span>
                   <div>
                     <p className="text-sm font-medium">{c.symbol}</p>
-                    <p className="text-xs text-muted">PKR {c.marketCapPkrBn} bn</p>
+                    <p className="text-xs text-muted">PKR {c.marketCapPkrBn} bn (est.)</p>
                   </div>
                 </div>
                 <span className={`text-xs font-medium ${c.changePct >= 0 ? "text-positive" : "text-negative"}`}>
@@ -102,13 +102,26 @@ export default function RightPanel({
           PUBLIC_SIGNALS_ENABLED pending the compliance review described in the project's
           non-negotiable gate, not by a subscription tier. */}
       <div className="rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/15 to-accent-pink/10 p-5">
-        <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-accent">
-          <Lock size={18} />
-        </span>
-        <p className="mb-1 font-semibold">AI Research Lab</p>
-        <p className="mb-4 text-xs text-muted">
-          Composite quality/growth/valuation scoring and signal engine are built but hidden
-          pending SECP/PSX compliance review — not a paywall.
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-accent">
+            <Lock size={18} />
+          </span>
+          <div>
+            <p className="font-semibold leading-tight">AI Research Lab</p>
+            <p className="text-[10px] text-accent/80 font-medium uppercase tracking-wider">Engine built · pending compliance</p>
+          </div>
+        </div>
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          {["Quality", "Growth", "Valuation", "Financial Health", "Catalyst Risk", "Momentum"].map((dim) => (
+            <div key={dim} className="flex items-center gap-1.5 text-[11px] text-muted">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent/40 shrink-0" />
+              {dim}
+            </div>
+          ))}
+        </div>
+        <p className="mb-4 text-[11px] text-muted/80 leading-relaxed">
+          6-dimension composite scoring for all covered companies. Gated pending PSX data
+          licensing and SECP research-regulation review — not a paywall.
         </p>
         <button
           disabled

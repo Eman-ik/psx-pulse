@@ -6,16 +6,14 @@ import {
   LayoutDashboard,
   Building2,
   SlidersHorizontal,
-  LineChart,
   Newspaper,
   GraduationCap,
   Bell,
   Settings,
   HelpCircle,
   LogOut,
-  Sprout,
+  BarChart2,
   Layers,
-  Factory,
 } from "lucide-react";
 
 const mainNav = [
@@ -36,10 +34,10 @@ export default function Sidebar() {
       <div>
         <div className="mb-8 flex items-center gap-2 px-1">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
-            <Sprout size={18} />
+            <BarChart2 size={18} />
           </span>
           <span className="text-lg font-semibold tracking-tight">
-            Ferti<span className="text-accent">Research</span>
+            PSX<span className="text-accent">Research</span>
           </span>
         </div>
 

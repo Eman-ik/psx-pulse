@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import CompaniesTable from "@/components/companies/CompaniesTable";
@@ -116,12 +116,23 @@ export default async function SectorDetailPage({ params }: Props) {
               </>
             )
           ) : (
-            <div className="rounded-2xl border border-border/50 bg-surface/50 p-8 text-center">
-              <p className="mb-1 font-medium text-muted">Full company data not yet available</p>
-              <p className="text-sm text-muted/60">
-                This sector is in our research pipeline. Price history, financial facts, and AI
-                signal coverage will be added in a future release.
+            <div className="rounded-2xl border border-border bg-surface p-6">
+              <p className="mb-1 font-semibold">
+                {sector.companies} listed companies in this sector
               </p>
+              <p className="mb-4 text-sm text-muted">
+                Individual company pages — price history, financial statements, ratios, and AI signal
+                scoring — are in the research pipeline for this sector. The overview above
+                (description, GDP share, PSX weight, and specialized metrics) reflects published
+                sector data.
+              </p>
+              <Link
+                href="/screener"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-accent/15 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/25 transition-colors"
+              >
+                Browse all covered companies in the Screener
+                <ChevronRight size={14} />
+              </Link>
             </div>
           )}
 

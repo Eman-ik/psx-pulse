@@ -19,7 +19,7 @@ function SectorCard({ s }: { s: (typeof SECTORS)[number] }) {
     >
       {!s.hasData && (
         <span className="absolute right-4 top-4 rounded-full bg-surface-alt px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted">
-          Soon
+          Overview
         </span>
       )}
 
@@ -70,7 +70,7 @@ function SectorCard({ s }: { s: (typeof SECTORS)[number] }) {
 
   return (
     <Link href={s.href} className="block h-full">
-      <div className={!s.hasData ? "opacity-70" : ""}>{inner}</div>
+      {inner}
     </Link>
   );
 }
@@ -88,9 +88,9 @@ export default async function SectorIntelligencePage() {
         <main className="flex-1 px-6 py-6 lg:px-8">
           <h1 className="mb-1 text-xl font-semibold">Sector Intelligence</h1>
           <p className="mb-6 text-sm text-muted">
-            Performance, economics, risks, and sector-specific KPIs across all{" "}
-            {SECTORS.length} PSX sectors. Fertilizer and Cement have full data
-            coverage; all other sectors are coming soon.
+            Economics, KPIs, and company coverage across all {SECTORS.length} PSX sectors.
+            Fertilizer and Cement have full company data and live prices.
+            All other sectors show structural overviews and representative estimates — click any card to explore.
           </p>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

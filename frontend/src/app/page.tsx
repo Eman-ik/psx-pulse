@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Building2, Layers, SlidersHorizontal, Newspaper } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import StatCard from "@/components/dashboard/StatCard";
@@ -139,6 +141,30 @@ export default async function DashboardPage() {
               />
             </div>
 
+            {/* Quick-access strip — surfaces the main research flows */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { href: "/companies", icon: Building2, label: "Companies", sub: "Research pages" },
+                { href: "/sector", icon: Layers, label: "Sectors", sub: "20 PSX sectors" },
+                { href: "/screener", icon: SlidersHorizontal, label: "Screener", sub: "Filter & compare" },
+                { href: "/news", icon: Newspaper, label: "News", sub: "PSX announcements" },
+              ].map(({ href, icon: Icon, label, sub }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-colors hover:border-accent/40 hover:bg-surface-alt"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+                    <Icon size={15} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-tight">{label}</p>
+                    <p className="text-[11px] text-muted">{sub}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[2fr_1fr]">
               <div className="rounded-2xl border border-border bg-surface p-5">
                 <div className="mb-2 flex items-center justify-between">
@@ -202,13 +228,11 @@ export default async function DashboardPage() {
             ? `Prices are live-ish via ${live!.data_source}.`
             : "Sample company prices shown — not a live PSX feed."}{" "}
           {isFertixReal
-            ? `FERTIX is a custom equal-weighted price-return index computed from ${fertix!.bars.length} trading days of PriceOHLCV data (no published PSX fertilizer sub-index exists). `
-            : "Fertilizer Sector Index is sample data. "}
-          {isKseLive
-            ? "KSE-100 is ingested EOD data via psxdata. "
-            : "KSE-100 figures are still sample data. "}
-          Market cap figures remain sample data. Not investment advice. Public launch and AI signal
-          output remain disabled pending PSX data licensing and SECP compliance review.
+            ? `FERTIX is a custom equal-weighted fertilizer index from ${fertix!.bars.length} trading days of EOD data (no PSX sub-index published). `
+            : "FERTIX is sample data. "}
+          {isKseLive ? "KSE-100 is ingested EOD data via psxdata. " : "KSE-100 is sample data. "}
+          Market cap figures are estimates. Not investment advice. Public launch and AI signal output
+          pending PSX data licensing and SECP compliance review.
         </footer>
       </div>
     </div>

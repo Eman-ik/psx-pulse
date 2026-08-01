@@ -53,7 +53,7 @@ export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
               <th className="px-4 py-3 font-medium">Company</th>
               <th className="px-4 py-3 font-medium">Price</th>
               <th className="px-4 py-3 font-medium">Chg %</th>
-              <th className="px-4 py-3 font-medium">Market Cap</th>
+              <th className="px-4 py-3 font-medium">Market Cap <span className="font-normal text-muted/60">(est.)</span></th>
               <th className="px-4 py-3 font-medium">P/E</th>
               <th className="px-4 py-3 font-medium">ROE</th>
               <th className="px-4 py-3 font-medium">Div. Yield</th>

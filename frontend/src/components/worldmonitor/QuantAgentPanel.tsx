@@ -20,10 +20,10 @@ export const QuantAgentPanel: React.FC<QuantAgentPanelProps> = ({
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const PRESET_PROMPTS = [
-    "How does a 100 bps SBP rate cut impact Cement ($LUCK, $DGKC) vs Banking ($MCB, $UBL)?",
-    "Analyze Brent Crude spike to $76.8/bbl on OGDC, PPL, and ATRL revenue and EPS.",
-    "What is the quantitative 30-day outlook for Systems Limited ($SYS) IT exports?",
-    "Evaluate IMF $1.1B tranche conditions on Circular Debt resolution for $HUBC and $KEL."
+    "How does a 100 bps SBP rate cut affect urea offtake margins for FFC and EFERT?",
+    "Analyze the impact of a natural gas price hike on FATIMA's fertilizer production costs.",
+    "What is the outlook for $AGL and $AHCL given current urea demand from Punjab agriculture?",
+    "Compare FFC vs EFERT on dividend yield, payout history, and EPS trend for FY2024."
   ];
 
   useEffect(() => {

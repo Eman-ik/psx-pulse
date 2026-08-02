@@ -32,8 +32,8 @@ export interface PSXNewsItem {
   sentimentScore: number;
   volatilityScore: number;
   impactHorizon: ImpactHorizon;
-  aiAnalysis: string;
-  trendProjection: TrendProjection;
+  aiAnalysis?: string;
+  trendProjection?: TrendProjection;
   geopoliticalRegion?: string;
   isBreaking?: boolean;
   url?: string;

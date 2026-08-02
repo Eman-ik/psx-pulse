@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { PSX_HEATMAP_DATA, EXECUTIVE_MACRO_GEOPOLITICAL_STATUS } from './data/heatmapAndSectorData';
-import { HeatmapStockItem } from './types';
+import { EXECUTIVE_MACRO_GEOPOLITICAL_STATUS } from './data/heatmapAndSectorData';
+import { HeatmapStockItem, HeatmapSectorGroup, SentimentType } from './types';
+import type { LiveQuote, ComparisonRow } from '@/lib/api';
 import {
   ResponsiveContainer,
   LineChart,
@@ -52,6 +53,9 @@ import {
 } from 'lucide-react';
 
 interface MarketHeatmapProps {
+  liveQuotes?: LiveQuote[];
+  comparison?: ComparisonRow[];
+  companyById?: Record<number, { name: string; symbol: string | null }>;
   onAskAgent?: (prompt: string) => void;
 }
 
@@ -98,7 +102,12 @@ const Sparkline24h: React.FC<{ data?: number[]; isPositive: boolean; width?: num
   );
 };
 
-export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
+export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({
+  liveQuotes = [],
+  comparison = [],
+  companyById = {},
+  onAskAgent,
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('ALL');
   const [colorMetric, setColorMetric] = useState<'changePct' | 'sentiment'>('changePct');
@@ -112,6 +121,58 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
   const [macroTab, setMacroTab] = useState<'overview' | 'factors' | 'rationale' | 'opportunities'>('overview');
 
   const macroData = EXECUTIVE_MACRO_GEOPOLITICAL_STATUS;
+
+  // Build real heatmap data from live quotes and comparison endpoint
+  const realHeatmapData: HeatmapSectorGroup[] = useMemo(() => {
+    if (liveQuotes.length === 0) return [];
+    const compBySymbol = Object.fromEntries(comparison.map(c => [c.symbol ?? '', c]));
+    const stocks: HeatmapStockItem[] = liveQuotes
+      .filter(q => q.symbol && q.price != null)
+      .map(q => {
+        const comp = compBySymbol[q.symbol!];
+        const price = q.price ?? 0;
+        const changePct = q.change_pct ?? 0;
+        const changePkr = price !== 0 ? (price * changePct) / (100 + changePct) : 0;
+        const marketCapBillion = comp?.market_cap ? comp.market_cap / 1_000_000 : 0;
+        const volumeStr = q.volume
+          ? q.volume >= 1_000_000
+            ? `${(q.volume / 1_000_000).toFixed(2)}M`
+            : `${(q.volume / 1_000).toFixed(1)}K`
+          : 'N/A';
+        const score = comp?.ai_signal === 'strong_buy' ? 80
+          : comp?.ai_signal === 'buy' ? 55
+          : comp?.ai_signal === 'hold' ? 0
+          : comp?.ai_signal === 'sell' ? -40
+          : 0;
+        const sentiment: SentimentType = score > 20 ? 'BULLISH' : score < -20 ? 'BEARISH' : 'NEUTRAL';
+        return {
+          ticker: q.symbol!,
+          name: q.name,
+          sector: 'Fertilizer',
+          price,
+          changePct,
+          changePkr,
+          marketCapBillion,
+          volume: volumeStr,
+          high52: 0,
+          low52: 0,
+          sentimentScore: score,
+          sentiment,
+          peRatio: (q.pe_ratio && q.pe_ratio !== 0) ? q.pe_ratio : undefined,
+          dividendYieldPct: (q.dividend_yield && q.dividend_yield !== 0) ? q.dividend_yield : undefined,
+        };
+      });
+    const avgChangePct = stocks.length
+      ? stocks.reduce((a, s) => a + s.changePct, 0) / stocks.length
+      : 0;
+    const totalMarketCapBillion = stocks.reduce((a, s) => a + s.marketCapBillion, 0);
+    return [{
+      sector: 'Fertilizer',
+      totalMarketCapBillion,
+      avgChangePct,
+      stocks,
+    }];
+  }, [liveQuotes, comparison]);
 
   const toggleCompareSector = (sectorName: string) => {
     setComparedSectors(prev => {
@@ -130,15 +191,15 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
   };
 
   const totalMarketCap = useMemo(() => {
-    return PSX_HEATMAP_DATA.reduce((acc, sec) => acc + sec.totalMarketCapBillion, 0);
-  }, []);
+    return realHeatmapData.reduce((acc, sec) => acc + sec.totalMarketCapBillion, 0);
+  }, [realHeatmapData]);
 
   const marketBreadth = useMemo(() => {
     let advancers = 0;
     let decliners = 0;
     let unchanged = 0;
 
-    PSX_HEATMAP_DATA.forEach(sec => {
+    realHeatmapData.forEach(sec => {
       sec.stocks.forEach(stk => {
         if (stk.changePct > 0) advancers++;
         else if (stk.changePct < 0) decliners++;
@@ -147,10 +208,10 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
     });
 
     return { advancers, decliners, unchanged };
-  }, []);
+  }, [realHeatmapData]);
 
-  const filteredSectors = useMemo(() => {
-    return PSX_HEATMAP_DATA.map(sec => {
+  const filteredSectors = useMemo<HeatmapSectorGroup[]>(() => {
+    return realHeatmapData.map(sec => {
       if (selectedSector !== 'ALL' && sec.sector !== selectedSector) {
         return null;
       }
@@ -171,12 +232,12 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
         ...sec,
         stocks: matchingStocks
       };
-    }).filter(Boolean) as typeof PSX_HEATMAP_DATA;
-  }, [searchQuery, selectedSector]);
+    }).filter((x): x is HeatmapSectorGroup => x !== null);
+  }, [realHeatmapData, searchQuery, selectedSector]);
 
   const isolatedSectorObj = useMemo(() => {
     if (selectedSector === 'ALL') return null;
-    const secObj = PSX_HEATMAP_DATA.find(s => s.sector === selectedSector);
+    const secObj = realHeatmapData.find((s: HeatmapSectorGroup) => s.sector === selectedSector);
     if (!secObj) return null;
 
     const sortedByChange = [...secObj.stocks].sort((a, b) => b.changePct - a.changePct);
@@ -189,7 +250,9 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
       : 'N/A';
 
     const avgYield = (secObj.stocks.reduce((acc, s) => acc + (s.dividendYieldPct || 0), 0) / secObj.stocks.length).toFixed(1);
-    const capWeight = ((secObj.totalMarketCapBillion / totalMarketCap) * 100).toFixed(1);
+    const capWeight = totalMarketCap > 0
+      ? ((secObj.totalMarketCapBillion / totalMarketCap) * 100).toFixed(1)
+      : '100.0';
 
     return {
       ...secObj,
@@ -199,7 +262,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
       avgYield,
       capWeight
     };
-  }, [selectedSector, totalMarketCap]);
+  }, [selectedSector, totalMarketCap, realHeatmapData]);
 
   const getItemBackgroundColor = (item: HeatmapStockItem) => {
     if (colorMetric === 'changePct') {
@@ -234,11 +297,10 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-[10px] bg-[#3b82f6] text-white px-2 py-0.5 rounded font-extrabold uppercase tracking-wider">
-                  PSX MACRO INTELLIGENCE
+                  PSX MACRO CONTEXT
                 </span>
-                <span className="text-[10px] text-[#10b981] font-bold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse"></span>
-                  {macroData.lastUpdated}
+                <span className="text-[10px] text-[#a1a1aa] font-bold border border-[#27272a] px-2 py-0.5 rounded">
+                  Editorial analysis — not live data
                 </span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-[#fafafa] mt-0.5">
@@ -614,8 +676,8 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
               onChange={(e) => setSelectedSector(e.target.value)}
               className="bg-[#121214] text-[#fafafa] border border-[#3b82f6]/60 rounded-md px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-[#3b82f6] cursor-pointer hover:bg-[#27272a] transition-all w-full sm:w-72"
             >
-              <option value="ALL">All PSX Sectors (Full Market Heatmap)</option>
-              {PSX_HEATMAP_DATA.map(sec => (
+              <option value="ALL">Fertilizer Sector (pilot universe)</option>
+              {realHeatmapData.map(sec => (
                 <option key={sec.sector} value={sec.sector}>
                   {sec.sector} ({sec.avgChangePct > 0 ? '+' : ''}{sec.avgChangePct}%)
                 </option>
@@ -630,7 +692,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
 
           <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 lg:pb-0">
             <button onClick={() => setSelectedSector('ALL')} className={`px-2.5 py-1 rounded text-[11px] font-mono font-medium transition-all whitespace-nowrap ${selectedSector === 'ALL' ? 'bg-[#3b82f6] text-white font-bold' : 'bg-[#121214] text-[#a1a1aa] hover:text-[#fafafa] border border-[#27272a]'}`}>All</button>
-            {PSX_HEATMAP_DATA.map(sec => (
+            {realHeatmapData.map(sec => (
               <button key={sec.sector} onClick={() => setSelectedSector(sec.sector)} className={`px-2.5 py-1 rounded text-[11px] font-mono font-medium transition-all whitespace-nowrap ${selectedSector === sec.sector ? 'bg-[#27272a] text-[#fafafa] border border-[#3f3f46] font-bold' : 'bg-[#121214] text-[#a1a1aa] hover:text-[#fafafa] border border-[#27272a]'}`}>{sec.sector}</button>
             ))}
           </div>
@@ -639,7 +701,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
             <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-[#a1a1aa]" />
             <input
               type="text"
-              placeholder="Search $OGDC, $SYS..."
+              placeholder="Search $FFC, $EFERT..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#121214] border border-[#27272a] rounded pl-8 pr-3 py-1.5 text-xs text-[#fafafa] placeholder-[#a1a1aa] focus:outline-none focus:border-[#3b82f6]"
@@ -711,7 +773,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
             </div>
           </div>
           <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
-            <button onClick={() => { if (comparedSectors.length < 2) { const other = PSX_HEATMAP_DATA.find(s => s.sector !== comparedSectors[0]); if (other) setComparedSectors([comparedSectors[0], other.sector]); } setIsCompareModalOpen(true); }} className="px-3 py-1.5 bg-[#3b82f6] hover:bg-blue-600 text-white font-mono font-bold text-xs rounded transition-all flex items-center space-x-1.5 cursor-pointer shadow-md">
+            <button onClick={() => { if (comparedSectors.length < 2) { const other = realHeatmapData.find(s => s.sector !== comparedSectors[0]); if (other) setComparedSectors([comparedSectors[0], other.sector]); } setIsCompareModalOpen(true); }} className="px-3 py-1.5 bg-[#3b82f6] hover:bg-blue-600 text-white font-mono font-bold text-xs rounded transition-all flex items-center space-x-1.5 cursor-pointer shadow-md">
               <BarChart2 className="w-4 h-4" /><span>Launch Side-by-Side Comparison Chart</span>
             </button>
             <button onClick={() => setComparedSectors([])} className="p-1.5 bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa] hover:text-[#fafafa] rounded transition-all"><X className="w-4 h-4" /></button>
@@ -723,7 +785,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
         <div className="flex items-center space-x-2">
           <span className="w-2 h-2 rounded-full bg-[#10b981] animate-ping" />
           <span className="font-bold text-[#fafafa]">LIVE TICKER FEED & PULSE ANIMATIONS ACTIVE</span>
-          <span className="text-[10px] bg-[#10b981]/15 text-[#10b981] px-2 py-0.5 rounded border border-[#10b981]/30 font-bold">Real-Time PSX Feed</span>
+          <span className="text-[10px] bg-[#10b981]/15 text-[#10b981] px-2 py-0.5 rounded border border-[#10b981]/30 font-bold">Live EOD quotes · psxdata</span>
         </div>
         <div className="flex items-center space-x-3">
           <span className="font-semibold text-[#fafafa] hidden md:inline">{colorMetric === 'changePct' ? '1D PRICE CHANGE SCALE:' : 'AI SENTIMENT SCORE SCALE:'}</span>
@@ -915,14 +977,14 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#18181b] p-3.5 rounded-lg border border-[#27272a]">
               <div>
                 <label className="text-[10px] text-[#3b82f6] font-bold block mb-1">SECTOR A (PRIMARY)</label>
-                <select value={comparedSectors[0] || PSX_HEATMAP_DATA[0].sector} onChange={(e) => setComparedSectors([e.target.value, comparedSectors[1] || PSX_HEATMAP_DATA[1].sector])} className="w-full bg-[#121214] text-[#fafafa] border border-[#27272a] rounded px-3 py-1.5 text-xs font-mono focus:border-[#3b82f6] outline-none">
-                  {PSX_HEATMAP_DATA.map(s => <option key={s.sector} value={s.sector}>{s.sector}</option>)}
+                <select value={comparedSectors[0] || realHeatmapData[0].sector} onChange={(e) => setComparedSectors([e.target.value, comparedSectors[1] || realHeatmapData[1].sector])} className="w-full bg-[#121214] text-[#fafafa] border border-[#27272a] rounded px-3 py-1.5 text-xs font-mono focus:border-[#3b82f6] outline-none">
+                  {realHeatmapData.map(s => <option key={s.sector} value={s.sector}>{s.sector}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-[10px] text-[#10b981] font-bold block mb-1">SECTOR B (BENCHMARK)</label>
-                <select value={comparedSectors[1] || PSX_HEATMAP_DATA[1].sector} onChange={(e) => setComparedSectors([comparedSectors[0] || PSX_HEATMAP_DATA[0].sector, e.target.value])} className="w-full bg-[#121214] text-[#fafafa] border border-[#27272a] rounded px-3 py-1.5 text-xs font-mono focus:border-[#10b981] outline-none">
-                  {PSX_HEATMAP_DATA.map(s => <option key={s.sector} value={s.sector}>{s.sector}</option>)}
+                <select value={comparedSectors[1] || realHeatmapData[1].sector} onChange={(e) => setComparedSectors([comparedSectors[0] || realHeatmapData[0].sector, e.target.value])} className="w-full bg-[#121214] text-[#fafafa] border border-[#27272a] rounded px-3 py-1.5 text-xs font-mono focus:border-[#10b981] outline-none">
+                  {realHeatmapData.map(s => <option key={s.sector} value={s.sector}>{s.sector}</option>)}
                 </select>
               </div>
             </div>
@@ -930,13 +992,13 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-[#fafafa] flex items-center gap-1.5"><Activity className="w-4 h-4 text-[#3b82f6]" />24-HOUR INTRADAY PERFORMANCE TRAJECTORY (%)</span>
-                <span className="text-[10px] text-[#a1a1aa]">Real-Time PSX Feed</span>
+                <span className="text-[10px] text-[#a1a1aa]">Live EOD quotes · psxdata</span>
               </div>
               <div className="h-60 bg-[#18181b] border border-[#27272a] rounded-lg p-3">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={(() => {
-                    const secA = PSX_HEATMAP_DATA.find(s => s.sector === (comparedSectors[0] || PSX_HEATMAP_DATA[0].sector));
-                    const secB = PSX_HEATMAP_DATA.find(s => s.sector === (comparedSectors[1] || PSX_HEATMAP_DATA[1].sector));
+                    const secA = realHeatmapData.find(s => s.sector === (comparedSectors[0] || realHeatmapData[0].sector));
+                    const secB = realHeatmapData.find(s => s.sector === (comparedSectors[1] || realHeatmapData[1].sector));
                     const changeA = secA ? secA.avgChangePct : 1.5;
                     const changeB = secB ? secB.avgChangePct : -0.8;
                     const times = ['09:30', '10:30', '11:30', '12:30', '13:30', '14:30', '15:30'];
@@ -954,8 +1016,8 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
                     <YAxis stroke="#a1a1aa" fontSize={10} tickFormatter={(val) => `${val}%`} />
                     <Tooltip contentStyle={{ backgroundColor: '#121214', borderColor: '#27272a', borderRadius: '8px', color: '#fafafa', fontSize: '11px' }} formatter={(val: any) => [`${val}%`, 'Change']} />
                     <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                    <Line type="monotone" dataKey={comparedSectors[0] || PSX_HEATMAP_DATA[0].sector} stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey={comparedSectors[1] || PSX_HEATMAP_DATA[1].sector} stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey={comparedSectors[0] || realHeatmapData[0].sector} stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey={comparedSectors[1] || realHeatmapData[1].sector} stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -967,7 +1029,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
                 Comparing <strong className="text-[#fafafa]">{comparedSectors[0] || 'Sector A'}</strong> with <strong className="text-[#fafafa]">{comparedSectors[1] || 'Sector B'}</strong> reveals distinct risk-reward profiles. {comparedSectors[0] || 'Sector A'} offers higher dividend yield support in an easing monetary environment, whereas {comparedSectors[1] || 'Sector B'} provides greater beta sensitivity for capital growth.
               </p>
               <div className="flex items-center justify-end pt-2 border-t border-[#27272a]">
-                <button onClick={() => { const sA = comparedSectors[0] || PSX_HEATMAP_DATA[0].sector; const sB = comparedSectors[1] || PSX_HEATMAP_DATA[1].sector; setIsCompareModalOpen(false); if (onAskAgent) onAskAgent(`QuantAgent, compare trade opportunities between the ${sA} sector and ${sB} sector. Which sector has better risk-adjusted return potential over the next 3 to 6 months based on macro interest rates and sentiment?`); }} className="px-4 py-2 bg-[#10b981] hover:bg-[#059669] text-white font-mono font-bold text-xs rounded transition-all flex items-center space-x-2 cursor-pointer shadow-md">
+                <button onClick={() => { const sA = comparedSectors[0] || realHeatmapData[0].sector; const sB = comparedSectors[1] || realHeatmapData[1].sector; setIsCompareModalOpen(false); if (onAskAgent) onAskAgent(`QuantAgent, compare trade opportunities between the ${sA} sector and ${sB} sector. Which sector has better risk-adjusted return potential over the next 3 to 6 months based on macro interest rates and sentiment?`); }} className="px-4 py-2 bg-[#10b981] hover:bg-[#059669] text-white font-mono font-bold text-xs rounded transition-all flex items-center space-x-2 cursor-pointer shadow-md">
                   <Bot className="w-4 h-4" /><span>Ask QuantAgent to Compare Trade Options</span>
                 </button>
               </div>
@@ -986,7 +1048,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({ onAskAgent }) => {
         </div>
         <div className="py-3 bg-[#09090b] overflow-hidden relative">
           <div className="animate-ticker space-x-6 px-4">
-            {[...PSX_HEATMAP_DATA, ...PSX_HEATMAP_DATA].map((sec, idx) => (
+            {[...realHeatmapData, ...realHeatmapData].map((sec, idx) => (
               <div key={`${sec.sector}-${idx}`} onClick={() => setSelectedSector(sec.sector)} className="inline-flex items-center space-x-2 px-3 py-1.5 bg-[#121214] hover:bg-[#27272a] border border-[#27272a] hover:border-[#3b82f6] rounded cursor-pointer transition-all shrink-0 font-mono text-xs">
                 <span className="font-bold text-[#fafafa]">{sec.sector}</span>
                 <span className={`font-extrabold px-1.5 py-0.2 rounded text-[11px] ${sec.avgChangePct >= 0 ? 'bg-[#10b981]/15 text-[#10b981]' : 'bg-[#ef4444]/15 text-[#ef4444]'}`}>

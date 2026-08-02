@@ -31,8 +31,6 @@ interface LiveNewsTerminalProps {
   setSearchQuery: (query: string) => void;
   onOpenNewsDetail: (news: PSXNewsItem) => void;
   onAskAgent: (prompt: string) => void;
-  isScanningWeb: boolean;
-  onTriggerScan: () => void;
 }
 
 export const LiveNewsTerminal: React.FC<LiveNewsTerminalProps> = ({
@@ -47,20 +45,15 @@ export const LiveNewsTerminal: React.FC<LiveNewsTerminalProps> = ({
   setSearchQuery,
   onOpenNewsDetail,
   onAskAgent,
-  isScanningWeb,
-  onTriggerScan
 }) => {
   const [expandedProjectionId, setExpandedProjectionId] = useState<string | null>(null);
 
-  const popularTickers = ['OGDC', 'PPL', 'SYS', 'MCB', 'LUCK', 'HUBC', 'ENGRO', 'FFC', 'DGKC', 'TRG'];
+  // Pilot universe — only these 5 active companies are tracked
+  const popularTickers = ['FFC', 'EFERT', 'FATIMA', 'AGL', 'AHCL'];
 
   const categoriesList: { key: NewsCategory; label: string }[] = [
-    { key: 'ALL', label: 'All Intelligence' },
+    { key: 'ALL', label: 'All Announcements' },
     { key: 'PSX_EQUITIES', label: 'PSX Companies' },
-    { key: 'GEOPOLITICS', label: 'Geopolitics' },
-    { key: 'MACRO_SBP_IMF', label: 'Macro / SBP / IMF' },
-    { key: 'COMMODITIES_FX', label: 'Commodities & FX' },
-    { key: 'QUANT_SIGNALS', label: 'Quant Signals' }
   ];
 
   const filteredItems = newsItems.filter(item => {
@@ -386,7 +379,7 @@ export const LiveNewsTerminal: React.FC<LiveNewsTerminalProps> = ({
                     </button>
                   </div>
 
-                  <span className="text-[11px] font-mono text-[#a1a1aa]">AI Grounded Evaluation</span>
+                  <span className="text-[11px] font-mono text-[#a1a1aa]">Official PSX Filing</span>
                 </div>
 
               </div>
@@ -395,17 +388,10 @@ export const LiveNewsTerminal: React.FC<LiveNewsTerminalProps> = ({
         ) : (
           <div className="p-12 bg-[#121214] border border-[#27272a] rounded-lg text-center space-y-4">
             <Compass className="w-12 h-12 text-[#a1a1aa] mx-auto animate-pulse" />
-            <h3 className="text-lg font-bold font-mono text-[#fafafa]">No matching intelligence items found</h3>
+            <h3 className="text-lg font-bold font-mono text-[#fafafa]">No announcements matched your filters</h3>
             <p className="text-xs text-[#a1a1aa] max-w-md mx-auto">
-              Try adjusting your category, sentiment, or ticker filter, or run an AI Web Scan to scrape the latest breaking news.
+              Try clearing the ticker or sentiment filter, or use the search box above.
             </p>
-            <button
-              onClick={onTriggerScan}
-              disabled={isScanningWeb}
-              className="px-4 py-2 bg-[#3b82f6] hover:bg-blue-600 text-white font-mono text-xs font-bold rounded-md shadow-xs"
-            >
-              Run AI Web Scan Now
-            </button>
           </div>
         )}
       </div>

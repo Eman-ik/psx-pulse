@@ -40,8 +40,11 @@ export const WorldGeopoliticalMap: React.FC<WorldGeopoliticalMapProps> = ({
             Geopolitical Stress Map & PSX Contagion Radar
           </h2>
           <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-3xl">
-            Interactive visualizer mapping maritime supply channels, IMF Washington directives, SBP monetary policy shifts, and CPEC corridors directly to PSX listed company earnings.
+            Curated editorial context on macro stress zones that affect fertilizer sector inputs (gas feedstock, import costs, subsidy policy). Not live intelligence — editorial analysis only.
           </p>
+          <span className="inline-flex items-center gap-1.5 mt-1.5 text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+            Editorial analysis — not live data
+          </span>
         </div>
 
         <div className="flex items-center space-x-3 shrink-0">
@@ -252,7 +255,7 @@ export const WorldGeopoliticalMap: React.FC<WorldGeopoliticalMapProps> = ({
                     ))
                   ) : (
                     <div className="p-4 bg-[#0b0e16] border border-slate-800 rounded-lg text-center text-xs text-slate-500 font-mono">
-                      No direct breaking alerts for this specific hotspot in the last hour.
+                      No fertilizer sector announcements matched this hotspot's tickers.
                     </div>
                   )}
                 </div>
@@ -266,7 +269,7 @@ export const WorldGeopoliticalMap: React.FC<WorldGeopoliticalMapProps> = ({
           )}
 
           <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
-            <span>DATA SOURCE: GROUNDED SEARCH & PSX FEED</span>
+            <span className="text-amber-400/80">Curated editorial context — not live data</span>
             <button
               onClick={() => onSelectHotspotNewsFilter(selectedHotspot?.region || '')}
               className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center space-x-1"

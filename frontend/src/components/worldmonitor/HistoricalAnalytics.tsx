@@ -2,8 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { SectorSentiment } from './types';
-import { HISTORICAL_CHART_DATA } from './data/mockAndInitialData';
-import { SECTOR_SENTIMENT_TRENDS } from './data/heatmapAndSectorData';
+import type { NewsAnnouncement } from '@/lib/api';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -18,48 +17,89 @@ import {
   Area,
   ReferenceLine
 } from 'recharts';
-import { TrendingUp, BarChart3, Layers, Sparkles, Filter, Activity } from 'lucide-react';
+import { TrendingUp, BarChart3, Sparkles, Activity, Grid3X3 } from 'lucide-react';
 import { StrategyBacktester } from './StrategyBacktester';
 
 interface HistoricalAnalyticsProps {
   sectorSentiment: SectorSentiment[];
+  realAnnouncements?: NewsAnnouncement[];
+  companyById?: Record<number, { name: string; symbol: string | null }>;
   onAskAgent?: (promptText: string) => void;
 }
 
+const COMPANY_COLORS: Record<string, string> = {
+  FFC: '#3b82f6',
+  EFERT: '#10b981',
+  FATIMA: '#f59e0b',
+  AGL: '#8b5cf6',
+  AHCL: '#ec4899',
+};
+
 export const HistoricalAnalytics: React.FC<HistoricalAnalyticsProps> = ({
   sectorSentiment,
+  realAnnouncements = [],
+  companyById = {},
   onAskAgent
 }) => {
-  const [selectedMetric, setSelectedMetric] = useState<'kse100' | 'brent' | 'pkrUsd' | 'sentimentScore'>('kse100');
-  const [selectedSectorFilter, setSelectedSectorFilter] = useState<string>('ALL');
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string>('ALL');
 
-  const sectorColors: Record<string, string> = {
-    'Oil & Gas Exploration': '#10b981',
-    'Technology & Telecom': '#3b82f6',
-    'Cement & Construction': '#8b5cf6',
-    'Commercial Banks': '#f59e0b',
-    'Fertilizer': '#ec4899',
-    'Power Generation': '#06b6d4'
-  };
+  const { monthlyData, companyMonthlyData, availableCompanies } = useMemo(() => {
+    type MonthEntry = { count: number; totalSentiment: number; byCategory: Record<string, number> };
+    type CompanyMonthEntry = { count: number; totalSentiment: number };
 
-  const combinedSectorData = useMemo(() => {
-    const dates = SECTOR_SENTIMENT_TRENDS[0]?.history.map(h => h.date) || [];
-    return dates.map((date, idx) => {
-      const row: Record<string, any> = { date };
-      SECTOR_SENTIMENT_TRENDS.forEach(sec => {
-        const point = sec.history[idx];
-        if (point) {
-          row[sec.sector] = point.score;
-        }
+    const monthMap = new Map<string, MonthEntry>();
+    const companyMonthMap = new Map<string, Map<string, CompanyMonthEntry>>();
+    const companySet = new Set<string>();
+
+    for (const a of realAnnouncements) {
+      const month = a.published_at.slice(0, 7);
+      const ticker = a.issuer_id != null ? (companyById[a.issuer_id]?.symbol ?? 'UNK') : 'UNK';
+      const score = a.sentiment_score ?? 0;
+
+      if (!monthMap.has(month)) monthMap.set(month, { count: 0, totalSentiment: 0, byCategory: {} });
+      const entry = monthMap.get(month)!;
+      entry.count++;
+      entry.totalSentiment += score;
+      entry.byCategory[a.category] = (entry.byCategory[a.category] ?? 0) + 1;
+
+      companySet.add(ticker);
+      if (!companyMonthMap.has(ticker)) companyMonthMap.set(ticker, new Map());
+      const cm = companyMonthMap.get(ticker)!;
+      if (!cm.has(month)) cm.set(month, { count: 0, totalSentiment: 0 });
+      const ce = cm.get(month)!;
+      ce.count++;
+      ce.totalSentiment += score;
+    }
+
+    const sortedMonths = Array.from(monthMap.keys()).sort();
+
+    const monthlyData = sortedMonths.map(month => {
+      const e = monthMap.get(month)!;
+      return {
+        date: month.slice(2),
+        fullDate: month,
+        count: e.count,
+        avgSentiment: e.count > 0 ? +(e.totalSentiment / e.count * 100).toFixed(1) : 0,
+        results: e.byCategory['results'] ?? 0,
+        payout: e.byCategory['payout'] ?? 0,
+        leadership: e.byCategory['leadership'] ?? 0,
+        other: (e.byCategory['regulatory'] ?? 0) + (e.byCategory['operations'] ?? 0) + (e.byCategory['general'] ?? 0),
+      };
+    });
+
+    const companyMonthlyData = sortedMonths.map(month => {
+      const row: Record<string, string | number> = { date: month.slice(2) };
+      companyMonthMap.forEach((cm, ticker) => {
+        const ce = cm.get(month);
+        row[ticker] = ce ? +(ce.totalSentiment / ce.count * 100).toFixed(1) : 0;
       });
       return row;
     });
-  }, []);
 
-  const activeSectorData = useMemo(() => {
-    if (selectedSectorFilter === 'ALL') return null;
-    return SECTOR_SENTIMENT_TRENDS.find(s => s.sector === selectedSectorFilter) || null;
-  }, [selectedSectorFilter]);
+    const availableCompanies = Array.from(companySet).filter(t => t !== 'UNK').sort();
+
+    return { monthlyData, companyMonthlyData, availableCompanies };
+  }, [realAnnouncements, companyById]);
 
   const getCorrelationBg = (score: number) => {
     if (score >= 0.7) return 'bg-[#10b981]/15 text-[#10b981] border-[#10b981]/30';
@@ -68,9 +108,18 @@ export const HistoricalAnalytics: React.FC<HistoricalAnalyticsProps> = ({
     return 'bg-[#ef4444]/15 text-[#ef4444] border-[#ef4444]/30';
   };
 
+  const filteredCompanyData = selectedCompanyFilter === 'ALL'
+    ? companyMonthlyData
+    : companyMonthlyData;
+
+  const activeCompanies = selectedCompanyFilter === 'ALL'
+    ? availableCompanies
+    : [selectedCompanyFilter];
+
   return (
     <div className="space-y-6 font-mono">
 
+      {/* Header */}
       <div className="bg-[#121214] border border-[#27272a] rounded-lg p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
         <div>
           <div className="flex items-center space-x-2 text-[#3b82f6] text-xs font-semibold uppercase tracking-wider mb-1">
@@ -81,384 +130,257 @@ export const HistoricalAnalytics: React.FC<HistoricalAnalyticsProps> = ({
             PSX Historical Data & Sector Sentiment Analytics
           </h2>
           <p className="text-[#a1a1aa] text-xs font-sans mt-1 max-w-3xl">
-            Analyze historical correlations between KSE-100 benchmark index levels, Brent Crude oil prices, PKR exchange rates, and AI-derived sentiment trajectories across PSX market sectors over time.
+            Real announcement volume and keyword-derived sentiment trends for the fertilizer sector pilot (FFC, EFERT, FATIMA, AGL, AHCL). Data sourced from 91 official PSX filings in the research DB.
           </p>
         </div>
-
-        <div className="flex items-center space-x-1.5 bg-[#18181b] p-1 rounded-md border border-[#27272a] shrink-0 text-xs">
-          <button
-            onClick={() => setSelectedMetric('kse100')}
-            className={`px-3 py-1.5 rounded transition-all ${
-              selectedMetric === 'kse100'
-                ? 'bg-[#27272a] text-[#fafafa] font-bold border border-[#3f3f46]'
-                : 'text-[#a1a1aa] hover:text-[#fafafa]'
-            }`}
-          >
-            KSE-100 Index
-          </button>
-          <button
-            onClick={() => setSelectedMetric('brent')}
-            className={`px-3 py-1.5 rounded transition-all ${
-              selectedMetric === 'brent'
-                ? 'bg-[#27272a] text-[#fafafa] font-bold border border-[#3f3f46]'
-                : 'text-[#a1a1aa] hover:text-[#fafafa]'
-            }`}
-          >
-            Brent Crude
-          </button>
-          <button
-            onClick={() => setSelectedMetric('sentimentScore')}
-            className={`px-3 py-1.5 rounded transition-all ${
-              selectedMetric === 'sentimentScore'
-                ? 'bg-[#27272a] text-[#fafafa] font-bold border border-[#3f3f46]'
-                : 'text-[#a1a1aa] hover:text-[#fafafa]'
-            }`}
-          >
-            Sentiment Index
-          </button>
-        </div>
+        <span className="text-xs font-mono text-[#10b981] bg-[#10b981]/10 px-3 py-1 rounded border border-[#10b981]/20 shrink-0">
+          {realAnnouncements.length} real DB filings
+        </span>
       </div>
 
       <StrategyBacktester onAskAgent={onAskAgent} />
 
+      {/* Chart 1: Monthly Announcement Volume & Sentiment */}
       <div className="bg-[#121214] border border-[#27272a] rounded-lg p-5 shadow-xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-[#fafafa] uppercase tracking-wider flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-[#3b82f6]" />
-            <span>KSE-100 vs Macro Drivers & Event Timeline (12-Month)</span>
+            <span>Monthly Announcement Volume & Sentiment — Fertilizer Sector</span>
           </h3>
-          <span className="text-xs font-mono text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">
-            Current Benchmark: 114,850.40 pts (+0.54%)
-          </span>
+          <span className="text-[10px] text-[#a1a1aa] font-mono">Keyword sentiment · not AI/LLM</span>
         </div>
 
-        <div className="h-[340px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={HISTORICAL_CHART_DATA}>
-              <defs>
-                <linearGradient id="kse100Gradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis dataKey="date" stroke="#a1a1aa" tick={{ fontSize: 11, fill: '#a1a1aa' }} />
-              <YAxis yAxisId="left" stroke="#3b82f6" tick={{ fontSize: 11, fill: '#3b82f6' }} domain={['dataMin - 2000', 'dataMax + 2000']} />
-              <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" tick={{ fontSize: 11, fill: '#f59e0b' }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#18181b',
-                  borderColor: '#27272a',
-                  borderRadius: '6px',
-                  color: '#fafafa',
-                  fontSize: '12px'
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-              <Area
-                yAxisId="left"
-                type="monotone"
-                dataKey="kse100"
-                name="KSE-100 Index (Pts)"
-                stroke="#3b82f6"
-                fillOpacity={1}
-                fill="url(#kse100Gradient)"
-                strokeWidth={2.5}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="brent"
-                name="Brent Crude ($/bbl)"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="sentimentScore"
-                name="AI Quant Sentiment Score"
-                stroke="#10b981"
-                strokeWidth={2}
-                strokeDasharray="4 4"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+        {monthlyData.length > 0 ? (
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={monthlyData}>
+                <defs>
+                  <linearGradient id="sentGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="date" stroke="#a1a1aa" tick={{ fontSize: 10, fill: '#a1a1aa' }} />
+                <YAxis yAxisId="left" stroke="#10b981" tick={{ fontSize: 10, fill: '#10b981' }} />
+                <YAxis yAxisId="right" orientation="right" stroke="#3b82f6" tick={{ fontSize: 10, fill: '#3b82f6' }} domain={[-100, 100]} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '6px', color: '#fafafa', fontSize: '11px' }}
+                  formatter={(value, name) => [
+                    name === 'Avg Sentiment (×100)' && typeof value === 'number' ? `${value > 0 ? '+' : ''}${value}` : value,
+                    name
+                  ]}
+                />
+                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                <Bar yAxisId="left" dataKey="results" name="Results" stackId="a" fill="#3b82f6" opacity={0.8} />
+                <Bar yAxisId="left" dataKey="payout" name="Payout/Div" stackId="a" fill="#10b981" opacity={0.8} />
+                <Bar yAxisId="left" dataKey="leadership" name="Leadership" stackId="a" fill="#f59e0b" opacity={0.8} />
+                <Bar yAxisId="left" dataKey="other" name="Other" stackId="a" fill="#6b7280" opacity={0.7} />
+                <ReferenceLine yAxisId="right" y={0} stroke="#3f3f46" strokeDasharray="3 3" />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="avgSentiment"
+                  name="Avg Sentiment (×100)"
+                  stroke="#3b82f6"
+                  fill="url(#sentGradient)"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: '#3b82f6' }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-[200px] flex items-center justify-center text-[#a1a1aa] text-xs">
+            No announcement data — check backend connection.
+          </div>
+        )}
 
-        <div className="pt-3 border-t border-[#27272a] space-y-2">
-          <span className="text-xs font-bold text-[#a1a1aa] uppercase tracking-wider block">
-            HISTORICAL EVENT ANNOTATIONS & IMPACT NODES:
-          </span>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            {HISTORICAL_CHART_DATA.map((item, idx) => (
+        {monthlyData.length > 0 && (
+          <div className="pt-2 border-t border-[#27272a] grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            {monthlyData.slice(-4).map((item, idx) => (
               <div key={idx} className="p-2 bg-[#18181b] border border-[#27272a] rounded space-y-0.5">
-                <span className="text-[10px] text-[#3b82f6] font-bold block">{item.date}</span>
-                <span className="text-[11px] text-[#fafafa] font-medium truncate block">{item.event}</span>
-                <span className="text-[10px] text-[#a1a1aa]">KSE: {item.kse100.toLocaleString()} pts</span>
+                <span className="text-[10px] text-[#3b82f6] font-bold block">{item.fullDate}</span>
+                <span className="text-[11px] text-[#fafafa] font-medium block">{item.count} announcements</span>
+                <span className={`text-[10px] font-bold ${item.avgSentiment > 0 ? 'text-[#10b981]' : item.avgSentiment < 0 ? 'text-[#ef4444]' : 'text-[#a1a1aa]'}`}>
+                  Sentiment: {item.avgSentiment > 0 ? '+' : ''}{item.avgSentiment}
+                </span>
               </div>
             ))}
           </div>
-        </div>
+        )}
       </div>
 
+      {/* Chart 2: Per-company sentiment trend */}
       <div className="bg-[#121214] border border-[#27272a] rounded-lg p-5 shadow-xs space-y-4">
-
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#27272a] pb-4">
           <div>
             <div className="flex items-center space-x-2 text-[#3b82f6] text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-4 h-4 text-[#3b82f6]" />
-              <span>PSX SECTOR SENTIMENT TREND VISUALIZER</span>
+              <span>PER-COMPANY SENTIMENT TREND — FERTILIZER PILOT</span>
             </div>
             <h3 className="text-base sm:text-lg font-bold text-[#fafafa] font-mono mt-0.5">
-              Historical Sector Sentiment Trajectory (-100 to +100)
+              Monthly Keyword Sentiment by Company (×100)
             </h3>
             <p className="text-xs text-[#a1a1aa] font-sans">
-              Select a sector below to inspect its multi-month sentiment score trajectory, article volume, and key catalyst events.
+              Filter by company to inspect monthly sentiment trajectory derived from official PSX announcement headlines.
             </p>
           </div>
 
           <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 lg:pb-0 shrink-0">
             <button
-              onClick={() => setSelectedSectorFilter('ALL')}
+              onClick={() => setSelectedCompanyFilter('ALL')}
               className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all whitespace-nowrap ${
-                selectedSectorFilter === 'ALL'
+                selectedCompanyFilter === 'ALL'
                   ? 'bg-[#3b82f6] text-white shadow-xs'
                   : 'bg-[#18181b] text-[#a1a1aa] hover:text-[#fafafa] border border-[#27272a]'
               }`}
             >
-              All Sectors (Comparative Overlay)
+              All Companies
             </button>
-            {SECTOR_SENTIMENT_TRENDS.map(sec => (
+            {availableCompanies.map(ticker => (
               <button
-                key={sec.sector}
-                onClick={() => setSelectedSectorFilter(sec.sector)}
+                key={ticker}
+                onClick={() => setSelectedCompanyFilter(ticker)}
                 className={`px-2.5 py-1.5 rounded-md text-xs font-mono font-medium transition-all whitespace-nowrap flex items-center space-x-1.5 ${
-                  selectedSectorFilter === sec.sector
+                  selectedCompanyFilter === ticker
                     ? 'bg-[#27272a] text-[#fafafa] border border-[#3f3f46] font-bold'
                     : 'bg-[#18181b] text-[#a1a1aa] hover:text-[#fafafa] border border-[#27272a]'
                 }`}
               >
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sec.color }} />
-                <span>{sec.sector}</span>
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COMPANY_COLORS[ticker] ?? '#6b7280' }} />
+                <span>${ticker}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {selectedSectorFilter === 'ALL' ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-[#a1a1aa]">
-              <span>Comparing AI Sentiment Trajectory Across All 6 PSX Major Sectors</span>
-              <span className="text-[#3b82f6]">Baseline: 0 (Neutral Sentiment)</span>
-            </div>
-
-            <div className="h-[360px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={combinedSectorData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                  <XAxis dataKey="date" stroke="#a1a1aa" tick={{ fontSize: 11, fill: '#a1a1aa' }} />
-                  <YAxis stroke="#a1a1aa" tick={{ fontSize: 11, fill: '#a1a1aa' }} domain={[-40, 100]} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#18181b',
-                      borderColor: '#27272a',
-                      borderRadius: '6px',
-                      color: '#fafafa',
-                      fontSize: '12px'
-                    }}
+        {companyMonthlyData.length > 0 ? (
+          <div className="h-[320px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={filteredCompanyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="date" stroke="#a1a1aa" tick={{ fontSize: 10, fill: '#a1a1aa' }} />
+                <YAxis stroke="#a1a1aa" tick={{ fontSize: 10, fill: '#a1a1aa' }} domain={[-100, 100]} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '6px', color: '#fafafa', fontSize: '11px' }}
+                  formatter={(value, name) => [typeof value === 'number' ? `${value > 0 ? '+' : ''}${value}` : value, `$${name}`]}
+                />
+                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                <ReferenceLine y={0} stroke="#3f3f46" strokeDasharray="3 3" label={{ value: 'Neutral (0)', fill: '#a1a1aa', fontSize: 9 }} />
+                <ReferenceLine y={20} stroke="#10b981" strokeDasharray="2 2" opacity={0.3} />
+                <ReferenceLine y={-20} stroke="#ef4444" strokeDasharray="2 2" opacity={0.3} />
+                {activeCompanies.map(ticker => (
+                  <Line
+                    key={ticker}
+                    type="monotone"
+                    dataKey={ticker}
+                    name={ticker}
+                    stroke={COMPANY_COLORS[ticker] ?? '#6b7280'}
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 6 }}
+                    connectNulls
                   />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                  <ReferenceLine y={0} stroke="#3f3f46" strokeDasharray="3 3" label={{ value: 'NEUTRAL (0)', fill: '#a1a1aa', fontSize: 10 }} />
-                  <ReferenceLine y={50} stroke="#10b981" strokeDasharray="2 2" opacity={0.4} />
-
-                  {SECTOR_SENTIMENT_TRENDS.map(sec => (
-                    <Line
-                      key={sec.sector}
-                      type="monotone"
-                      dataKey={sec.sector}
-                      name={sec.sector}
-                      stroke={sec.color}
-                      strokeWidth={2.5}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         ) : (
-          activeSectorData && (
-            <div className="space-y-5">
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#18181b] p-3 rounded-md border border-[#27272a] text-xs">
-                <div>
-                  <span className="text-[#a1a1aa] block text-[10px]">SELECTED SECTOR</span>
-                  <span className="text-[#fafafa] font-bold text-sm">{activeSectorData.sector}</span>
-                </div>
-                <div>
-                  <span className="text-[#a1a1aa] block text-[10px]">LATEST SENTIMENT SCORE</span>
-                  <span className="text-[#10b981] font-bold text-sm">
-                    +{activeSectorData.history[activeSectorData.history.length - 1].score} / 100
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[#a1a1aa] block text-[10px]">6-MONTH CHANGE</span>
-                  <span className="text-[#3b82f6] font-bold text-sm">
-                    +{(activeSectorData.history[activeSectorData.history.length - 1].score - activeSectorData.history[0].score)} pts
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[#a1a1aa] block text-[10px]">TOTAL NEWS ARTICLES</span>
-                  <span className="text-[#fafafa] font-bold text-sm">
-                    {activeSectorData.history.reduce((acc, curr) => acc + curr.newsCount, 0)} Items
-                  </span>
-                </div>
-              </div>
-
-              <div className="h-[320px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={activeSectorData.history}>
-                    <defs>
-                      <linearGradient id="singleSectorGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={activeSectorData.color} stopOpacity={0.4} />
-                        <stop offset="95%" stopColor={activeSectorData.color} stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                    <XAxis dataKey="date" stroke="#a1a1aa" tick={{ fontSize: 11, fill: '#a1a1aa' }} />
-                    <YAxis yAxisId="score" stroke={activeSectorData.color} tick={{ fontSize: 11, fill: activeSectorData.color }} domain={[-30, 100]} />
-                    <YAxis yAxisId="volume" orientation="right" stroke="#a1a1aa" tick={{ fontSize: 11, fill: '#a1a1aa' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#18181b',
-                        borderColor: '#27272a',
-                        borderRadius: '6px',
-                        color: '#fafafa',
-                        fontSize: '12px'
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                    <ReferenceLine yAxisId="score" y={0} stroke="#3f3f46" strokeDasharray="3 3" />
-
-                    <Bar
-                      yAxisId="volume"
-                      dataKey="newsCount"
-                      name="News Volume (Articles)"
-                      fill="#27272a"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Area
-                      yAxisId="score"
-                      type="monotone"
-                      dataKey="score"
-                      name="AI Sentiment Score (-100 to +100)"
-                      stroke={activeSectorData.color}
-                      fillOpacity={1}
-                      fill="url(#singleSectorGradient)"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: activeSectorData.color }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-[#27272a]">
-                <span className="text-xs font-bold text-[#fafafa] uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5 text-[#3b82f6]" />
-                  <span>MONTHLY CATALYSTS & GEOPOLITICAL DRIVERS FOR {activeSectorData.sector.toUpperCase()}:</span>
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-                  {activeSectorData.history.map((pt, idx) => (
-                    <div key={idx} className="p-2.5 bg-[#18181b] border border-[#27272a] rounded space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-[#3b82f6]">{pt.date}</span>
-                        <span className="text-[10px] font-bold text-[#10b981] bg-[#10b981]/10 px-1.5 py-0.2 rounded">
-                          +{pt.score} pts
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#fafafa] font-sans leading-tight">
-                        {pt.keyEvent}
-                      </p>
-                      <div className="text-[10px] text-[#a1a1aa] flex justify-between">
-                        <span>Bullish Ratio: {Math.round(pt.bullishRatio * 100)}%</span>
-                        <span>{pt.newsCount} articles</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-          )
+          <div className="h-[200px] flex items-center justify-center text-[#a1a1aa] text-xs">
+            No announcement data — check backend connection.
+          </div>
         )}
 
+        {availableCompanies.length > 0 && (
+          <div className="pt-3 border-t border-[#27272a] space-y-2">
+            <span className="text-xs font-bold text-[#fafafa] uppercase tracking-wider flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-[#3b82f6]" />
+              <span>COMPANY ANNOUNCEMENT BREAKDOWN:</span>
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+              {availableCompanies.map(ticker => {
+                const co = Object.values(companyById).find(c => c.symbol === ticker);
+                const count = realAnnouncements.filter(a => a.issuer_id != null && companyById[a.issuer_id]?.symbol === ticker).length;
+                const scores = realAnnouncements
+                  .filter(a => a.issuer_id != null && companyById[a.issuer_id]?.symbol === ticker && a.sentiment_score != null)
+                  .map(a => a.sentiment_score!);
+                const avg = scores.length > 0 ? scores.reduce((s, v) => s + v, 0) / scores.length : 0;
+                return (
+                  <div key={ticker} className="p-2 bg-[#18181b] border border-[#27272a] rounded space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COMPANY_COLORS[ticker] ?? '#6b7280' }} />
+                      <span className="font-bold text-[#fafafa]">${ticker}</span>
+                    </div>
+                    <span className="text-[#a1a1aa] block">{count} filings</span>
+                    <span className={`font-bold text-[10px] ${avg > 0.02 ? 'text-[#10b981]' : avg < -0.02 ? 'text-[#ef4444]' : 'text-[#a1a1aa]'}`}>
+                      Avg: {avg > 0 ? '+' : ''}{(avg * 100).toFixed(1)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Sector Sentiment Heatmap (from sectorSentiment prop — real API) */}
       <div className="bg-[#121214] border border-[#27272a] rounded-lg p-5 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-[#fafafa] uppercase tracking-wider flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[#3b82f6]" />
-            <span>PSX Sector Sentiment & Macro Correlation Heatmap</span>
+            <Grid3X3 className="w-4 h-4 text-[#3b82f6]" />
+            <span>Sector Sentiment Overview</span>
           </h3>
-          <span className="text-xs text-[#a1a1aa]">
-            Updated via Real-time AI Sentiment Models
-          </span>
+          <span className="text-[10px] text-[#a1a1aa] font-mono">From sector intelligence API</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sectorSentiment.map((sec) => (
-            <div
-              key={sec.sector}
-              className="p-4 bg-[#18181b] border border-[#27272a] rounded-lg space-y-3 hover:border-[#3f3f46] transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-[#fafafa] text-sm">
-                  {sec.sector}
-                </h4>
-                <span className="text-xs font-bold text-[#10b981]">
-                  {sec.weeklyChange}
-                </span>
-              </div>
+        {sectorSentiment.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sectorSentiment.map((sec) => (
+              <div
+                key={sec.sector}
+                className="p-4 bg-[#18181b] border border-[#27272a] rounded-lg space-y-3 hover:border-[#3f3f46] transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-[#fafafa] text-sm">{sec.sector}</h4>
+                  <span className="text-xs font-bold text-[#10b981]">{sec.weeklyChange}</span>
+                </div>
 
-              <div className="flex items-center justify-between">
-                <span
-                  className={`text-xs font-bold px-2.5 py-0.5 rounded border ${
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded border ${
                     sec.sentiment === 'BULLISH'
                       ? 'bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30'
                       : sec.sentiment === 'BEARISH'
                       ? 'bg-[#ef4444]/10 text-[#ef4444] border-[#ef4444]/30'
                       : 'bg-[#27272a] text-[#a1a1aa] border-[#3f3f46]'
-                  }`}
-                >
-                  {sec.score > 0 ? `+${sec.score}` : sec.score} {sec.sentiment}
-                </span>
-
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded border ${getCorrelationBg(sec.correlationToMacro)}`}
-                  title="Correlation to Macro & Geopolitical Drivers (-1.0 to +1.0)"
-                >
-                  CORR: {sec.correlationToMacro > 0 ? `+${sec.correlationToMacro}` : sec.correlationToMacro}
-                </span>
-              </div>
-
-              <p className="text-xs text-[#a1a1aa] font-sans leading-normal">
-                <strong className="text-[#fafafa] font-mono">Driver:</strong> {sec.keyDriver}
-              </p>
-
-              <div className="flex items-center space-x-1.5 pt-1">
-                <span className="text-[10px] text-[#a1a1aa]">Key constituents:</span>
-                {sec.topTickers.map((t) => (
-                  <span key={t} className="text-[10px] font-bold bg-[#27272a] text-[#3b82f6] px-1.5 py-0.5 rounded">
-                    ${t}
+                  }`}>
+                    {sec.score > 0 ? `+${sec.score}` : sec.score} {sec.sentiment}
                   </span>
-                ))}
+                  <span className={`text-[10px] px-2 py-0.5 rounded border ${getCorrelationBg(sec.correlationToMacro)}`}>
+                    CORR: {sec.correlationToMacro > 0 ? `+${sec.correlationToMacro}` : sec.correlationToMacro}
+                  </span>
+                </div>
+
+                <p className="text-xs text-[#a1a1aa] font-sans leading-normal">
+                  <strong className="text-[#fafafa] font-mono">Driver:</strong> {sec.keyDriver}
+                </p>
+
+                <div className="flex items-center space-x-1.5 pt-1">
+                  <span className="text-[10px] text-[#a1a1aa]">Key constituents:</span>
+                  {sec.topTickers.map((t) => (
+                    <span key={t} className="text-[10px] font-bold bg-[#27272a] text-[#3b82f6] px-1.5 py-0.5 rounded">
+                      ${t}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center text-[#a1a1aa] text-xs py-8">
+            No sector sentiment data available.
+          </div>
+        )}
       </div>
 
     </div>

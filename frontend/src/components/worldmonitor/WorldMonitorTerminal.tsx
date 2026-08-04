@@ -9,6 +9,8 @@ import { HistoricalAnalytics } from './HistoricalAnalytics';
 import { AlertsManager } from './AlertsManager';
 import { MarketHeatmap } from './MarketHeatmap';
 import { CompanyDisclosuresTerminal } from './CompanyDisclosuresTerminal';
+import { NewsTab } from './NewsTab';
+import { EquityResearchTab } from './EquityResearchTab';
 import { NewsDetailModal } from './NewsDetailModal';
 import { ExportReportModal } from './ExportReportModal';
 import type { NewsAnnouncement, LiveQuote, ComparisonRow } from '@/lib/api';
@@ -49,6 +51,8 @@ import {
   FileText,
   Radio,
   Download,
+  Newspaper,
+  FileSearch,
 } from 'lucide-react';
 
 // Convert a real DB announcement to the PSXNewsItem shape used by LiveNewsTerminal.
@@ -116,7 +120,7 @@ export default function WorldMonitorTerminal({
   liveQuotes = [],
   comparison = [],
 }: WorldMonitorTerminalProps) {
-  const [activeTab, setActiveTab] = useState<'stream' | 'map' | 'agent' | 'analytics' | 'alerts' | 'heatmap' | 'disclosures'>('stream');
+  const [activeTab, setActiveTab] = useState<'news' | 'equity' | 'stream' | 'map' | 'agent' | 'analytics' | 'alerts' | 'heatmap' | 'disclosures'>('news');
 
   const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(INITIAL_MACRO_INDICATORS);
   const [hotspots] = useState(MAP_HOTSPOTS);
@@ -398,6 +402,8 @@ Ask me anything about these companies or the fertilizer sector.`,
   const unreadAlertsCount = notifications.filter(n => !n.read).length;
 
   const tabs = [
+    { id: 'news' as const, label: 'News', icon: <Newspaper className="w-4 h-4" /> },
+    { id: 'equity' as const, label: 'Equity Research', icon: <FileSearch className="w-4 h-4" /> },
     { id: 'stream' as const, label: 'Announcements', icon: <Radio className="w-4 h-4" /> },
     { id: 'heatmap' as const, label: 'Market Heatmap', icon: <Grid className="w-4 h-4" /> },
     { id: 'map' as const, label: 'Macro Context', icon: <Globe className="w-4 h-4" /> },
@@ -466,7 +472,16 @@ Ask me anything about these companies or the fertilizer sector.`,
 
       <MacroTickerBanner indicators={macroIndicators} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {activeTab === 'news' && (
+        <NewsTab
+          announcements={realAnnouncements}
+          companyById={companyById}
+        />
+      )}
+
+      {activeTab === 'equity' && <EquityResearchTab />}
+
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 ${activeTab === 'news' || activeTab === 'equity' ? 'hidden' : ''}`}>
 
         {activeTab === 'stream' && (
           <LiveNewsTerminal

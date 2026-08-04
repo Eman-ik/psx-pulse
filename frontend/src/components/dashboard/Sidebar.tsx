@@ -14,6 +14,7 @@ import {
   LogOut,
   BarChart2,
   Layers,
+  FileSearch,
 } from "lucide-react";
 
 const mainNav = [
@@ -22,7 +23,8 @@ const mainNav = [
   { label: "Screener", icon: SlidersHorizontal, href: "/screener" },
   { label: "Sectors", icon: Layers, href: "/sector" },
   { label: "News & Announcements", icon: Newspaper, href: "/news" },
-  { label: "Academy", icon: GraduationCap, href: "#" },
+  { label: "Research Studio", icon: FileSearch, href: "/research" },
+  { label: "Academy", icon: GraduationCap, href: "#", disabled: true },
   { label: "Watchlists & Alerts", icon: Bell, href: "#", disabled: true },
 ];
 

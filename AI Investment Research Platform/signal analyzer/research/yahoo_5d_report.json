@@ -1,0 +1,411 @@
+{
+  "experiment": "five_day_psx_relative_return_baseline",
+  "generated_at": "2026-08-10T10:41:20.463679+05:00",
+  "source": {
+    "provider": "Yahoo Finance via yfinance",
+    "usage": "research_only",
+    "benchmark": "equal_weight_available_downloaded_universe",
+    "available_symbols": 24,
+    "cached_input": "research\\yahoo_psx_panel.csv",
+    "limitations": [
+      "Cached Yahoo research dataset",
+      "Survivorship bias",
+      "Benchmark is not KSE-100"
+    ]
+  },
+  "config": {
+    "horizon_days": 5,
+    "excess_return_threshold": 0.0,
+    "transaction_cost": 0.004,
+    "min_train_days": 504,
+    "test_days": 126,
+    "embargo_days": 5,
+    "buy_probability": 0.6,
+    "sell_probability": 0.4,
+    "minimum_validated_accuracy": 0.6,
+    "minimum_observations": 30
+  },
+  "validation": {
+    "observations": 86279,
+    "accuracy": 0.5095446168824396,
+    "buy_precision": 0.5195402298850574,
+    "sell_precision": 0.6706827309236948,
+    "brier_score": 0.24989943333339934,
+    "roc_auc": 0.5161355123227777
+  },
+  "yearly_out_of_sample": [
+    {
+      "year": 2012,
+      "observations": 4410,
+      "accuracy": 0.493,
+      "mean_probability": 0.4961,
+      "realized_positive_rate": 0.4329
+    },
+    {
+      "year": 2013,
+      "observations": 5481,
+      "accuracy": 0.5258,
+      "mean_probability": 0.4957,
+      "realized_positive_rate": 0.4466
+    },
+    {
+      "year": 2014,
+      "observations": 5666,
+      "accuracy": 0.4922,
+      "mean_probability": 0.5002,
+      "realized_positive_rate": 0.4516
+    },
+    {
+      "year": 2015,
+      "observations": 5896,
+      "accuracy": 0.4954,
+      "mean_probability": 0.5063,
+      "realized_positive_rate": 0.4591
+    },
+    {
+      "year": 2016,
+      "observations": 6003,
+      "accuracy": 0.5052,
+      "mean_probability": 0.4976,
+      "realized_positive_rate": 0.4629
+    },
+    {
+      "year": 2017,
+      "observations": 5978,
+      "accuracy": 0.4851,
+      "mean_probability": 0.508,
+      "realized_positive_rate": 0.4764
+    },
+    {
+      "year": 2018,
+      "observations": 5981,
+      "accuracy": 0.513,
+      "mean_probability": 0.5039,
+      "realized_positive_rate": 0.4961
+    },
+    {
+      "year": 2019,
+      "observations": 6133,
+      "accuracy": 0.5258,
+      "mean_probability": 0.5006,
+      "realized_positive_rate": 0.4743
+    },
+    {
+      "year": 2020,
+      "observations": 6288,
+      "accuracy": 0.5146,
+      "mean_probability": 0.5006,
+      "realized_positive_rate": 0.4505
+    },
+    {
+      "year": 2021,
+      "observations": 6264,
+      "accuracy": 0.5214,
+      "mean_probability": 0.5006,
+      "realized_positive_rate": 0.4572
+    },
+    {
+      "year": 2022,
+      "observations": 6240,
+      "accuracy": 0.4954,
+      "mean_probability": 0.5028,
+      "realized_positive_rate": 0.4854
+    },
+    {
+      "year": 2023,
+      "observations": 6240,
+      "accuracy": 0.5184,
+      "mean_probability": 0.4952,
+      "realized_positive_rate": 0.4487
+    },
+    {
+      "year": 2024,
+      "observations": 6002,
+      "accuracy": 0.5245,
+      "mean_probability": 0.4947,
+      "realized_positive_rate": 0.4577
+    },
+    {
+      "year": 2025,
+      "observations": 6121,
+      "accuracy": 0.5107,
+      "mean_probability": 0.4964,
+      "realized_positive_rate": 0.4362
+    },
+    {
+      "year": 2026,
+      "observations": 3576,
+      "accuracy": 0.5227,
+      "mean_probability": 0.5044,
+      "realized_positive_rate": 0.4757
+    }
+  ],
+  "latest_signals": [
+    {
+      "symbol": "POL",
+      "as_of": "2026-08-07",
+      "price": 688.63,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4596,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "MARI",
+      "as_of": "2026-08-07",
+      "price": 681.53,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4571,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "HUBC",
+      "as_of": "2026-08-07",
+      "price": 225.64,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4511,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "NESTLE",
+      "as_of": "2026-08-07",
+      "price": 7599.87,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4501,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "OGDC",
+      "as_of": "2026-08-07",
+      "price": 319.19,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4498,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "COLG",
+      "as_of": "2026-08-07",
+      "price": 1234.55,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4489,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "NBP",
+      "as_of": "2026-08-07",
+      "price": 206.35,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4484,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "ILP",
+      "as_of": "2026-08-07",
+      "price": 103.97,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4479,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "PPL",
+      "as_of": "2026-08-07",
+      "price": 221.55,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4473,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "UBL",
+      "as_of": "2026-08-07",
+      "price": 475.74,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4471,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "EFERT",
+      "as_of": "2026-08-07",
+      "price": 190.61,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4468,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "PSO",
+      "as_of": "2026-08-07",
+      "price": 350.67,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4461,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "MCB",
+      "as_of": "2026-08-07",
+      "price": 419.92,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4456,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "LUCK",
+      "as_of": "2026-08-07",
+      "price": 458.75,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4454,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "SYS",
+      "as_of": "2026-08-07",
+      "price": 136.52,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4452,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "FFC",
+      "as_of": "2026-08-07",
+      "price": 583.48,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.445,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "INDU",
+      "as_of": "2026-08-07",
+      "price": 1928.78,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4447,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "TRG",
+      "as_of": "2026-08-07",
+      "price": 63.29,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4435,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "BAHL",
+      "as_of": "2026-08-07",
+      "price": 177.65,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4424,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "HBL",
+      "as_of": "2026-08-07",
+      "price": 324.62,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4411,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "DGKC",
+      "as_of": "2026-08-07",
+      "price": 218.03,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4407,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "FCCL",
+      "as_of": "2026-08-07",
+      "price": 57.36,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4401,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "MTL",
+      "as_of": "2026-08-07",
+      "price": 310.34,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.44,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    },
+    {
+      "symbol": "MLCF",
+      "as_of": "2026-08-07",
+      "price": 102.07,
+      "signal": "NO SIGNAL",
+      "outperformance_probability": 0.4386,
+      "evidence_confidence": 0.5323,
+      "validated_buy_precision": 0.5195,
+      "validated_sell_precision": 0.6707,
+      "validation_observations": 86279
+    }
+  ],
+  "target_definition": "stock adjusted 5-day return minus equal-weight research benchmark 5-day return; positive class is excess return > 0",
+  "interpretation": "Research baseline. Signal qualification is evaluated separately from the raw market-outperformance target. SELL is intentionally withheld until a separately validated downside model exists. Do not use for investment decisions."
+}

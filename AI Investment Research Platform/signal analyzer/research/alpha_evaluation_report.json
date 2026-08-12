@@ -1,0 +1,134 @@
+{
+  "methodology": "Daily cross-sectional deciles; portfolio metrics use every fifth trading-date cohort to avoid overlapping target windows.",
+  "round_trip_cost": 0.004,
+  "long_short_cost": 0.008,
+  "deciles": [
+    {
+      "decile": 1,
+      "observations": 4436,
+      "avg_5d_excess_return": -0.002565865041120212,
+      "median_5d_excess_return": -0.005884151879932187,
+      "hit_rate": 0.4294409377817854
+    },
+    {
+      "decile": 2,
+      "observations": 4436,
+      "avg_5d_excess_return": -0.0029989673006197352,
+      "median_5d_excess_return": -0.005125142884835843,
+      "hit_rate": 0.4314697926059513
+    },
+    {
+      "decile": 3,
+      "observations": 6266,
+      "avg_5d_excess_return": -0.0019319231215275169,
+      "median_5d_excess_return": -0.0034908769763082326,
+      "hit_rate": 0.44940951165017556
+    },
+    {
+      "decile": 4,
+      "observations": 4824,
+      "avg_5d_excess_return": -0.001783058737308691,
+      "median_5d_excess_return": -0.00298089810980523,
+      "hit_rate": 0.4521144278606965
+    },
+    {
+      "decile": 5,
+      "observations": 6266,
+      "avg_5d_excess_return": -0.0007980754647067097,
+      "median_5d_excess_return": -0.0028614680690119965,
+      "hit_rate": 0.45515480370252154
+    },
+    {
+      "decile": 6,
+      "observations": 4436,
+      "avg_5d_excess_return": -0.0008030958695911775,
+      "median_5d_excess_return": -0.002907402671716519,
+      "hit_rate": 0.4582957619477006
+    },
+    {
+      "decile": 7,
+      "observations": 4824,
+      "avg_5d_excess_return": -0.00023427835835027505,
+      "median_5d_excess_return": -0.0024571420976702285,
+      "hit_rate": 0.46496683250414594
+    },
+    {
+      "decile": 8,
+      "observations": 6266,
+      "avg_5d_excess_return": 3.2758588995388656e-05,
+      "median_5d_excess_return": -0.0017139780480645017,
+      "hit_rate": 0.473188637089052
+    },
+    {
+      "decile": 9,
+      "observations": 4436,
+      "avg_5d_excess_return": 0.002605108568385735,
+      "median_5d_excess_return": 0.00015910646622874225,
+      "hit_rate": 0.5018034265103697
+    },
+    {
+      "decile": 10,
+      "observations": 6658,
+      "avg_5d_excess_return": 0.005101751638558763,
+      "median_5d_excess_return": 0.0006806332300844931,
+      "hit_rate": 0.5085611294683088
+    }
+  ],
+  "top_decile_long_only_net": {
+    "observations": 445,
+    "mean_5d_return": 0.003074126528437751,
+    "annualized_return": 0.09233462915592594,
+    "annualized_volatility": 0.44085472475133136,
+    "sharpe": 0.3514445197806509,
+    "sortino": 1.092806638572251,
+    "maximum_drawdown": -0.4271463336786774,
+    "hit_rate": 0.4786516853932584,
+    "profit_factor": 1.3107939885977664
+  },
+  "top_minus_bottom_net": {
+    "observations": 442,
+    "mean_5d_return": 0.003300848523732841,
+    "annualized_return": 0.0406229772370299,
+    "annualized_volatility": 0.5811424628256078,
+    "sharpe": 0.28626847328837884,
+    "sortino": 0.6545594496932845,
+    "maximum_drawdown": -0.7558957778563051,
+    "hit_rate": 0.504524886877828,
+    "profit_factor": 1.1766009042590373
+  },
+  "regimes": [
+    {
+      "trend": "BEAR",
+      "volatility": "HIGH_VOL",
+      "top_decile_mean_excess": 0.011537772029611749,
+      "bottom_decile_mean_excess": -0.0002968261854994182,
+      "spread": 0.011834598215111167,
+      "observations": 13321
+    },
+    {
+      "trend": "BEAR",
+      "volatility": "LOW_VOL",
+      "top_decile_mean_excess": 0.004043629730152537,
+      "bottom_decile_mean_excess": -0.0011673734060339593,
+      "spread": 0.005211003136186497,
+      "observations": 7551
+    },
+    {
+      "trend": "BULL",
+      "volatility": "HIGH_VOL",
+      "top_decile_mean_excess": 0.0036347765472833295,
+      "bottom_decile_mean_excess": -0.004848981047905223,
+      "spread": 0.008483757595188553,
+      "observations": 16734
+    },
+    {
+      "trend": "BULL",
+      "volatility": "LOW_VOL",
+      "top_decile_mean_excess": 0.0015997297300659396,
+      "bottom_decile_mean_excess": -0.0027481789439162403,
+      "spread": 0.00434790867398218,
+      "observations": 15242
+    }
+  ],
+  "execution_warning": "Long-short is an alpha diagnostic; short availability and borrow costs are not modeled for PSX."
+}

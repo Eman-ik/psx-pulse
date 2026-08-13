@@ -623,19 +623,22 @@ def run_analyst_synthesis(db: Session, issuer_id: int) -> dict:
         # Step 3: LLM synthesis (preferred) or rule-based synthesis (fallback)
         synthesis: dict = {}
         synthesis_status = "complete"
-        if settings.anthropic_api_key:
+        if settings.gemini_api_key:
             try:
-                import anthropic
-                client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+                from google import genai
+                from google.genai import types
+                client = genai.Client(api_key=settings.gemini_api_key)
                 prompt = _build_prompt(evidence, forensic, capm_diag, factor_model)
-                message = client.messages.create(
-                    model="claude-sonnet-4-6",
-                    max_tokens=4096,
-                    system=SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2,
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        temperature=0.2,
+                        max_output_tokens=4096,
+                    ),
                 )
-                synthesis = _parse_synthesis(message.content[0].text)
+                synthesis = _parse_synthesis(response.text)
                 synthesis_status = "llm_complete"
             except Exception as e:
                 logger.error("LLM synthesis failed for %s: %s — falling back to rule-based", symbol, e)
@@ -643,7 +646,7 @@ def run_analyst_synthesis(db: Session, issuer_id: int) -> dict:
                 synthesis_status = "rule_based_llm_failed"
         else:
             logger.info(
-                "No ANTHROPIC_API_KEY — using rule-based synthesis for %s (deterministic, no LLM).",
+                "No GEMINI_API_KEY — using rule-based synthesis for %s (deterministic, no LLM).",
                 symbol,
             )
             synthesis = _rule_based_synthesis(forensic, capm_diag, evidence)

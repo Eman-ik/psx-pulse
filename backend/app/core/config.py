@@ -36,11 +36,11 @@ class Settings(BaseSettings):
     sbp_easydata_api_key: str | None = None
     sbp_easydata_base_url: str = "https://easydata.sbp.org.pk/api/v1"
 
-    # Anthropic API key for the PSX Senior Analyst Agent (LLM synthesis node).
-    # When unset, the analyst endpoint returns all deterministic data (forensics, CAPM,
-    # factor model) but skips the LLM synthesis step with synthesis_status="requires_api_key".
-    # Obtain a key at https://console.anthropic.com.
-    anthropic_api_key: str | None = None
+    # Gemini API key for the PSX Senior Analyst Agent (LLM synthesis node).
+    # When unset, the analyst endpoint still returns all deterministic data (forensics, CAPM,
+    # factor model) but the synthesis step falls back to rule_based (synthesis_status="rule_based")
+    # instead of an LLM-generated narrative. Obtain a key at https://aistudio.google.com/apikey.
+    gemini_api_key: str | None = None
 
 
 @lru_cache

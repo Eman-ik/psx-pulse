@@ -155,7 +155,7 @@ def trigger_analyst_run(issuer_id: int, db: Session = Depends(get_db)) -> dict:
     """Trigger a new analyst run for an issuer.
 
     Runs synchronously for the pilot (no Celery queue yet). Expected duration 10-60s
-    depending on whether ANTHROPIC_API_KEY is set and the LLM response time.
+    depending on whether GEMINI_API_KEY is set and the LLM response time.
     Returns the completed packet or an error status.
     """
     issuer = db.get(Issuer, issuer_id)

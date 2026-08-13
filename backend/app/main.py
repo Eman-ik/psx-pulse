@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, analyst, comparison, companies, financials, live, macro, market, news, screener, sectors, signals
+from app.api import admin, analyst, comparison, companies, financials, live, macro, market, ml_signals, news, screener, sectors, signals
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -27,6 +27,7 @@ app.include_router(screener.router)
 app.include_router(news.router)
 app.include_router(macro.router)
 app.include_router(signals.router)
+app.include_router(ml_signals.router)
 app.include_router(admin.router)
 
 

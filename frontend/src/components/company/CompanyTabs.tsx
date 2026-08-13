@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ComparisonRow, CompanyOverview, IndexPrices, PriceBar, RatioBenchmark, SignalResearch } from "@/lib/api";
+import type { ComparisonRow, CompanyOverview, IndexPrices, MlSignalResearch, PriceBar, RatioBenchmark, SignalResearch } from "@/lib/api";
 import SummaryTab from "./SummaryTab";
 import CompanyProfile from "./CompanyProfile";
 import OwnershipAndGovernance from "./OwnershipAndGovernance";
@@ -17,6 +17,7 @@ import DataQualityPanel from "./DataQualityPanel";
 import AISignalTab from "./AISignalTab";
 import FinancialStatementsPanel from "./FinancialStatementsPanel";
 import AnalystWorkbenchTab from "./AnalystWorkbenchTab";
+import MLModelTab from "./MLModelTab";
 
 const TABS = [
   "Summary",
@@ -28,6 +29,7 @@ const TABS = [
   "Announcements",
   "Competitors",
   "AI Signal",
+  "ML Model",
   "Analyst",
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -39,6 +41,7 @@ export default function CompanyTabs({
   prices,
   securityId,
   signal,
+  mlSignal,
   kseIndex,
   fertixIndex,
 }: {
@@ -48,6 +51,7 @@ export default function CompanyTabs({
   prices: PriceBar[];
   securityId: number | null;
   signal: SignalResearch | null;
+  mlSignal: MlSignalResearch | null;
   kseIndex: IndexPrices | null;
   fertixIndex: IndexPrices | null;
 }) {
@@ -109,6 +113,8 @@ export default function CompanyTabs({
       {active === "AI Signal" && (
         <AISignalTab signal={signal} prices={prices} data={data} kseIndex={kseIndex} fertixIndex={fertixIndex} />
       )}
+
+      {active === "ML Model" && <MLModelTab signal={mlSignal} />}
 
       {active === "Analyst" && (
         <AnalystWorkbenchTab issuerId={data.issuer.id} />

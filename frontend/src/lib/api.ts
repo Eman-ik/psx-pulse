@@ -530,3 +530,57 @@ export async function fetchCAPMDiagnostics(issuerId: number): Promise<CAPMDiagno
     return null;
   }
 }
+
+// ─── ML signal engine types (walk-forward-validated calibrated classifier) ──────────────────
+
+export interface MlSignalResearch {
+  is_research_only: true;
+  signal: string;
+  disclaimer?: string;
+  reason?: string;
+  as_of_date?: string;
+  model_version?: number;
+  outperformance_probability: number | null;
+  validation_observations: number | null;
+  validation_accuracy: number | null;
+  validation_buy_precision: number | null;
+  validation_sell_precision: number | null;
+  validation_brier_score: number | null;
+  validation_roc_auc: number | null;
+  is_public?: boolean;
+}
+
+export async function fetchMlSignalResearch(issuerId: number): Promise<MlSignalResearch | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/ml-signals/research/${issuerId}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as MlSignalResearch;
+  } catch {
+    return null;
+  }
+}
+
+export interface MlModelEvidence {
+  is_research_only: true;
+  reason?: string;
+  disclaimer?: string;
+  as_of_date?: string;
+  calculated_at?: string;
+  model_version?: number;
+  observations: number | null;
+  accuracy: number | null;
+  buy_precision: number | null;
+  sell_precision: number | null;
+  brier_score: number | null;
+  roc_auc: number | null;
+}
+
+export async function fetchMlModelEvidence(): Promise<MlModelEvidence | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/ml-signals/research/evidence`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as MlModelEvidence;
+  } catch {
+    return null;
+  }
+}

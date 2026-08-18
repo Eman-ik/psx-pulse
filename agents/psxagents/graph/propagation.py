@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from tradingagents.agents.utils.agent_states import (
+from psxagents.agents.utils.agent_states import (
     InvestDebateState,
     RiskDebateState,
 )

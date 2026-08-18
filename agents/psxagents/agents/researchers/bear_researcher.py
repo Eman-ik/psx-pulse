@@ -1,4 +1,4 @@
-from tradingagents.agents.utils.agent_utils import (
+from psxagents.agents.utils.agent_utils import (
     get_instrument_context_from_state,
     get_language_instruction,
 )

@@ -11,7 +11,7 @@ import yfinance as yf
 from langgraph.prebuilt import ToolNode
 
 # Import the abstract tool methods from agent_utils
-from tradingagents.agents.utils.agent_utils import (
+from psxagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_balance_sheet,
     get_cashflow,
@@ -27,12 +27,12 @@ from tradingagents.agents.utils.agent_utils import (
     get_verified_market_snapshot,
     resolve_instrument_identity,
 )
-from tradingagents.agents.utils.memory import TradingMemoryLog
-from tradingagents.dataflows.config import set_config
-from tradingagents.dataflows.utils import safe_ticker_component
-from tradingagents.default_config import DEFAULT_CONFIG
-from tradingagents.llm_clients import create_llm_client
-from tradingagents.reporting import write_report_tree
+from psxagents.agents.utils.memory import TradingMemoryLog
+from psxagents.dataflows.config import set_config
+from psxagents.dataflows.utils import safe_ticker_component
+from psxagents.default_config import DEFAULT_CONFIG
+from psxagents.llm_clients import create_llm_client
+from psxagents.reporting import write_report_tree
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
 from .conditional_logic import ConditionalLogic
@@ -259,7 +259,7 @@ class TradingAgentsGraph:
         actual_holding_days)`` or ``(None, None, None)`` if price data is
         unavailable (too recent, delisted, or network error).
         """
-        from tradingagents.dataflows.symbol_utils import normalize_symbol
+        from psxagents.dataflows.symbol_utils import normalize_symbol
 
         try:
             start = datetime.strptime(trade_date, "%Y-%m-%d")

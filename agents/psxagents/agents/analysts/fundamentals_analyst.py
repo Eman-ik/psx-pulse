@@ -1,6 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from tradingagents.agents.utils.agent_utils import (
+from psxagents.agents.utils.agent_utils import (
     get_balance_sheet,
     get_cashflow,
     get_fundamentals,

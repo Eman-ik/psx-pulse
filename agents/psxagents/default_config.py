@@ -130,13 +130,21 @@ DEFAULT_CONFIG = _apply_env_overrides({
     # The configured value is the exact vendor chain — requests are NOT silently
     # routed to vendors you didn't choose. For ordered fallback, list several,
     # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
+    #
+    # Default vendor is "psx" everywhere real PSX coverage exists (see
+    # dataflows/psx_data.py, backed by the real psx_fertilizer Postgres DB: 672
+    # issuers, 782k+ real daily OHLCV rows, real SBP macro series, real classified
+    # announcements). yfinance/alpha_vantage/fred stay wired into VENDOR_METHODS as
+    # options, but they have no PSX-listed-company coverage, so they are not useful
+    # fallbacks here -- explicitly NOT listed as a fallback chain (Principle: don't
+    # silently fall back to a vendor that will just return no data for a PSX symbol).
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
-        "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
-        "prediction_markets": "polymarket",  # Options: polymarket (keyless)
+        "core_stock_apis": "psx",
+        "technical_indicators": "psx",
+        "fundamental_data": "psx",
+        "news_data": "psx",
+        "macro_data": "psx",
+        "prediction_markets": "default",     # Polymarket only; minimal PSX relevance (see migration map)
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {

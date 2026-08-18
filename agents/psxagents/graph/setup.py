@@ -5,7 +5,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from tradingagents.agents import (
+from psxagents.agents import (
     create_aggressive_debator,
     create_bear_researcher,
     create_bull_researcher,
@@ -20,7 +20,7 @@ from tradingagents.agents import (
     create_sentiment_analyst,
     create_trader,
 )
-from tradingagents.agents.utils.agent_states import AgentState
+from psxagents.agents.utils.agent_states import AgentState
 
 from .analyst_execution import build_analyst_execution_plan
 from .conditional_logic import ConditionalLogic

@@ -22,3 +22,8 @@ Thumbs.db
 # Scratch dev-server copy used for isolated verification (see session notes)
 .verify-frontend/
 ~$*
+
+# Reference clone of upstream TauricResearch/TradingAgents, used to build the
+# KEEP/MODIFY/REPLACE migration map for agents/psxagents/ -- not part of this
+# repo's own history.
+_tradingagents-upstream/

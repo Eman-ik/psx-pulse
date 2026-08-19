@@ -62,6 +62,7 @@ class AgentState(MessagesState):
     equity_research_report: Annotated[
         str, "Real, verified deep-dive report relayed from the Equity-research project's own pipeline"
     ]
+    quant_report: Annotated[str, "Interpretation of the real Kronos quantitative price forecast"]
 
     # researcher team discussion step
     investment_debate_state: Annotated[

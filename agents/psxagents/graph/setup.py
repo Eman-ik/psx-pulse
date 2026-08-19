@@ -17,6 +17,7 @@ from psxagents.agents import (
     create_neutral_debator,
     create_news_analyst,
     create_portfolio_manager,
+    create_quant_analyst,
     create_research_manager,
     create_sentiment_analyst,
     create_trader,
@@ -60,7 +61,8 @@ class GraphSetup:
         self.conditional_logic = conditional_logic
 
     def setup_graph(
-        self, selected_analysts=("market", "social", "news", "fundamentals", "equity_research")
+        self,
+        selected_analysts=("market", "social", "news", "fundamentals", "equity_research", "quant"),
     ):
         """Set up and compile the agent workflow graph.
 
@@ -73,6 +75,8 @@ class GraphSetup:
                 - "equity_research": Relays the real, verified deep-dive report from
                   the separate Equity-research pipeline (see equity_research_tools.py)
                   -- honest not-covered/unavailable for tickers it hasn't researched.
+                - "quant": Real Kronos-model probabilistic price forecast, interpreted
+                  by the LLM but never overridden (see quant_forecast_tools.py).
         """
         plan = build_analyst_execution_plan(selected_analysts)
 
@@ -82,6 +86,7 @@ class GraphSetup:
             "news": lambda: create_news_analyst(self.quick_thinking_llm),
             "fundamentals": lambda: create_fundamentals_analyst(self.quick_thinking_llm),
             "equity_research": lambda: create_equity_research_analyst(self.quick_thinking_llm),
+            "quant": lambda: create_quant_analyst(self.quick_thinking_llm),
         }
 
         # Create researcher and manager nodes

@@ -1,3 +1,4 @@
+from .analysts.equity_research_analyst import create_equity_research_analyst
 from .analysts.fundamentals_analyst import create_fundamentals_analyst
 from .analysts.market_analyst import create_market_analyst
 from .analysts.news_analyst import create_news_analyst
@@ -25,6 +26,7 @@ __all__ = [
     "create_bull_researcher",
     "create_research_manager",
     "create_fundamentals_analyst",
+    "create_equity_research_analyst",
     "create_market_analyst",
     "create_neutral_debator",
     "create_news_analyst",

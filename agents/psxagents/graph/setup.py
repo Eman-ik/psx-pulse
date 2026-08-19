@@ -10,6 +10,7 @@ from psxagents.agents import (
     create_bear_researcher,
     create_bull_researcher,
     create_conservative_debator,
+    create_equity_research_analyst,
     create_fundamentals_analyst,
     create_market_analyst,
     create_msg_delete,
@@ -59,7 +60,7 @@ class GraphSetup:
         self.conditional_logic = conditional_logic
 
     def setup_graph(
-        self, selected_analysts=("market", "social", "news", "fundamentals")
+        self, selected_analysts=("market", "social", "news", "fundamentals", "equity_research")
     ):
         """Set up and compile the agent workflow graph.
 
@@ -69,6 +70,9 @@ class GraphSetup:
                 - "social": Social media analyst
                 - "news": News analyst
                 - "fundamentals": Fundamentals analyst
+                - "equity_research": Relays the real, verified deep-dive report from
+                  the separate Equity-research pipeline (see equity_research_tools.py)
+                  -- honest not-covered/unavailable for tickers it hasn't researched.
         """
         plan = build_analyst_execution_plan(selected_analysts)
 
@@ -77,6 +81,7 @@ class GraphSetup:
             "social": lambda: create_sentiment_analyst(self.quick_thinking_llm),
             "news": lambda: create_news_analyst(self.quick_thinking_llm),
             "fundamentals": lambda: create_fundamentals_analyst(self.quick_thinking_llm),
+            "equity_research": lambda: create_equity_research_analyst(self.quick_thinking_llm),
         }
 
         # Create researcher and manager nodes

@@ -27,6 +27,7 @@ from psxagents.agents.utils.agent_utils import (
     get_verified_market_snapshot,
     resolve_instrument_identity,
 )
+from psxagents.agents.utils.equity_research_tools import get_equity_research_report
 from psxagents.agents.utils.memory import TradingMemoryLog
 from psxagents.dataflows.config import set_config
 from psxagents.dataflows.utils import safe_ticker_component
@@ -67,7 +68,7 @@ class TradingAgentsGraph:
 
     def __init__(
         self,
-        selected_analysts=("market", "social", "news", "fundamentals"),
+        selected_analysts=("market", "social", "news", "fundamentals", "equity_research"),
         debug=False,
         config: dict[str, Any] = None,
         callbacks: list | None = None,
@@ -223,6 +224,13 @@ class TradingAgentsGraph:
                     get_balance_sheet,
                     get_cashflow,
                     get_income_statement,
+                ]
+            ),
+            "equity_research": ToolNode(
+                [
+                    # Relays the real, verified report from the separate
+                    # Equity-research pipeline (see equity_research_tools.py).
+                    get_equity_research_report,
                 ]
             ),
         }

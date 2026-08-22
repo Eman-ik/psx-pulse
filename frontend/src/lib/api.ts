@@ -368,6 +368,43 @@ export async function fetchSignalResearch(issuerId: number): Promise<SignalResea
   }
 }
 
+export interface EquityResearchSection {
+  title: string;
+  content: string;
+  has_real_content: boolean;
+  missing_evidence: string[];
+}
+
+export interface EquityResearchReportResponse {
+  ticker: string;
+  not_covered: boolean;
+  unavailable: boolean;
+  error?: string;
+  coverage_note?: string;
+  company_name?: string;
+  status?: string;
+  is_preliminary?: boolean;
+  published_at?: string | null;
+  sections_total?: number;
+  sections_with_real_content?: number;
+  sections?: EquityResearchSection[];
+}
+
+// Real, citation-grounded report from Equity-research's 8-agent pipeline -- see
+// backend/app/api/equity_research.py. Deliberately not an LLM call from the frontend:
+// this relays whatever the real pipeline actually published, including its gaps.
+export async function fetchEquityResearchReport(ticker: string): Promise<EquityResearchReportResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/equity-research/${encodeURIComponent(ticker)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as EquityResearchReportResponse;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Analyst Agent types ─────────────────────────────────────────────────────
 
 export interface ForensicFlag {

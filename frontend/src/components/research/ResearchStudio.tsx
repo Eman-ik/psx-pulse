@@ -2,22 +2,15 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Search, Loader2, AlertCircle, ChevronRight } from "lucide-react";
-import type { ResearchJSON } from "./ResearchReport";
-import { ResearchReport } from "./ResearchReport";
+import type { EquityResearchReportResponse } from "@/lib/api";
+import { EquityResearchSections } from "./EquityResearchSections";
 
 // ─── Terminal step log ─────────────────────────────────────────────────────────
 
 const STEPS = [
-  "Resolving ticker from PSX database…",
-  "Fetching company overview and financials…",
-  "Loading announcements and dividend history…",
-  "Building research context from DB…",
-  "Running 18-stage institutional equity workflow…",
-  "Reconstructing financial statements…",
-  "Running forensic accounting checks…",
-  "Valuing via DCF / P/E / DDM methods…",
-  "Building scenario analysis…",
-  "Assembling research report…",
+  "Resolving ticker against Equity-research's coverage…",
+  "Fetching the latest published report…",
+  "Loading report sections…",
 ];
 
 function TerminalLog({ activeStep }: { activeStep: number }) {
@@ -59,7 +52,7 @@ export function ResearchStudio() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
-  const [report, setReport] = useState<ResearchJSON | null>(null);
+  const [report, setReport] = useState<EquityResearchReportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -106,13 +99,13 @@ export function ResearchStudio() {
         setError(data.error ?? `Server error ${res.status}`);
         return;
       }
-      if (!data.report) {
+      if (!data.result) {
         setError("No report returned from server.");
         return;
       }
 
       setActiveStep(STEPS.length); // mark all done
-      setReport(data.report as ResearchJSON);
+      setReport(data.result as EquityResearchReportResponse);
       // Scroll to report after short delay so render completes
       setTimeout(() => {
         reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -142,8 +135,9 @@ export function ResearchStudio() {
         </span>
         <h1 className="text-3xl font-bold text-foreground">Research Studio</h1>
         <p className="text-muted text-sm max-w-xl mx-auto font-sans">
-          Type a PSX ticker or company name. The AI runs a full 18-stage
-          institutional equity research workflow and delivers it as a structured report.
+          Type a PSX ticker. Returns the real, citation-grounded report from
+          Equity-research&apos;s deterministic pipeline — currently covering FFC, EFERT,
+          and FATIMA, with per-section coverage shown honestly.
         </p>
       </div>
 
@@ -192,7 +186,7 @@ export function ResearchStudio() {
       {loading && (
         <div className="space-y-4">
           <p className="text-center text-xs font-mono text-muted">
-            Analysis typically takes 60–90 seconds via <span className="text-accent">claude-opus-5</span>
+            Fetching the real, published Equity-research report…
           </p>
           <TerminalLog activeStep={activeStep} />
         </div>
@@ -205,12 +199,6 @@ export function ResearchStudio() {
           <div className="space-y-1">
             <p className="text-sm font-bold text-negative">Analysis Failed</p>
             <p className="text-xs text-muted font-sans">{error}</p>
-            {error.includes("ANTHROPIC_API_KEY") && (
-              <p className="text-xs text-muted font-mono mt-2">
-                Add <code className="bg-surface border border-border rounded px-1">ANTHROPIC_API_KEY=sk-ant-...</code> to{" "}
-                <code className="bg-surface border border-border rounded px-1">frontend/.env.local</code>
-              </p>
-            )}
           </div>
         </div>
       )}
@@ -218,7 +206,7 @@ export function ResearchStudio() {
       {/* ── Report ──────────────────────────────────────────────────────── */}
       {report && !loading && (
         <div ref={reportRef}>
-          <ResearchReport r={report} />
+          <EquityResearchSections r={report} />
         </div>
       )}
 
@@ -226,9 +214,9 @@ export function ResearchStudio() {
       {!loading && !report && !error && (
         <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
           {[
-            { icon: "⚙️", title: "18-Stage Workflow", desc: "From mandate to monitoring KPI dashboard, every institutional research stage covered." },
-            { icon: "📊", title: "Charts & KPIs", desc: "Revenue, NI, EPS, margins, fair value range, scenario table — all rendered live." },
-            { icon: "🎯", title: "Thesis + Falsifiers", desc: "Each thesis pillar comes with a measurable falsifier. No hype. Evidence-first." },
+            { icon: "🔗", title: "Citation-Grounded", desc: "Every claim traces to real evidence — no invented facts, no ungrounded narrative." },
+            { icon: "✅", title: "Honest Coverage", desc: "Each section is marked real or not-yet-available. Gaps are shown, never papered over." },
+            { icon: "🧪", title: "Independently Verified", desc: "Reports pass a separate verification pass before publication." },
           ].map(card => (
             <div key={card.title} className="bg-surface border border-border rounded-xl p-4 space-y-2 text-center">
               <span className="text-2xl">{card.icon}</span>

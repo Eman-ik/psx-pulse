@@ -8,7 +8,8 @@ import {
   ClipboardCheck, CheckCircle2, XCircle, AlertTriangle, TrendingUp,
   BookOpen, Zap,
 } from "lucide-react";
-import { ResearchReport, type ResearchJSON } from "../research/ResearchReport";
+import { EquityResearchSections } from "../research/EquityResearchSections";
+import type { EquityResearchReportResponse } from "@/lib/api";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Framework data — sourced from the Complete Company Research and
@@ -373,18 +374,13 @@ export function EquityResearchTab() {
   // Research runner state
   const [ticker, setTicker] = useState("");
   const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<ResearchJSON | null>(null);
+  const [report, setReport] = useState<EquityResearchReportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stageIdx, setStageIdx] = useState(0);
 
   const runResearch = async (t: string) => {
     const sym = t.trim().toUpperCase();
     if (!sym) return;
-    setLoading(true); setReport(null); setError(null); setStageIdx(0);
-
-    const timer = setInterval(() => {
-      setStageIdx(i => (i < WORKFLOW_STAGES.length - 1 ? i + 1 : i));
-    }, 5000);
+    setLoading(true); setReport(null); setError(null);
 
     try {
       const res = await fetch("/api/research/analyze", {
@@ -394,13 +390,11 @@ export function EquityResearchTab() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? `Server error ${res.status}`); return; }
-      if (!data.report) { setError("No report returned."); return; }
-      setStageIdx(WORKFLOW_STAGES.length);
-      setReport(data.report as ResearchJSON);
+      if (!data.result) { setError("No report returned."); return; }
+      setReport(data.result as EquityResearchReportResponse);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
     } finally {
-      clearInterval(timer);
       setLoading(false);
     }
   };
@@ -499,30 +493,13 @@ export function EquityResearchTab() {
                 </div>
               </div>
 
-              {/* Live stage tracker */}
+              {/* Loading state */}
               {loading && (
-                <div className="max-w-2xl mx-auto bg-[#09090b] border border-[#27272a] rounded-lg p-4 space-y-1">
-                  <p className="text-[9px] text-[#52525b] uppercase tracking-wider pb-2">
-                    Running institutional workflow · 60–90s via claude-opus-5
+                <div className="max-w-2xl mx-auto bg-[#09090b] border border-[#27272a] rounded-lg p-4 flex items-center gap-2 justify-center">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#3b82f6]" />
+                  <p className="text-[11px] text-[#71717a]">
+                    Fetching the real, published Equity-research report…
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                    {WORKFLOW_STAGES.map((s, i) => {
-                      const done = i < stageIdx, active = i === stageIdx;
-                      return (
-                        <div key={s.n} className={`flex items-center gap-2 text-[10px] ${i > stageIdx ? "opacity-25" : ""}`}>
-                          <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0 ${
-                            done ? "bg-[#10b981]/20 text-[#10b981]" : active ? "bg-[#3b82f6]/20 text-[#3b82f6]" : "bg-[#27272a] text-[#52525b]"
-                          }`}>
-                            {done ? "✓" : s.n}
-                          </span>
-                          <span className={done ? "text-[#52525b] line-through" : active ? "text-[#3b82f6]" : "text-[#52525b]"}>
-                            {s.stage}
-                          </span>
-                          {active && <Loader2 className="w-2.5 h-2.5 animate-spin text-[#3b82f6] ml-auto" />}
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               )}
 
@@ -538,7 +515,7 @@ export function EquityResearchTab() {
 
               {report && !loading && (
                 <div className="pt-4 border-t border-[#27272a]">
-                  <ResearchReport r={report} />
+                  <EquityResearchSections r={report} />
                 </div>
               )}
 

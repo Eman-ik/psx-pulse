@@ -5,14 +5,18 @@ LLM narrative (the previous /api/research/analyze implementation, which called
 Anthropic directly with only a light DB context dump -- no citation grounding, no
 verification pass, none of the deterministic engines the real pipeline runs).
 
-Same DB and query shape psxagents/agents/utils/equity_research_tools.py already uses
-to bridge the TradingAgents fork into the same reports -- kept consistent so both
-consumers read one real source of truth instead of drifting.
+Resolves the ticker through external_identity_map (this DB's own canonical cross-system
+mapping -- see app/db/models/identity.py::ExternalIdentityMap) instead of matching ticker
+strings directly against Equity-research's database. That used to mean re-deriving the same
+fuzzy match on every request, here and independently again in
+psxagents/agents/utils/equity_research_tools.py, which has since been switched to call this
+endpoint instead of running its own copy of these queries -- one real implementation, one
+source of truth for "which record in that other database is this company."
 
-Deliberately honest about coverage and completeness: a ticker Equity-research has
-never researched returns not_covered=true, and a section without has_real_content
-is returned as-is (title + missing_evidence) rather than papering over the gap --
-Equity-research's own Principle 5: failure/absence must be visible, never silently
+Deliberately honest about coverage and completeness: a ticker with no mapping row, or a
+mapped company with no published report, returns not_covered=true; a section without
+has_real_content is returned as-is (title + missing_evidence) rather than papering over the
+gap -- Equity-research's own Principle 5: failure/absence must be visible, never silently
 guessed around.
 """
 
@@ -21,18 +25,23 @@ from __future__ import annotations
 import os
 
 import psycopg2
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_db
+from app.db.models import ExternalIdentityMap, Security
 
 router = APIRouter(prefix="/equity-research", tags=["equity-research"])
 
+EXTERNAL_SYSTEM = "equity_research"
 _DEFAULT_EQUITY_RESEARCH_DSN = "postgresql://equity_research:equity_research_dev@localhost:5433/equity_research"
 
-_LATEST_REPORT_SQL = """
+_LATEST_REPORT_BY_COMPANY_SQL = """
     SELECT r.id, r.status, r.is_preliminary, r.published_at, c.legal_name
     FROM analytical.research_reports r
     JOIN core.companies c ON c.id = r.company_id
-    JOIN core.securities s ON s.company_id = c.id
-    WHERE upper(s.ticker) = upper(%s)
+    WHERE c.id = %s
     ORDER BY r.published_at DESC NULLS LAST, r.created_at DESC
     LIMIT 1
 """
@@ -44,15 +53,39 @@ _SECTIONS_SQL = """
     ORDER BY section_order
 """
 
+_NOT_COVERED_NOTE = (
+    "Equity-research's real, citation-grounded pipeline currently only has evidence for "
+    "FFC, EFERT, and FATIMA. Run backend/scripts/sync_equity_research_identity_map.py after "
+    "it covers a new company -- this endpoint only sees companies recorded in "
+    "external_identity_map, not Equity-research's database directly."
+)
+
 
 def _get_connection():
     dsn = os.environ.get("EQUITY_RESEARCH_DATABASE_URL", _DEFAULT_EQUITY_RESEARCH_DSN)
     return psycopg2.connect(dsn)
 
 
+def _not_covered(ticker: str, note: str = _NOT_COVERED_NOTE) -> dict:
+    return {"ticker": ticker, "not_covered": True, "unavailable": False, "coverage_note": note}
+
+
 @router.get("/{ticker}")
-def get_equity_research_report(ticker: str) -> dict:
+def get_equity_research_report(ticker: str, db: Session = Depends(get_db)) -> dict:
     ticker_upper = ticker.upper()
+
+    security = db.execute(select(Security).where(Security.symbol == ticker_upper)).scalar_one_or_none()
+    identity = None
+    if security is not None:
+        identity = db.execute(
+            select(ExternalIdentityMap).where(
+                ExternalIdentityMap.issuer_id == security.issuer_id,
+                ExternalIdentityMap.external_system == EXTERNAL_SYSTEM,
+            )
+        ).scalar_one_or_none()
+
+    if identity is None:
+        return _not_covered(ticker_upper)
 
     try:
         conn = _get_connection()
@@ -66,16 +99,14 @@ def get_equity_research_report(ticker: str) -> dict:
 
     try:
         with conn.cursor() as cur:
-            cur.execute(_LATEST_REPORT_SQL, (ticker_upper,))
+            cur.execute(_LATEST_REPORT_BY_COMPANY_SQL, (identity.external_id,))
             row = cur.fetchone()
             if row is None:
-                return {
-                    "ticker": ticker_upper,
-                    "not_covered": True,
-                    "unavailable": False,
-                    "coverage_note": "Equity-research's real, citation-grounded pipeline "
-                    "currently only has evidence for FFC, EFERT, and FATIMA.",
-                }
+                return _not_covered(
+                    ticker_upper,
+                    f"{ticker_upper} is mapped to Equity-research company "
+                    f"{identity.external_id}, but no report has been published for it yet.",
+                )
             report_id, status, is_preliminary, published_at, company_name = row
 
             cur.execute(_SECTIONS_SQL, (str(report_id),))

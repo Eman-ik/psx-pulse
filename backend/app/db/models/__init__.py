@@ -1,4 +1,4 @@
-from app.db.models.identity import BoardMembership, Issuer, Person, Sector, Security, TickerHistory
+from app.db.models.identity import BoardMembership, ExternalIdentityMap, Issuer, Person, Sector, Security, TickerHistory
 from app.db.models.evidence import EvidenceLink, Extraction, SourceDocument
 from app.db.models.financials import FinancialFact, RatioDefinition, RatioValue
 from app.db.models.market import CorporateAction, IndexOHLCV, MarketIndex, PriceOHLCV
@@ -13,6 +13,7 @@ __all__ = [
     "Issuer",
     "Security",
     "TickerHistory",
+    "ExternalIdentityMap",
     "Person",
     "BoardMembership",
     "SourceDocument",

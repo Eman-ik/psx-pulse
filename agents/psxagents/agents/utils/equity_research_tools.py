@@ -1,12 +1,17 @@
 """
 Real bridge into the Equity-research project (D:/khronos/Equity-research) -- a
 separate, deterministic 8-agent LangGraph pipeline that produces citation-grounded,
-verified research reports, but only for the 3 companies it has real evidence for
-(FFC, EFERT, FATIMA as of 2026-08). Rather than re-running that whole pipeline (which
-makes real LLM calls and can take minutes), this queries its already-published,
-already-persisted reports directly from its own Postgres DB -- the same tables
-Equity-research's own apps/api/main.py serves its report viewer from
-(analytical.research_reports / analytical.research_report_sections).
+verified research reports, but only for the companies it has real evidence for
+(FFC, EFERT, FATIMA as of 2026-08).
+
+Calls the psx-fertilizer backend's GET /equity-research/{ticker} endpoint rather than
+querying Equity-research's Postgres DB directly. That used to mean this file carried its own
+copy of the same SQL backend/app/api/equity_research.py also ran -- two independent
+implementations of the same ticker match, which could silently drift. The backend endpoint is
+now the one real implementation, resolving the ticker through psx_fertilizer's own
+external_identity_map (see app/db/models/identity.py::ExternalIdentityMap) instead of matching
+ticker strings against Equity-research's database directly -- this file just relays whatever
+it says.
 
 Deliberately honest about coverage: a ticker Equity-research has never researched
 returns a clear "not covered" message, not a fabricated summary. Principle 5
@@ -19,32 +24,15 @@ from __future__ import annotations
 import os
 from typing import Annotated
 
-import psycopg2
+import requests
 from langchain_core.tools import tool
 
-_DEFAULT_EQUITY_RESEARCH_DSN = "postgresql://equity_research:equity_research_dev@localhost:5433/equity_research"
-
-_LATEST_REPORT_SQL = """
-    SELECT r.id, r.status, r.is_preliminary, r.published_at
-    FROM analytical.research_reports r
-    JOIN core.companies c ON c.id = r.company_id
-    JOIN core.securities s ON s.company_id = c.id
-    WHERE upper(s.ticker) = upper(%s)
-    ORDER BY r.published_at DESC NULLS LAST, r.created_at DESC
-    LIMIT 1
-"""
-
-_SECTIONS_SQL = """
-    SELECT title, content, has_real_content, missing_evidence
-    FROM analytical.research_report_sections
-    WHERE research_report_id = %s
-    ORDER BY section_order
-"""
+_DEFAULT_BACKEND_BASE_URL = "http://localhost:8001"
+_REQUEST_TIMEOUT_S = 15
 
 
-def _get_connection():
-    dsn = os.environ.get("EQUITY_RESEARCH_DATABASE_URL", _DEFAULT_EQUITY_RESEARCH_DSN)
-    return psycopg2.connect(dsn)
+def _backend_base_url() -> str:
+    return os.environ.get("PSX_BACKEND_BASE_URL", _DEFAULT_BACKEND_BASE_URL)
 
 
 @tool
@@ -64,47 +52,45 @@ def get_equity_research_report(
         str: The real report content (markdown, section by section), or a clear
         unavailable/not-covered message.
     """
+    ticker_upper = ticker.upper()
     try:
-        conn = _get_connection()
-    except Exception as exc:  # noqa: BLE001 -- a DB outage must not crash the whole graph run
+        response = requests.get(
+            f"{_backend_base_url()}/equity-research/{ticker_upper}", timeout=_REQUEST_TIMEOUT_S
+        )
+        response.raise_for_status()
+        data = response.json()
+    except Exception as exc:  # noqa: BLE001 -- a backend/network outage must not crash the graph run
         return (
-            f"EQUITY_RESEARCH_UNAVAILABLE: could not reach the Equity-research database "
-            f"({exc}). This agent's assessment is unavailable for this run; do not "
+            f"EQUITY_RESEARCH_UNAVAILABLE: could not reach the psx-fertilizer backend's "
+            f"equity-research bridge ({exc}). This agent's assessment is unavailable for "
+            f"this run; do not fabricate a substitute."
+        )
+
+    if data.get("unavailable"):
+        return (
+            f"EQUITY_RESEARCH_UNAVAILABLE: {data.get('error', 'the Equity-research database '
+            'is unreachable')}. This agent's assessment is unavailable for this run; do not "
             f"fabricate a substitute."
         )
 
-    try:
-        with conn.cursor() as cur:
-            cur.execute(_LATEST_REPORT_SQL, (ticker,))
-            row = cur.fetchone()
-            if row is None:
-                return (
-                    f"NOT_COVERED: Equity-research has not published a report for "
-                    f"'{ticker.upper()}'. As of 2026-08, its real coverage is limited "
-                    f"to FFC, EFERT, and FATIMA. No deep-dive assessment is available "
-                    f"for this ticker from this agent."
-                )
-            report_id, status, is_preliminary, published_at = row
-
-            cur.execute(_SECTIONS_SQL, (str(report_id),))
-            sections = cur.fetchall()
-    finally:
-        conn.close()
+    if data.get("not_covered"):
+        note = data.get("coverage_note", "No deep-dive assessment is available for this ticker.")
+        return f"NOT_COVERED: Equity-research has not published a report for '{ticker_upper}'. {note}"
 
     header = (
-        f"# Equity Research deep-dive report for {ticker.upper()}\n"
-        f"# Status: {status}{' (preliminary)' if is_preliminary else ''}, "
-        f"published {published_at if published_at else 'not yet published'}\n"
+        f"# Equity Research deep-dive report for {ticker_upper}\n"
+        f"# Status: {data.get('status')}{' (preliminary)' if data.get('is_preliminary') else ''}, "
+        f"published {data.get('published_at') or 'not yet published'}\n"
         f"# Source: Equity-research's real 8-agent pipeline (citation-grounded evidence, "
         f"deterministic financial engines, independent verification pass)\n\n"
     )
 
     parts = [header]
-    for title, content, has_real_content, missing_evidence in sections:
-        if not has_real_content:
-            missing = ", ".join(missing_evidence) if missing_evidence else "insufficient evidence"
-            parts.append(f"## {title}\n_Not yet available: {missing}._\n")
+    for section in data.get("sections", []):
+        if not section.get("has_real_content"):
+            missing = ", ".join(section.get("missing_evidence") or []) or "insufficient evidence"
+            parts.append(f"## {section['title']}\n_Not yet available: {missing}._\n")
             continue
-        parts.append(f"## {title}\n{content}\n")
+        parts.append(f"## {section['title']}\n{section['content']}\n")
 
     return "\n".join(parts)

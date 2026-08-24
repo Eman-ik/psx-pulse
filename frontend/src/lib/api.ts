@@ -614,6 +614,56 @@ export async function fetchMlSignalResearch(issuerId: number): Promise<MlSignalR
   }
 }
 
+// ─── Kronos quant forecast + Signal Qualification Gate ──────────────────────────
+
+export interface SignalQualificationTrackRecord {
+  n_observations: number;
+  hits: number;
+  accuracy: number;
+  p_value_vs_random: number;
+  significant_at_10pct: boolean;
+}
+
+export interface SignalQualification {
+  signal: "BUY" | "SELL" | "HOLD" | "NO_SIGNAL";
+  qualified: boolean;
+  reason: string;
+  track_record: SignalQualificationTrackRecord | null;
+}
+
+export interface QuantForecast {
+  ok: boolean;
+  reason?: string;
+  ticker?: string;
+  issuer_name?: string;
+  as_of_date?: string;
+  last_real_close?: number;
+  horizon_days?: number;
+  model_source?: string;
+  n_samples?: number;
+  p_positive_return?: number;
+  expected_return_pct?: number;
+  downside_var_pct?: number;
+  expected_volatility_pct?: number;
+  trend_regime?: "bullish" | "bearish" | "neutral";
+  model_confidence?: "medium-high" | "medium" | "low";
+  signal_qualification?: SignalQualification;
+}
+
+// Real Kronos ensemble forecast, on-demand only (costs ~5-30s, a genuine 15-sample
+// CPU inference run) -- never bundled into the company page's eager parallel fetch.
+export async function fetchQuantForecast(ticker: string, horizonDays = 5): Promise<QuantForecast | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/quant-forecast/${encodeURIComponent(ticker)}?horizon_days=${horizonDays}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as QuantForecast;
+  } catch {
+    return null;
+  }
+}
+
 export interface MlModelEvidence {
   is_research_only: true;
   reason?: string;

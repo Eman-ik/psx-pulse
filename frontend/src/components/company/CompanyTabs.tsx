@@ -18,6 +18,7 @@ import AISignalTab from "./AISignalTab";
 import FinancialStatementsPanel from "./FinancialStatementsPanel";
 import AnalystWorkbenchTab from "./AnalystWorkbenchTab";
 import MLModelTab from "./MLModelTab";
+import QuantForecastTab from "./QuantForecastTab";
 
 const TABS = [
   "Summary",
@@ -30,6 +31,7 @@ const TABS = [
   "Competitors",
   "AI Signal",
   "ML Model",
+  "Quant Forecast",
   "Analyst",
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -115,6 +117,8 @@ export default function CompanyTabs({
       )}
 
       {active === "ML Model" && <MLModelTab signal={mlSignal} />}
+
+      {active === "Quant Forecast" && <QuantForecastTab ticker={data.symbol} />}
 
       {active === "Analyst" && (
         <AnalystWorkbenchTab issuerId={data.issuer.id} />

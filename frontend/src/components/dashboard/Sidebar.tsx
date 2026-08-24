@@ -23,6 +23,7 @@ const mainNav = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },
   { label: "Companies", icon: Building2, href: "/companies" },
   { label: "Screener", icon: SlidersHorizontal, href: "/screener" },
+  { label: "Ranking", icon: BarChart2, href: "/ranking" },
   { label: "Sectors", icon: Layers, href: "/sector" },
   { label: "News & Announcements", icon: Newspaper, href: "/news" },
   { label: "Research Studio", icon: FileSearch, href: "/research" },

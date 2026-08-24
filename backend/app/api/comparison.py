@@ -3,7 +3,16 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.db.models import FinancialFact, Issuer, RatioDefinition, RatioValue, Security, SignalScore
+from app.db.models import (
+    FinancialFact,
+    Issuer,
+    MlSignalScore,
+    RatioDefinition,
+    RatioValue,
+    Sector,
+    Security,
+    SignalScore,
+)
 from app.ingestion.psx_live import (
     CEMENT_SECTOR_COMPANIES,
     FERTILIZER_SECTOR_COMPANIES,
@@ -11,6 +20,20 @@ from app.ingestion.psx_live import (
 )
 
 router = APIRouter(prefix="/companies", tags=["companies"])
+
+# Same "internal research only, not a regulated recommendation" framing as
+# app/api/ml_signals.py's _DISCLAIMER -- the composite/ML scores below are real
+# (not fabricated), but is_public stays False on the underlying rows per
+# settings.public_signals_enabled/ml_signals_enabled until PSX/SECP compliance
+# review actually completes (see app/core/config.py). Confirmed with the project
+# owner that surfacing them in this internal screener/ranking view (not a public
+# launch surface) is fine for now -- the non-public gate on the stored rows and
+# any future public API/export is untouched by this.
+SCORE_DISCLAIMER = (
+    "Experimental scoring output for internal research only, not a regulated "
+    "investment recommendation. Hidden from any public-facing surface until "
+    "PSX/SECP compliance review completes."
+)
 
 _ALL_PILOT_COMPANIES = FERTILIZER_SECTOR_COMPANIES + CEMENT_SECTOR_COMPANIES
 
@@ -44,8 +67,8 @@ def _latest_ratio_by_issuer(db: Session, ratio_key: str) -> dict[int, float]:
     return {issuer_id: value for issuer_id, (_, value) in latest.items()}
 
 
-def _latest_signals(db: Session) -> dict[int, str]:
-    """Latest non-suppressed composite_signal per issuer, for internal research display."""
+def _latest_signals(db: Session) -> dict[int, SignalScore]:
+    """Latest non-suppressed SignalScore row per issuer, for internal research display."""
     subq = (
         select(SignalScore.issuer_id, func.max(SignalScore.as_of_date).label("max_date"))
         .where(SignalScore.suppressed.is_(False))
@@ -59,7 +82,29 @@ def _latest_signals(db: Session) -> dict[int, str]:
             & (SignalScore.as_of_date == subq.c.max_date),
         )
     ).scalars().all()
-    return {row.issuer_id: row.composite_signal for row in rows}
+    return {row.issuer_id: row for row in rows}
+
+
+def _latest_ml_signals(db: Session) -> dict[int, MlSignalScore]:
+    """Latest MlSignalScore row per issuer (see that model's docstring: signal is never
+    "SELL", a low outperformance_probability is "no edge detected", not a negative call)."""
+    subq = (
+        select(MlSignalScore.issuer_id, func.max(MlSignalScore.as_of_date).label("max_date"))
+        .group_by(MlSignalScore.issuer_id)
+        .subquery()
+    )
+    rows = db.execute(
+        select(MlSignalScore).join(
+            subq,
+            (MlSignalScore.issuer_id == subq.c.issuer_id)
+            & (MlSignalScore.as_of_date == subq.c.max_date),
+        )
+    ).scalars().all()
+    return {row.issuer_id: row for row in rows}
+
+
+def _f(v) -> float | None:
+    return float(v) if v is not None else None
 
 
 @router.get("/ratio-benchmarks")
@@ -90,28 +135,38 @@ def ratio_benchmarks(db: Session = Depends(get_db)) -> dict[str, dict]:
 
 @router.get("/comparison")
 def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
-    """Batch comparison row per covered issuer (fertilizer + cement).
+    """Batch comparison/screener row per covered issuer (fertilizer + cement).
 
     Price / Change / P/E / Div Yield come from live psxdata quotes, with fallbacks:
     - P/E: computed as live_price / latest_annual_eps when psxdata doesn't supply one.
     - Div Yield: computed as latest_annual_dps / live_price × 100 when psxdata omits it.
-    AI Signal is the latest non-suppressed research signal (internal only, no public gate).
+
+    ai_signal/ai_scores/ml_signal are real (never fabricated) but research-only -- see
+    SCORE_DISCLAIMER. A field is null when that issuer has no scoring run on file yet
+    (only 18 of 672 issuers do, as of this pilot), never a placeholder zero.
     """
     issuers = db.execute(
         select(Issuer).where(Issuer.securities.any(Security.is_active.is_(True)))
     ).scalars().all()
     securities = db.execute(select(Security).where(Security.is_active.is_(True))).scalars().all()
     security_by_issuer = {s.issuer_id: s for s in securities}
+    sector_by_id = {s.id: s.name for s in db.execute(select(Sector)).scalars().all()}
 
     live_quotes = fetch_live_snapshots(_ALL_PILOT_COMPANIES)
     live_by_symbol = {q["symbol"]: q for q in live_quotes}
 
     market_cap_by_issuer = _latest_by_issuer(db, "market_cap")
     roe_by_issuer = _latest_ratio_by_issuer(db, "roe")
+    roa_by_issuer = _latest_ratio_by_issuer(db, "roa")
     debt_to_equity_by_issuer = _latest_ratio_by_issuer(db, "debt_to_equity")
+    current_ratio_by_issuer = _latest_ratio_by_issuer(db, "current_ratio")
+    net_margin_by_issuer = _latest_ratio_by_issuer(db, "net_profit_margin")
+    revenue_growth_by_issuer = _latest_ratio_by_issuer(db, "revenue_growth_yoy")
+    eps_growth_by_issuer = _latest_ratio_by_issuer(db, "eps_growth_yoy")
     eps_by_issuer = _latest_by_issuer(db, "eps")
     dps_by_issuer = _latest_by_issuer(db, "dividend_per_share")
     signal_by_issuer = _latest_signals(db)
+    ml_signal_by_issuer = _latest_ml_signals(db)
 
     rows = []
     for issuer in issuers:
@@ -132,19 +187,58 @@ def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
             if price > 0:
                 dividend_yield = round(dps / price * 100, 2)
 
+        signal = signal_by_issuer.get(issuer.id)
+        ml_signal = ml_signal_by_issuer.get(issuer.id)
+
+        # risk_score/catalyst_risk_score deliberately excluded from this average: per
+        # SignalScore's own docstring, a higher risk_score means lower measured beta,
+        # not "better" in every sense -- averaging it in with the higher-is-better
+        # dimensions below would silently mix polarities.
+        dimension_scores = (
+            [
+                s
+                for s in (
+                    _f(signal.quality_score) if signal else None,
+                    _f(signal.growth_score) if signal else None,
+                    _f(signal.financial_health_score) if signal else None,
+                    _f(signal.valuation_score) if signal else None,
+                    _f(signal.momentum_score) if signal else None,
+                )
+                if s is not None
+            ]
+            if signal
+            else []
+        )
+        ai_score = round(sum(dimension_scores) / len(dimension_scores), 1) if dimension_scores else None
+
         rows.append(
             {
                 "id": issuer.id,
                 "symbol": symbol,
                 "name": issuer.name,
+                "sector": sector_by_id.get(issuer.sector_id),
                 "price": price,
                 "change_pct": quote.get("change_pct") if quote else None,
                 "market_cap": market_cap_by_issuer.get(issuer.id),
                 "pe_ratio": pe_ratio,
                 "dividend_yield": dividend_yield,
                 "roe": roe_by_issuer.get(issuer.id),
+                "roa": roa_by_issuer.get(issuer.id),
                 "debt_to_equity": debt_to_equity_by_issuer.get(issuer.id),
-                "ai_signal": signal_by_issuer.get(issuer.id),
+                "current_ratio": current_ratio_by_issuer.get(issuer.id),
+                "net_profit_margin": net_margin_by_issuer.get(issuer.id),
+                "revenue_growth_yoy": revenue_growth_by_issuer.get(issuer.id),
+                "eps_growth_yoy": eps_growth_by_issuer.get(issuer.id),
+                "ai_signal": signal.composite_signal if signal else None,
+                "ai_score": ai_score,
+                "ai_quality_score": _f(signal.quality_score) if signal else None,
+                "ai_growth_score": _f(signal.growth_score) if signal else None,
+                "ai_financial_health_score": _f(signal.financial_health_score) if signal else None,
+                "ai_valuation_score": _f(signal.valuation_score) if signal else None,
+                "ai_momentum_score": _f(signal.momentum_score) if signal else None,
+                "ml_signal": ml_signal.signal if ml_signal else None,
+                "ml_outperformance_probability": _f(ml_signal.outperformance_probability) if ml_signal else None,
+                "score_disclaimer": SCORE_DISCLAIMER if (signal or ml_signal) else None,
             }
         )
     return rows

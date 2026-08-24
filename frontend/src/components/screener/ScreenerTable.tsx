@@ -2,11 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ArrowUpDown, Lock, RotateCcw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Info, RotateCcw, Search } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
 import { formatLiveRatio, formatMarketCap, formatMultiple, formatPct, formatPercent, formatPrice } from "@/lib/format";
 
-type SortKey = "price" | "change_pct" | "market_cap" | "pe_ratio" | "roe" | "dividend_yield" | "debt_to_equity";
+type SortKey =
+  | "price" | "change_pct" | "market_cap" | "pe_ratio" | "roe" | "roa" | "dividend_yield"
+  | "debt_to_equity" | "current_ratio" | "net_profit_margin" | "revenue_growth_yoy"
+  | "eps_growth_yoy" | "ai_score";
 type SortDirection = "asc" | "desc";
 
 interface Column {
@@ -20,11 +23,17 @@ interface Column {
 const COLUMNS: Column[] = [
   { key: "price", label: "Price", format: formatPrice },
   { key: "change_pct", label: "Chg %", format: formatPct },
-  { key: "market_cap", label: "Market Cap (bn)", format: formatMarketCap, toFilterUnit: (v) => v / 1_000_000 },
+  { key: "market_cap", label: "Mkt Cap (bn)", format: formatMarketCap, toFilterUnit: (v) => v / 1_000_000 },
   { key: "pe_ratio", label: "P/E", format: (v) => formatLiveRatio(v, 2, "x") },
   { key: "roe", label: "ROE %", format: (v) => (v != null ? formatPercent(v) : "—") },
+  { key: "roa", label: "ROA %", format: (v) => (v != null ? formatPercent(v) : "—") },
   { key: "dividend_yield", label: "Div. Yield %", format: (v) => formatLiveRatio(v, 2, "%") },
   { key: "debt_to_equity", label: "D/E", format: formatMultiple },
+  { key: "current_ratio", label: "Current Ratio", format: formatMultiple },
+  { key: "net_profit_margin", label: "Net Margin %", format: (v) => (v != null ? formatPercent(v) : "—") },
+  { key: "revenue_growth_yoy", label: "Rev Growth %", format: (v) => (v != null ? formatPercent(v) : "—") },
+  { key: "eps_growth_yoy", label: "EPS Growth %", format: (v) => (v != null ? formatPercent(v) : "—") },
+  { key: "ai_score", label: "AI Score", format: (v) => (v != null ? v.toFixed(1) : "—") },
 ];
 
 interface RangeFilter {
@@ -32,21 +41,54 @@ interface RangeFilter {
   max: string;
 }
 
-const EMPTY_FILTERS: Record<SortKey, RangeFilter> = {
-  price: { min: "", max: "" },
-  change_pct: { min: "", max: "" },
-  market_cap: { min: "", max: "" },
-  pe_ratio: { min: "", max: "" },
-  roe: { min: "", max: "" },
-  dividend_yield: { min: "", max: "" },
-  debt_to_equity: { min: "", max: "" },
+const EMPTY_FILTERS: Record<SortKey, RangeFilter> = Object.fromEntries(
+  COLUMNS.map((c) => [c.key, { min: "", max: "" }])
+) as Record<SortKey, RangeFilter>;
+
+const SIGNAL_STYLE: Record<string, string> = {
+  strong_buy: "bg-positive/20 text-positive",
+  buy: "bg-positive/15 text-positive",
+  hold: "bg-surface-alt text-muted",
+  sell: "bg-negative/15 text-negative",
+  strong_sell: "bg-negative/20 text-negative",
+  no_signal: "bg-surface-alt text-muted",
 };
 
-export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
+function AiSignalCell({ row }: { row: ComparisonRow }) {
+  if (!row.ai_signal && row.ai_score == null) {
+    return <span className="text-xs text-muted">—</span>;
+  }
+  const style = SIGNAL_STYLE[row.ai_signal ?? "no_signal"] ?? "bg-surface-alt text-muted";
+  return (
+    <span
+      title={row.score_disclaimer ?? undefined}
+      className={`inline-flex cursor-help items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium ${style}`}
+    >
+      {row.ai_signal?.replace("_", " ") ?? "no signal"}
+      {row.ai_score != null && <span className="opacity-70">· {row.ai_score.toFixed(1)}</span>}
+      <Info size={9} className="opacity-50" />
+    </span>
+  );
+}
+
+export default function ScreenerTable({
+  rows,
+  mode = "screener",
+}: {
+  rows: ComparisonRow[];
+  /** "ranking" defaults the sort to AI Score (desc) and adds a rank column. */
+  mode?: "screener" | "ranking";
+}) {
   const [query, setQuery] = useState("");
+  const [sector, setSector] = useState<string>("");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey | null>(mode === "ranking" ? "ai_score" : null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const sectors = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.sector).filter((s): s is string => !!s))).sort(),
+    [rows]
+  );
 
   const setFilter = (key: SortKey, bound: "min" | "max", value: string) => {
     setFilters((prev) => ({ ...prev, [key]: { ...prev[key], [bound]: value } }));
@@ -63,13 +105,14 @@ export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
     }
   };
 
-  const activeFilterCount = Object.values(filters).filter((f) => f.min !== "" || f.max !== "").length;
+  const activeFilterCount = Object.values(filters).filter((f) => f.min !== "" || f.max !== "").length + (sector ? 1 : 0);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let result = rows.filter(
       (r) => !q || r.name.toLowerCase().includes(q) || (r.symbol ?? "").toLowerCase().includes(q)
     );
+    if (sector) result = result.filter((r) => r.sector === sector);
 
     for (const column of COLUMNS) {
       const { min, max } = filters[column.key];
@@ -96,7 +139,7 @@ export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
     }
 
     return result;
-  }, [rows, query, filters, sortKey, sortDirection]);
+  }, [rows, query, sector, filters, sortKey, sortDirection]);
 
   return (
     <div>
@@ -111,11 +154,23 @@ export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
             className="w-full bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none"
           />
         </div>
+        <select
+          value={sector}
+          onChange={(e) => setSector(e.target.value)}
+          className="rounded-full border border-border bg-surface px-3 py-2 text-xs text-foreground focus:outline-none"
+        >
+          <option value="">All sectors</option>
+          {sectors.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
         {(activeFilterCount > 0 || sortKey) && (
           <button
             onClick={() => {
               setFilters(EMPTY_FILTERS);
-              setSortKey(null);
+              setSector("");
+              setSortKey(mode === "ranking" ? "ai_score" : null);
+              setSortDirection("desc");
             }}
             className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-xs text-muted hover:text-foreground"
           >
@@ -124,7 +179,7 @@ export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
         )}
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="mb-4 grid grid-cols-2 gap-3 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-4 lg:grid-cols-6">
         {COLUMNS.map((column) => (
           <div key={column.key}>
             <p className="mb-1 text-[10px] text-muted">{column.label}</p>
@@ -150,12 +205,14 @@ export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
 
       <p className="mb-3 text-xs text-muted">
         {filtered.length} of {rows.length} companies
+        {mode === "ranking" && " · AI Score is a research-only average of quality/growth/financial-health/valuation/momentum (0–100, higher is better); risk dimensions are excluded from the average since higher isn't uniformly better for those."}
       </p>
 
       <div className="overflow-x-auto rounded-2xl border border-border bg-surface">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1100px] text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs text-muted">
+              {mode === "ranking" && <th className="px-4 py-3 font-medium">#</th>}
               <th className="px-4 py-3 font-medium">Company</th>
               {COLUMNS.map((column) => (
                 <th key={column.key} className="px-4 py-3 font-medium">
@@ -176,23 +233,22 @@ export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
                   </button>
                 </th>
               ))}
-              <th className="px-4 py-3 font-medium">
-                <span className="inline-flex items-center gap-1">
-                  <Lock size={11} /> AI Signal
-                </span>
-              </th>
+              <th className="px-4 py-3 font-medium">AI Signal</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={COLUMNS.length + 2} className="px-4 py-6 text-center text-xs text-muted">
+                <td colSpan={COLUMNS.length + (mode === "ranking" ? 3 : 2)} className="px-4 py-6 text-center text-xs text-muted">
                   No companies match these filters.
                 </td>
               </tr>
             )}
-            {filtered.map((row) => (
+            {filtered.map((row, i) => (
               <tr key={row.id} className="hover:bg-surface-alt/60">
+                {mode === "ranking" && (
+                  <td className="px-4 py-3 text-xs text-muted tabular-nums">{i + 1}</td>
+                )}
                 <td className="px-4 py-3">
                   <Link href={`/companies/${row.id}`} className="flex items-center gap-2">
                     {row.symbol && (
@@ -202,6 +258,7 @@ export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
                     )}
                     <span className="font-medium hover:text-accent">{row.name}</span>
                   </Link>
+                  {row.sector && <span className="ml-1 text-[10px] text-muted">{row.sector}</span>}
                 </td>
                 {COLUMNS.map((column) => (
                   <td
@@ -214,12 +271,7 @@ export default function ScreenerTable({ rows }: { rows: ComparisonRow[] }) {
                   </td>
                 ))}
                 <td className="px-4 py-3">
-                  <span
-                    title="AI signal output is built but hidden pending SECP/PSX compliance review — not a fabricated rating."
-                    className="inline-flex cursor-help items-center gap-1 rounded-full bg-surface-alt px-2 py-1 text-[10px] font-medium text-muted"
-                  >
-                    <Lock size={10} /> Locked
-                  </span>
+                  <AiSignalCell row={row} />
                 </td>
               </tr>
             ))}

@@ -116,14 +116,31 @@ export interface ComparisonRow {
   id: number;
   symbol: string | null;
   name: string;
+  sector: string | null;
   price: number | null;
   change_pct: number | null;
   market_cap: number | null;
   pe_ratio: number | null;
   dividend_yield: number | null;
   roe: number | null;
+  roa: number | null;
   debt_to_equity: number | null;
+  current_ratio: number | null;
+  net_profit_margin: number | null;
+  revenue_growth_yoy: number | null;
+  eps_growth_yoy: number | null;
+  // Real, research-only scoring output (see score_disclaimer) -- null when this
+  // issuer has no scoring run on file yet, never a placeholder.
   ai_signal: string | null;
+  ai_score: number | null;
+  ai_quality_score: number | null;
+  ai_growth_score: number | null;
+  ai_financial_health_score: number | null;
+  ai_valuation_score: number | null;
+  ai_momentum_score: number | null;
+  ml_signal: string | null;
+  ml_outperformance_probability: number | null;
+  score_disclaimer: string | null;
 }
 
 export interface RiskSnapshot {

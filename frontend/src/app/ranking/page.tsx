@@ -3,9 +3,10 @@ import Topbar from "@/components/dashboard/Topbar";
 import ScreenerTable from "@/components/screener/ScreenerTable";
 import { fetchComparison, fetchLiveQuotes } from "@/lib/api";
 
-export default async function ScreenerPage() {
+export default async function RankingPage() {
   const [rows, live] = await Promise.all([fetchComparison(), fetchLiveQuotes()]);
   const isLive = live != null && live.quotes.length > 0;
+  const scoredCount = rows.filter((r) => r.ai_score != null).length;
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
@@ -14,19 +15,18 @@ export default async function ScreenerPage() {
         <Topbar isLive={isLive} />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
-          <h1 className="mb-1 text-xl font-semibold">Screener</h1>
+          <h1 className="mb-1 text-xl font-semibold">AI Stock Ranking</h1>
           <p className="mb-6 text-sm text-muted">
-            Filter the {rows.length} currently-covered Fertilizer and Cement sector companies by
-            price, valuation, growth, and profitability. Every figure is real (live quote or the
-            latest reconciled financial_fact/ratio_value on file) — a blank cell means no such
-            record exists yet, not zero. AI Signal/Score are real research-only scoring output
-            (see the tooltip on each badge), not a fabricated rating.
+            Ranks the {scoredCount} of {rows.length} covered companies with a real scoring run on
+            file, by AI Score (highest first). This is a rules-based composite over real financial
+            and market data — research-only output, not a regulated recommendation (see each
+            badge&apos;s tooltip). Still filterable and re-sortable by any column below.
           </p>
 
           {rows.length === 0 ? (
-            <p className="text-sm text-muted">Screener data unavailable — backend unreachable.</p>
+            <p className="text-sm text-muted">Ranking data unavailable — backend unreachable.</p>
           ) : (
-            <ScreenerTable rows={rows} />
+            <ScreenerTable rows={rows} mode="ranking" />
           )}
         </main>
       </div>

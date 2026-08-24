@@ -10,12 +10,33 @@ Finnhub was evaluated first and dropped — it does not cover PSX-listed securit
 """
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import date, timedelta
 
 import psxdata
 
 logger = logging.getLogger(__name__)
+
+# psxdata exposes no request-level timeout (checked its public quote()/stocks() signatures --
+# neither takes one), and a Python thread blocked on a hung socket read can't be forcibly
+# cancelled. So this can only be capped at the batch level: give the whole batch this long,
+# then stop waiting and return whatever completed -- the still-running threads are abandoned
+# (not killed, just not waited on) rather than allowed to hang the calling request/page
+# indefinitely. Real observed cost on a slow day: "90+ seconds for all 7 pilot companies" (see
+# fetch_live_snapshots' docstring) -- this must stay comfortably above normal-case latency or
+# it would turn "slow" into "always empty". Raised from 25 to 35 alongside the concurrency cap
+# below: disabling the cache for this path (see fetch_live_snapshot's use_cache) made each
+# request slower with nothing to fall back on, so a real 16-symbol concurrent run that got
+# 3/16 back at cache=True got 0/16 back in 25s at cache=False -- needs real headroom to still
+# be useful now that it's not silently corrupting results instead.
+_LIVE_QUOTE_BATCH_TIMEOUT_S = 35
+
+# Uncapped (one thread per company) is what caused the concurrent cache writers to race each
+# other in the first place; even with caching off now, hitting a slow no-SLA public site with
+# 16+ simultaneous connections is both unfriendly and more likely to get rate-limited/blocked
+# by it, which would show up as this exact symptom again. Capping concurrency trades a little
+# batch latency for not hammering the source.
+_LIVE_QUOTE_MAX_WORKERS = 6
 
 # PSX's own "FERTILIZER" sector classification, confirmed via psxdata.symbols() on 2026-07-26.
 # AGLNCPS (Agritech non-voting preference shares) is a second security under the AGL issuer
@@ -80,10 +101,19 @@ def _clean(value: object) -> object:
         return None
 
 
-def fetch_live_snapshot(symbol: str) -> dict | None:
-    """Best-effort live-ish snapshot for one symbol. Returns None if the source has nothing."""
+def fetch_live_snapshot(symbol: str, use_cache: bool = True) -> dict | None:
+    """Best-effort live-ish snapshot for one symbol. Returns None if the source has nothing.
+
+    use_cache=False for fetch_live_snapshots' concurrent callers only (see that function):
+    psxdata's on-disk parquet cache isn't safe for concurrent writers -- multiple threads
+    caching different symbols at once were observed real-failing with "Parquet serialisation
+    failed for key 'X_historical'" (confirmed via a direct 16-symbol concurrent run, 13/16
+    failed this way). Single-symbol sequential callers (app/api/companies.py,
+    app/etl/ratio_engine.py, app/etl/valuation_engine.py) keep caching -- there's no writer
+    contention when only one fetch runs at a time.
+    """
     try:
-        quote_rows = psxdata.quote(symbol).to_dict(orient="records")
+        quote_rows = psxdata.quote(symbol, cache=use_cache).to_dict(orient="records")
         quote_row = quote_rows[0] if quote_rows else {}
     except Exception as exc:
         logger.warning("psxdata.quote failed for %s: %s", symbol, exc)
@@ -93,7 +123,7 @@ def fetch_live_snapshot(symbol: str) -> dict | None:
     try:
         end = date.today()
         start = end - timedelta(days=14)
-        bars = psxdata.stocks(symbol, start=start.isoformat(), end=end.isoformat())
+        bars = psxdata.stocks(symbol, start=start.isoformat(), end=end.isoformat(), cache=use_cache)
         if bars is not None and len(bars) > 0:
             bars = bars.sort_values("date")
             row = bars.iloc[-1]
@@ -144,12 +174,42 @@ def fetch_live_snapshots(companies: list[dict[str, str]] = FERTILIZER_SECTOR_COM
     on a slow day, which made every page that shows live prices (the dashboard first among them)
     look broken rather than just slow. A thread pool is enough here since these are I/O-bound
     calls, not CPU-bound work.
+
+    Capped at _LIVE_QUOTE_BATCH_TIMEOUT_S total: symbols that haven't responded by then are
+    skipped for this call (same as fetch_live_snapshot returning None) rather than left to hang
+    the caller/page indefinitely -- see that constant's comment for why this can't be a per-
+    request timeout instead.
+
+    Calls fetch_live_snapshot with use_cache=False: psxdata's parquet cache isn't safe for
+    concurrent writers (see that function's docstring) -- this batch is the only concurrent
+    caller, so it's the only one that needs caching off.
     """
-    with ThreadPoolExecutor(max_workers=len(companies)) as pool:
-        snapshots = list(pool.map(lambda c: fetch_live_snapshot(c["symbol"]), companies))
+    pool = ThreadPoolExecutor(max_workers=min(len(companies), _LIVE_QUOTE_MAX_WORKERS))
+    future_to_company = {
+        pool.submit(fetch_live_snapshot, c["symbol"], use_cache=False): c for c in companies
+    }
+    done, not_done = wait(future_to_company, timeout=_LIVE_QUOTE_BATCH_TIMEOUT_S)
+
+    if not_done:
+        stuck_symbols = ", ".join(sorted(future_to_company[f]["symbol"] for f in not_done))
+        logger.warning(
+            "Live quote batch hit its %ss cap with %d/%d symbols still pending (%s) -- "
+            "returning what completed instead of waiting further",
+            _LIVE_QUOTE_BATCH_TIMEOUT_S, len(not_done), len(companies), stuck_symbols,
+        )
+    # wait=False: a thread stuck on a hung socket read can't be cancelled, so don't block this
+    # call waiting for it to finish -- it's abandoned, not killed, and cleans up on its own
+    # whenever (if ever) the underlying request returns or the process exits.
+    pool.shutdown(wait=False)
 
     results = []
-    for company, snapshot in zip(companies, snapshots):
+    for future in done:
+        company = future_to_company[future]
+        try:
+            snapshot = future.result()
+        except Exception as exc:
+            logger.warning("Live quote fetch raised for %s, skipping: %s", company["symbol"], exc)
+            continue
         if snapshot is None:
             logger.info("No live data available for %s, skipping", company["symbol"])
             continue

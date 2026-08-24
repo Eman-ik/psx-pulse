@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Area, AreaChart, Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { Minus, TrendingDown, TrendingUp, Zap } from "lucide-react";
 import { fetchPrices, type PriceBar } from "@/lib/api";
 import { computeTechnicals, type IndicatorResult } from "@/lib/technicals";
 
@@ -201,7 +201,7 @@ export default function TechnicalsTab({
 
       <div>
         <h4 className="mb-3 text-sm font-semibold">Trend &amp; Key Levels</h4>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           <div className="rounded-2xl border border-border bg-surface p-4">
             <p className="mb-2 text-xs text-muted">Trend classification</p>
             {technicals.trendClassification.available ? (
@@ -223,6 +223,37 @@ export default function TechnicalsTab({
             ) : (
               <p className="text-xs text-muted">
                 Needs {technicals.trendClassification.requiredBars} days ({technicals.trendClassification.availableBars} on file)
+              </p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <p className="mb-2 text-xs text-muted">Breakout</p>
+            {technicals.breakout.available ? (
+              technicals.breakout.recentBreakout ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Zap className={`h-4 w-4 ${technicals.breakout.recentBreakout.direction === "bullish" ? "text-positive" : "text-negative"}`} />
+                    <p className="text-sm font-semibold capitalize">
+                      {technicals.breakout.recentBreakout.direction} break
+                    </p>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted">
+                    Closed {technicals.breakout.recentBreakout.closePrice.toFixed(2)} through PKR {technicals.breakout.recentBreakout.level.toFixed(2)} on {technicals.breakout.recentBreakout.date.slice(5)}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {technicals.breakout.recentBreakout.volumeConfirmed === null
+                      ? "No volume data to confirm"
+                      : technicals.breakout.recentBreakout.volumeConfirmed
+                        ? "Volume-confirmed (≥1.5× 20-day average)"
+                        : "Not volume-confirmed — below 1.5× 20-day average"}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-muted">No level crossed in the last 5 sessions.</p>
+              )
+            ) : (
+              <p className="text-xs text-muted">
+                Needs {technicals.breakout.requiredBars} days ({technicals.breakout.availableBars} on file)
               </p>
             )}
           </div>

@@ -433,6 +433,85 @@ function supportResistance(bars: PriceBar[]): SupportResistanceResult {
   return { available: true, requiredBars: required, availableBars: bars.length, levels };
 }
 
+// ─── Breakout identification ────────────────────────────────────────────────────
+
+export interface BreakoutEvent {
+  direction: "bullish" | "bearish";
+  level: number;
+  date: string;
+  closePrice: number;
+  // null when there's no volume data on file to compare against, not a false "no".
+  volumeConfirmed: boolean | null;
+}
+
+export interface BreakoutResult {
+  available: boolean;
+  requiredBars: number;
+  availableBars: number;
+  recentBreakout: BreakoutEvent | null;
+}
+
+const BREAKOUT_LOOKBACK = 5; // trading sessions scanned for a recent cross
+const BREAKOUT_VOLUME_MULTIPLE = 1.5; // breakout bar's volume vs. the preceding 20-day average
+
+function breakoutIdentification(bars: PriceBar[]): BreakoutResult {
+  const required = SR_LOOKBACK * 2 + 20 + BREAKOUT_LOOKBACK;
+  if (bars.length < required) {
+    return { available: false, requiredBars: required, availableBars: bars.length, recentBreakout: null };
+  }
+
+  // Levels come straight from swing-point clustering across the whole history --
+  // deliberately NOT supportResistance()'s current-price-filtered list. The moment
+  // a breakout happens, the broken level flips from one side of the current price
+  // to the other, so checking against that live-filtered list would never catch
+  // the breakout that just caused the flip.
+  const { highs, lows } = findSwingPoints(bars);
+  const levels = [...clusterLevels(highs), ...clusterLevels(lows)];
+
+  const recentBars = bars.slice(-BREAKOUT_LOOKBACK - 1); // +1 for the prior-close comparison
+  const avgVolumeBars = bars.slice(-20 - BREAKOUT_LOOKBACK, -BREAKOUT_LOOKBACK);
+  const avgVolume =
+    avgVolumeBars.length > 0
+      ? avgVolumeBars.reduce((sum, b) => sum + (b.volume ?? 0), 0) / avgVolumeBars.length
+      : null;
+
+  const events: BreakoutEvent[] = [];
+  for (let i = 1; i < recentBars.length; i++) {
+    const prevClose = recentBars[i - 1].close;
+    const bar = recentBars[i];
+    for (const level of levels) {
+      const bullish = prevClose < level.price && bar.close > level.price;
+      const bearish = prevClose > level.price && bar.close < level.price;
+      if (!bullish && !bearish) continue;
+      const volumeConfirmed =
+        avgVolume != null && avgVolume > 0 && bar.volume != null
+          ? bar.volume >= avgVolume * BREAKOUT_VOLUME_MULTIPLE
+          : null;
+      events.push({
+        direction: bullish ? "bullish" : "bearish",
+        level: level.price,
+        date: bar.date,
+        closePrice: bar.close,
+        volumeConfirmed,
+      });
+    }
+  }
+
+  if (events.length === 0) {
+    return { available: true, requiredBars: required, availableBars: bars.length, recentBreakout: null };
+  }
+
+  const latestDate = events.reduce((max, e) => (e.date > max ? e.date : max), events[0].date);
+  const onLatestDate = events.filter((e) => e.date === latestDate);
+  // Among same-day breaks (rare -- a big move clearing more than one level at once),
+  // report the level closest to the close as the most immediately relevant one.
+  const recentBreakout = onLatestDate.reduce((best, e) =>
+    Math.abs(e.level - e.closePrice) < Math.abs(best.level - best.closePrice) ? e : best
+  );
+
+  return { available: true, requiredBars: required, availableBars: bars.length, recentBreakout };
+}
+
 // ─── Trend classification ──────────────────────────────────────────────────────
 
 export interface TrendClassificationResult {
@@ -538,6 +617,7 @@ export interface TechnicalsResult {
   stochRsi: StochRsiResult;
   mfi: IndicatorResult;
   supportResistance: SupportResistanceResult;
+  breakout: BreakoutResult;
   trendClassification: TrendClassificationResult;
 }
 
@@ -566,6 +646,7 @@ export function computeTechnicals(bars: PriceBar[]): TechnicalsResult {
     stochRsi: stochRsi(closes, dates),
     mfi: mfi(sorted),
     supportResistance: supportResistance(sorted),
+    breakout: breakoutIdentification(sorted),
     trendClassification: classifyTrend(closes, sma20, sma50, sma200, adxResult),
   };
 }

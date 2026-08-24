@@ -346,6 +346,179 @@ function mfi(bars: PriceBar[], period = 14): IndicatorResult {
   return { available: true, requiredBars: period + 1, availableBars: bars.length, latest: series[series.length - 1].value, series };
 }
 
+// ─── Support / resistance (swing-point clustering) ────────────────────────────
+
+export interface SupportResistanceLevel {
+  price: number;
+  type: "support" | "resistance";
+  touches: number;
+  lastTouchDate: string;
+}
+
+export interface SupportResistanceResult {
+  available: boolean;
+  requiredBars: number;
+  availableBars: number;
+  levels: SupportResistanceLevel[];
+}
+
+const SR_LOOKBACK = 5; // bars on each side that must be lower/higher for a swing point
+const SR_CLUSTER_TOLERANCE = 0.015; // 1.5% — swing points this close are the same level
+const SR_PROXIMITY_BAND = 0.4; // ignore levels more than 40% away from the current price
+const SR_MAX_LEVELS_PER_SIDE = 3;
+
+function findSwingPoints(bars: PriceBar[]): {
+  highs: { price: number; date: string }[];
+  lows: { price: number; date: string }[];
+} {
+  const highs: { price: number; date: string }[] = [];
+  const lows: { price: number; date: string }[] = [];
+  for (let i = SR_LOOKBACK; i < bars.length - SR_LOOKBACK; i++) {
+    const window = bars.slice(i - SR_LOOKBACK, i + SR_LOOKBACK + 1);
+    if (bars[i].high === Math.max(...window.map((b) => b.high))) {
+      highs.push({ price: bars[i].high, date: bars[i].date });
+    }
+    if (bars[i].low === Math.min(...window.map((b) => b.low))) {
+      lows.push({ price: bars[i].low, date: bars[i].date });
+    }
+  }
+  return { highs, lows };
+}
+
+// Merges swing points into level clusters: points within SR_CLUSTER_TOLERANCE of a
+// cluster's running average join it, so a level touched several times over the
+// history collapses into one line with a real touch count instead of many near-
+// duplicate points.
+function clusterLevels(points: { price: number; date: string }[]): { price: number; touches: number; lastDate: string }[] {
+  const sorted = [...points].sort((a, b) => a.price - b.price);
+  const clusters: { prices: number[]; dates: string[] }[] = [];
+  for (const p of sorted) {
+    const last = clusters[clusters.length - 1];
+    const avg = last ? last.prices.reduce((a, b) => a + b, 0) / last.prices.length : null;
+    if (last && avg !== null && Math.abs(p.price - avg) / avg <= SR_CLUSTER_TOLERANCE) {
+      last.prices.push(p.price);
+      last.dates.push(p.date);
+    } else {
+      clusters.push({ prices: [p.price], dates: [p.date] });
+    }
+  }
+  return clusters.map((c) => ({
+    price: c.prices.reduce((a, b) => a + b, 0) / c.prices.length,
+    touches: c.prices.length,
+    lastDate: c.dates[c.dates.length - 1],
+  }));
+}
+
+function supportResistance(bars: PriceBar[]): SupportResistanceResult {
+  const required = SR_LOOKBACK * 2 + 20;
+  if (bars.length < required) return { available: false, requiredBars: required, availableBars: bars.length, levels: [] };
+
+  const currentPrice = bars[bars.length - 1].close;
+  const inBand = (price: number) => Math.abs(price - currentPrice) / currentPrice <= SR_PROXIMITY_BAND;
+  const { highs, lows } = findSwingPoints(bars);
+
+  const rank = (clusters: { price: number; touches: number; lastDate: string }[]) =>
+    [...clusters]
+      .sort((a, b) => b.touches - a.touches || b.lastDate.localeCompare(a.lastDate))
+      .slice(0, SR_MAX_LEVELS_PER_SIDE);
+
+  const resistance = rank(clusterLevels(highs).filter((c) => c.price > currentPrice && inBand(c.price)));
+  const support = rank(clusterLevels(lows).filter((c) => c.price < currentPrice && inBand(c.price)));
+
+  const levels: SupportResistanceLevel[] = [
+    ...support.map((c) => ({ price: c.price, type: "support" as const, touches: c.touches, lastTouchDate: c.lastDate })),
+    ...resistance.map((c) => ({ price: c.price, type: "resistance" as const, touches: c.touches, lastTouchDate: c.lastDate })),
+  ].sort((a, b) => b.price - a.price);
+
+  return { available: true, requiredBars: required, availableBars: bars.length, levels };
+}
+
+// ─── Trend classification ──────────────────────────────────────────────────────
+
+export interface TrendClassificationResult {
+  available: boolean;
+  requiredBars: number;
+  availableBars: number;
+  trend: "uptrend" | "downtrend" | "sideways" | null;
+  strength: "strong" | "moderate" | "weak" | null;
+  reasoning: string[];
+}
+
+const TREND_SLOPE_WINDOW = 15; // ~3 trading weeks, same horizon signal-analysis.ts's narrative uses
+
+// Deterministic, explainable rule over already-computed indicators (price vs. SMA50,
+// SMA50 vs. SMA200 when available, SMA20 slope) — never re-derives new price math,
+// and every point counted toward the verdict is returned in `reasoning` so the badge
+// is never a black box.
+function classifyTrend(
+  closes: number[],
+  sma20: IndicatorResult,
+  sma50: IndicatorResult,
+  sma200: IndicatorResult,
+  adx: AdxResult
+): TrendClassificationResult {
+  const required = 50;
+  if (!sma20.available || !sma50.available || sma20.series.length <= TREND_SLOPE_WINDOW) {
+    return { available: false, requiredBars: required, availableBars: closes.length, trend: null, strength: null, reasoning: [] };
+  }
+
+  const price = closes[closes.length - 1];
+  const s50 = sma50.latest!;
+  const s200 = sma200.available ? sma200.latest! : null;
+  const adxVal = adx.available ? adx.latest!.adx : null;
+
+  const sma20Now = sma20.series[sma20.series.length - 1].value;
+  const sma20Then = sma20.series[sma20.series.length - 1 - TREND_SLOPE_WINDOW].value;
+  const slopePct = ((sma20Now - sma20Then) / sma20Then) * 100;
+
+  const reasoning: string[] = [];
+  let bullPoints = 0;
+  let bearPoints = 0;
+
+  if (price > s50) {
+    bullPoints++;
+    reasoning.push("Price above SMA50");
+  } else {
+    bearPoints++;
+    reasoning.push("Price below SMA50");
+  }
+
+  if (s200 !== null) {
+    if (s50 > s200) {
+      bullPoints++;
+      reasoning.push("SMA50 above SMA200");
+    } else {
+      bearPoints++;
+      reasoning.push("SMA50 below SMA200");
+    }
+  }
+
+  if (slopePct > 0.5) {
+    bullPoints++;
+    reasoning.push(`SMA20 rising ${slopePct.toFixed(1)}% over ${TREND_SLOPE_WINDOW} sessions`);
+  } else if (slopePct < -0.5) {
+    bearPoints++;
+    reasoning.push(`SMA20 falling ${slopePct.toFixed(1)}% over ${TREND_SLOPE_WINDOW} sessions`);
+  } else {
+    reasoning.push(`SMA20 roughly flat over ${TREND_SLOPE_WINDOW} sessions`);
+  }
+
+  let trend: "uptrend" | "downtrend" | "sideways";
+  if (bullPoints - bearPoints >= 2) trend = "uptrend";
+  else if (bearPoints - bullPoints >= 2) trend = "downtrend";
+  else trend = "sideways";
+
+  let strength: "strong" | "moderate" | "weak";
+  if (adxVal !== null) {
+    strength = adxVal >= 25 ? "strong" : adxVal >= 15 ? "moderate" : "weak";
+    reasoning.push(`ADX ${adxVal.toFixed(1)}`);
+  } else {
+    strength = "moderate";
+  }
+
+  return { available: true, requiredBars: required, availableBars: closes.length, trend, strength, reasoning };
+}
+
 // ─── Result & compute ─────────────────────────────────────────────────────────
 
 export interface TechnicalsResult {
@@ -364,16 +537,22 @@ export interface TechnicalsResult {
   vwap: IndicatorResult;
   stochRsi: StochRsiResult;
   mfi: IndicatorResult;
+  supportResistance: SupportResistanceResult;
+  trendClassification: TrendClassificationResult;
 }
 
 export function computeTechnicals(bars: PriceBar[]): TechnicalsResult {
   const sorted = [...bars].sort((a, b) => a.date.localeCompare(b.date));
   const closes = sorted.map((b) => b.close);
   const dates = sorted.map((b) => b.date);
+  const sma20 = smaSeries(closes, dates, 20);
+  const sma50 = smaSeries(closes, dates, 50);
+  const sma200 = smaSeries(closes, dates, 200);
+  const adxResult = adx(sorted);
   return {
-    sma20: smaSeries(closes, dates, 20),
-    sma50: smaSeries(closes, dates, 50),
-    sma200: smaSeries(closes, dates, 200),
+    sma20,
+    sma50,
+    sma200,
     ema20: emaSeries(closes, dates, 20),
     ema50: emaSeries(closes, dates, 50),
     ema200: emaSeries(closes, dates, 200),
@@ -381,10 +560,12 @@ export function computeTechnicals(bars: PriceBar[]): TechnicalsResult {
     macd: macd(closes, dates),
     bollinger: bollinger(closes, dates),
     atr14: atr14(sorted),
-    adx: adx(sorted),
+    adx: adxResult,
     obv: obv(sorted),
     vwap: vwap(sorted),
     stochRsi: stochRsi(closes, dates),
     mfi: mfi(sorted),
+    supportResistance: supportResistance(sorted),
+    trendClassification: classifyTrend(closes, sma20, sma50, sma200, adxResult),
   };
 }

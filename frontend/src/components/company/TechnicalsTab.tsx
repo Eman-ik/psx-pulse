@@ -1,9 +1,46 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area, AreaChart, Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from "recharts";
+import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { fetchPrices, type PriceBar } from "@/lib/api";
 import { computeTechnicals, type IndicatorResult } from "@/lib/technicals";
+
+// Recharts has no built-in candlestick: this is the standard "floating bar" pattern
+// -- a single Bar keyed to the [low, high] range (so Recharts positions x/y/height
+// correctly for that range) with a custom shape that then derives the open/close
+// body proportionally from the same pixel range, rather than needing a second
+// synced series.
+function Candle(props: {
+  x?: number; y?: number; width?: number; height?: number;
+  payload?: { open: number; high: number; low: number; close: number };
+}) {
+  const { x, y, width, height, payload } = props;
+  if (x == null || y == null || width == null || height == null || !payload) return null;
+  const { open, high, low, close } = payload;
+  const isUp = close >= open;
+  const color = isUp ? "#22c55e" : "#ef4444";
+  const centerX = x + width / 2;
+
+  if (high === low) {
+    return <line x1={x} y1={y} x2={x + width} y2={y} stroke={color} strokeWidth={1} />;
+  }
+
+  const priceToY = (price: number) => y + (height * (high - price)) / (high - low);
+  const bodyTop = priceToY(Math.max(open, close));
+  const bodyBottom = priceToY(Math.min(open, close));
+  const bodyHeight = Math.max(bodyBottom - bodyTop, 1);
+  const bodyWidth = Math.max(width * 0.6, 2);
+
+  return (
+    <g>
+      <line x1={centerX} y1={y} x2={centerX} y2={y + height} stroke={color} strokeWidth={1} />
+      <rect x={centerX - bodyWidth / 2} y={bodyTop} width={bodyWidth} height={bodyHeight} fill={color} />
+    </g>
+  );
+}
 
 function IndicatorCard({ label, unit, result }: { label: string; unit?: string; result: IndicatorResult }) {
   return (
@@ -32,6 +69,7 @@ export default function TechnicalsTab({
   dataDelayNotice: string;
   securityId: number | null;
 }) {
+  const [chartView, setChartView] = useState<"area" | "candles">("area");
   const [adjusted, setAdjusted] = useState(false);
   const [adjustedBars, setAdjustedBars] = useState<PriceBar[] | null>(null);
   const [actionsOnFile, setActionsOnFile] = useState<number | null>(null);
@@ -68,7 +106,7 @@ export default function TechnicalsTab({
 
   const chartData = [...activeBars]
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map((b) => ({ date: b.date.slice(5), close: b.close }));
+    .map((b) => ({ date: b.date.slice(5), close: b.close, open: b.open, high: b.high, low: b.low }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -76,6 +114,20 @@ export default function TechnicalsTab({
         <div className="mb-2 flex items-center justify-between">
           <h3 className="font-semibold">Price ({activeBars.length} sessions)</h3>
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 rounded-full bg-surface-alt p-0.5 text-xs">
+              <button
+                onClick={() => setChartView("area")}
+                className={`rounded-full px-2.5 py-1 ${chartView === "area" ? "bg-accent text-white" : "text-muted"}`}
+              >
+                Area
+              </button>
+              <button
+                onClick={() => setChartView("candles")}
+                className={`rounded-full px-2.5 py-1 ${chartView === "candles" ? "bg-accent text-white" : "text-muted"}`}
+              >
+                Candles
+              </button>
+            </div>
             {securityId != null && (
               <div className="flex items-center gap-1 rounded-full bg-surface-alt p-0.5 text-xs">
                 <button
@@ -109,23 +161,95 @@ export default function TechnicalsTab({
         )}
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="closeFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#4f7cff" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#4f7cff" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fill: "#8b92a5", fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={30} />
-              <YAxis domain={["auto", "auto"]} tick={{ fill: "#8b92a5", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ background: "#161a26", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
-                labelStyle={{ color: "#8b92a5" }}
-              />
-              <Area type="monotone" dataKey="close" name="Close" stroke="#4f7cff" strokeWidth={2} fill="url(#closeFill)" />
-            </AreaChart>
+            {chartView === "area" ? (
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="closeFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4f7cff" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#4f7cff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: "#8b92a5", fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={30} />
+                <YAxis domain={["auto", "auto"]} tick={{ fill: "#8b92a5", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: "#161a26", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
+                  labelStyle={{ color: "#8b92a5" }}
+                />
+                <Area type="monotone" dataKey="close" name="Close" stroke="#4f7cff" strokeWidth={2} fill="url(#closeFill)" />
+              </AreaChart>
+            ) : (
+              <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: "#8b92a5", fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={30} />
+                <YAxis domain={["auto", "auto"]} tick={{ fill: "#8b92a5", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ background: "#161a26", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
+                  labelStyle={{ color: "#8b92a5" }}
+                  formatter={(_value, _name, item) => {
+                    const p = item?.payload as { open: number; high: number; low: number; close: number } | undefined;
+                    if (!p) return [null, null];
+                    return [`O ${p.open.toFixed(2)} · H ${p.high.toFixed(2)} · L ${p.low.toFixed(2)} · C ${p.close.toFixed(2)}`, "OHLC"];
+                  }}
+                />
+                <Bar dataKey={(d: { low: number; high: number }) => [d.low, d.high]} shape={Candle} isAnimationActive={false} />
+              </ComposedChart>
+            )}
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div>
+        <h4 className="mb-3 text-sm font-semibold">Trend &amp; Key Levels</h4>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <p className="mb-2 text-xs text-muted">Trend classification</p>
+            {technicals.trendClassification.available ? (
+              <>
+                <div className="flex items-center gap-2">
+                  {technicals.trendClassification.trend === "uptrend" && <TrendingUp className="h-4 w-4 text-positive" />}
+                  {technicals.trendClassification.trend === "downtrend" && <TrendingDown className="h-4 w-4 text-negative" />}
+                  {technicals.trendClassification.trend === "sideways" && <Minus className="h-4 w-4 text-muted" />}
+                  <p className="text-sm font-semibold capitalize">
+                    {technicals.trendClassification.trend} · {technicals.trendClassification.strength}
+                  </p>
+                </div>
+                <ul className="mt-2 space-y-0.5">
+                  {technicals.trendClassification.reasoning.map((r, i) => (
+                    <li key={i} className="text-[11px] text-muted">· {r}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="text-xs text-muted">
+                Needs {technicals.trendClassification.requiredBars} days ({technicals.trendClassification.availableBars} on file)
+              </p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-4">
+            <p className="mb-2 text-xs text-muted">Support &amp; resistance</p>
+            {technicals.supportResistance.available ? (
+              technicals.supportResistance.levels.length > 0 ? (
+                <ul className="space-y-1">
+                  {technicals.supportResistance.levels.map((l, i) => (
+                    <li key={i} className="flex items-center justify-between text-[11px]">
+                      <span className={l.type === "resistance" ? "text-negative" : "text-positive"}>
+                        {l.type === "resistance" ? "Resistance" : "Support"}
+                      </span>
+                      <span className="font-semibold tabular-nums">PKR {l.price.toFixed(2)}</span>
+                      <span className="text-muted">{l.touches}× · last {l.lastTouchDate.slice(5)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted">No swing levels found near the current price yet.</p>
+              )
+            ) : (
+              <p className="text-xs text-muted">
+                Needs {technicals.supportResistance.requiredBars} days ({technicals.supportResistance.availableBars} on file)
+              </p>
+            )}
+          </div>
         </div>
       </div>
 

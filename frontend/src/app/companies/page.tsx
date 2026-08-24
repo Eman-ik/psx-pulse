@@ -1,16 +1,16 @@
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import CompaniesTable from "@/components/companies/CompaniesTable";
-import { fetchComparison, fetchLiveQuotes } from "@/lib/api";
+import { fetchComparison } from "@/lib/api";
 
 export default async function CompaniesPage() {
-  const [rows, live] = await Promise.all([fetchComparison(), fetchLiveQuotes()]);
+  const rows = await fetchComparison();
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar isLive={!!live} />
+        <Topbar />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
           <h1 className="mb-1 text-xl font-semibold">PSX Pilot Companies</h1>

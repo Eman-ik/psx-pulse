@@ -36,7 +36,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar isLive={!!data.live_quote} />
+        <Topbar />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
           <CompanyHeader data={data} weekRange={weekRange} />

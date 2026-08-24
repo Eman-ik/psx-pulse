@@ -1,6 +1,10 @@
+"use client";
+
+import { useMemo } from "react";
 import { Lock } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
 import { formatLiveRatio, formatMarketCap, formatMultiple, formatPct, formatPercent, formatPrice } from "@/lib/format";
+import { mergeLiveQuote, useLiveQuotes } from "@/lib/useLiveQuotes";
 
 function rankLine(rows: ComparisonRow[], issuerId: number, key: keyof ComparisonRow, label: string) {
   const ranked = rows
@@ -12,12 +16,18 @@ function rankLine(rows: ComparisonRow[], issuerId: number, key: keyof Comparison
 }
 
 export default function CompetitorsTab({ rows, issuerId }: { rows: ComparisonRow[]; issuerId: number }) {
-  if (rows.length === 0) {
+  const { quotesBySymbol } = useLiveQuotes();
+  const liveRows = useMemo(
+    () => rows.map((r) => (r.symbol ? mergeLiveQuote(r, quotesBySymbol[r.symbol]) : r)),
+    [rows, quotesBySymbol]
+  );
+
+  if (liveRows.length === 0) {
     return <p className="text-xs text-muted">Peer comparison data unavailable — backend unreachable.</p>;
   }
 
-  const roeLine = rankLine(rows, issuerId, "roe", "ROE");
-  const peLine = rankLine(rows, issuerId, "market_cap", "Market cap");
+  const roeLine = rankLine(liveRows, issuerId, "roe", "ROE");
+  const peLine = rankLine(liveRows, issuerId, "market_cap", "Market cap");
 
   return (
     <div className="flex flex-col gap-4">
@@ -41,7 +51,7 @@ export default function CompetitorsTab({ rows, issuerId }: { rows: ComparisonRow
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map((row) => {
+            {liveRows.map((row) => {
               const isYou = row.id === issuerId;
               return (
                 <tr key={row.id} className={isYou ? "bg-accent/5" : undefined}>

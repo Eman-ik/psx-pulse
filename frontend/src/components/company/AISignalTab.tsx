@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CompanyOverview, IndexPrices, PriceBar, SignalResearch } from "@/lib/api";
 import { computeTechnicals } from "@/lib/technicals";
+import { useLiveQuote } from "@/lib/useLiveQuotes";
 import {
   computeKnnModel,
   computeLinearRegression,
@@ -155,7 +156,8 @@ export default function AISignalTab({
     signal ? computeTradeSetup(sortedBars, signal, signal.composite_signal) : null,
     [sortedBars, signal]);
 
-  const quote = data.live_quote;
+  // Overview no longer embeds a live quote -- see CompanyHeader.tsx's comment.
+  const { quote } = useLiveQuote(data.symbol);
   const price = quote?.price ?? sortedBars[sortedBars.length - 1]?.close ?? null;
   const changePct = quote?.change_pct ?? null;
 

@@ -8,7 +8,6 @@ import {
   fetchComparison,
   fetchFertilizerSector,
   fetchCementSector,
-  fetchLiveQuotes,
   type ComparisonRow,
 } from "@/lib/api";
 import { SECTOR_BY_SLUG, COLOR } from "@/lib/sector-config";
@@ -22,8 +21,7 @@ export default async function SectorDetailPage({ params }: Props) {
   const sector = SECTOR_BY_SLUG[slug];
   if (!sector) notFound();
 
-  const [allRows, live] = await Promise.all([fetchComparison(), fetchLiveQuotes()]);
-  const isLive = live != null && live.quotes.length > 0;
+  const allRows = await fetchComparison();
 
   // Filter comparison rows to this sector's companies
   let rows: ComparisonRow[] = [];
@@ -49,7 +47,7 @@ export default async function SectorDetailPage({ params }: Props) {
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar isLive={isLive} />
+        <Topbar />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
           {/* Back */}

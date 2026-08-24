@@ -6,6 +6,7 @@ import type { CompanyOverview, PriceBar } from "@/lib/api";
 import { latestValue as latest } from "@/lib/financials";
 import { GLOSSARY } from "@/lib/glossary";
 import { computeTechnicals } from "@/lib/technicals";
+import { useLiveQuote } from "@/lib/useLiveQuotes";
 import CatalystsRisksPanel from "./CatalystsRisksPanel";
 
 interface Metric {
@@ -38,6 +39,8 @@ function MetricGrid({ metrics }: { metrics: Metric[] }) {
 
 export default function SummaryTab({ data, prices }: { data: CompanyOverview; prices: PriceBar[] }) {
   const [lens, setLens] = useState<"long_term" | "short_term">("long_term");
+  // Overview no longer embeds a live quote -- see CompanyHeader.tsx's comment.
+  const { quote: liveQuote } = useLiveQuote(data.symbol);
 
   const marketCap = latest(data.financials["market_cap"]);
   const eps = latest(data.financials["eps"]);
@@ -52,8 +55,8 @@ export default function SummaryTab({ data, prices }: { data: CompanyOverview; pr
   const currentRatio = data.ratios["current_ratio"]?.values.length
     ? latest(data.ratios["current_ratio"].values)
     : null;
-  const dividendYield = data.live_quote?.dividend_yield ?? null;
-  const volume = data.live_quote?.volume ?? null;
+  const dividendYield = liveQuote?.dividend_yield ?? null;
+  const volume = liveQuote?.volume ?? null;
 
   const sharesLatest = latest(data.financials["shares_outstanding"]);
   const freeFloatShares =
@@ -88,7 +91,7 @@ export default function SummaryTab({ data, prices }: { data: CompanyOverview; pr
   ];
 
   const technicals = useMemo(() => computeTechnicals(prices), [prices]);
-  const changePct = data.live_quote?.change_pct ?? null;
+  const changePct = liveQuote?.change_pct ?? null;
 
   const shortTermMetrics: Metric[] = [
     {

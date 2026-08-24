@@ -1,20 +1,26 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowLeft, Globe, Info } from "lucide-react";
 import type { CompanyOverview } from "@/lib/api";
 import { latestValue } from "@/lib/financials";
 import { GLOSSARY } from "@/lib/glossary";
+import { useLiveQuote } from "@/lib/useLiveQuotes";
 
 export default function CompanyHeader({ data, weekRange }: { data: CompanyOverview; weekRange: { low: number; high: number } | null }) {
-  const { issuer, symbol, live_quote, free_float_pct } = data;
-  const price = live_quote?.price;
-  const changePct = live_quote?.change_pct;
+  const { issuer, symbol, free_float_pct } = data;
+  // Overview no longer embeds a live quote (see companies.py's docstring) -- fetched here
+  // instead so the rest of the page doesn't wait on it.
+  const { quote: liveQuote } = useLiveQuote(symbol);
+  const price = liveQuote?.price;
+  const changePct = liveQuote?.change_pct;
   const positive = (changePct ?? 0) >= 0;
   const marketCapFact = data.financials["market_cap"]?.[data.financials["market_cap"].length - 1];
 
   const eps = latestValue(data.financials["eps"]);
   const pe = latestValue(data.ratios["price_to_earnings"]?.values);
   const roe = latestValue(data.ratios["roe"]?.values);
-  const dividendYield = live_quote?.dividend_yield && live_quote.dividend_yield !== 0 ? live_quote.dividend_yield : null;
+  const dividendYield = liveQuote?.dividend_yield && liveQuote.dividend_yield !== 0 ? liveQuote.dividend_yield : null;
 
   const headline: { label: string; value: string }[] = [
     { label: "Trailing P/E", value: pe != null ? `${pe.toFixed(2)}x` : "—" },
@@ -92,7 +98,7 @@ export default function CompanyHeader({ data, weekRange }: { data: CompanyOvervi
           </div>
           <div>
             <p className="text-xs text-muted">As of</p>
-            <p className="text-xl font-semibold">{live_quote?.as_of_date ?? "—"}</p>
+            <p className="text-xl font-semibold">{liveQuote?.as_of_date ?? "—"}</p>
           </div>
         </div>
       </div>

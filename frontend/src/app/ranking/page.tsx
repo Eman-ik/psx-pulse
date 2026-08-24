@@ -1,18 +1,17 @@
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import ScreenerTable from "@/components/screener/ScreenerTable";
-import { fetchComparison, fetchLiveQuotes } from "@/lib/api";
+import { fetchComparison } from "@/lib/api";
 
 export default async function RankingPage() {
-  const [rows, live] = await Promise.all([fetchComparison(), fetchLiveQuotes()]);
-  const isLive = live != null && live.quotes.length > 0;
+  const rows = await fetchComparison();
   const scoredCount = rows.filter((r) => r.ai_score != null).length;
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar isLive={isLive} />
+        <Topbar />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
           <h1 className="mb-1 text-xl font-semibold">AI Stock Ranking</h1>

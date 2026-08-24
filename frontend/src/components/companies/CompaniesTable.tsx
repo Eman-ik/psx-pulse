@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
 import { formatLiveRatio, formatMarketCap, formatPct, formatPercent, formatPrice } from "@/lib/format";
+import { mergeLiveQuote, useLiveQuotes } from "@/lib/useLiveQuotes";
 
 function SignalPill({ signal }: { signal: string | null }) {
   if (!signal) {
@@ -27,11 +28,17 @@ function SignalPill({ signal }: { signal: string | null }) {
 export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
   const [query, setQuery] = useState("");
 
+  const { quotesBySymbol } = useLiveQuotes();
+  const liveRows = useMemo(
+    () => rows.map((r) => (r.symbol ? mergeLiveQuote(r, quotesBySymbol[r.symbol]) : r)),
+    [rows, quotesBySymbol]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => r.name.toLowerCase().includes(q) || (r.symbol ?? "").toLowerCase().includes(q));
-  }, [rows, query]);
+    if (!q) return liveRows;
+    return liveRows.filter((r) => r.name.toLowerCase().includes(q) || (r.symbol ?? "").toLowerCase().includes(q));
+  }, [liveRows, query]);
 
   return (
     <div>

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
-import { fetchLiveQuotes } from "@/lib/api";
 import { SECTORS, COLOR } from "@/lib/sector-config";
 
 function SectorCard({ s }: { s: (typeof SECTORS)[number] }) {
@@ -75,15 +74,12 @@ function SectorCard({ s }: { s: (typeof SECTORS)[number] }) {
   );
 }
 
-export default async function SectorIntelligencePage() {
-  const live = await fetchLiveQuotes();
-  const isLive = live != null && live.quotes.length > 0;
-
+export default function SectorIntelligencePage() {
   return (
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar isLive={isLive} />
+        <Topbar />
 
         <main className="flex-1 px-6 py-6 lg:px-8">
           <h1 className="mb-1 text-xl font-semibold">Sector Intelligence</h1>

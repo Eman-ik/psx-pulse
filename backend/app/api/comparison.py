@@ -13,11 +13,6 @@ from app.db.models import (
     Security,
     SignalScore,
 )
-from app.ingestion.psx_live import (
-    CEMENT_SECTOR_COMPANIES,
-    FERTILIZER_SECTOR_COMPANIES,
-    fetch_live_snapshots,
-)
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -34,8 +29,6 @@ SCORE_DISCLAIMER = (
     "investment recommendation. Hidden from any public-facing surface until "
     "PSX/SECP compliance review completes."
 )
-
-_ALL_PILOT_COMPANIES = FERTILIZER_SECTOR_COMPANIES + CEMENT_SECTOR_COMPANIES
 
 
 def _latest_by_issuer(db: Session, line_item: str) -> dict[int, float]:
@@ -135,11 +128,17 @@ def ratio_benchmarks(db: Session = Depends(get_db)) -> dict[str, dict]:
 
 @router.get("/comparison")
 def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
-    """Batch comparison/screener row per covered issuer (fertilizer + cement).
+    """Batch comparison/screener row per covered issuer (fertilizer + cement), DB-only and fast.
 
-    Price / Change / P/E / Div Yield come from live psxdata quotes, with fallbacks:
-    - P/E: computed as live_price / latest_annual_eps when psxdata doesn't supply one.
-    - Div Yield: computed as latest_annual_dps / live_price × 100 when psxdata omits it.
+    price/change_pct/pe_ratio(live)/dividend_yield(live) are deliberately NOT fetched here --
+    this used to call fetch_live_snapshots() inline, which can take up to 35s and made every
+    page that renders this endpoint (Screener, Ranking, Companies, Sector) block for that long.
+    It also held this function's DB connection idle across that scrape, which reliably killed
+    it (Windows idle-socket abort -- pool_pre_ping only validates at checkout, not mid-request).
+    The frontend now fetches live quotes separately (GET /market/live/all) and merges them into
+    these rows client-side, after the page has already rendered with the fast DB-only data below.
+    eps/dividend_per_share are exposed so that client-side merge can reproduce the same P/E and
+    dividend-yield fallback this endpoint used to compute server-side once a live price lands.
 
     ai_signal/ai_scores/ml_signal are real (never fabricated) but research-only -- see
     SCORE_DISCLAIMER. A field is null when that issuer has no scoring run on file yet
@@ -151,9 +150,6 @@ def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
     securities = db.execute(select(Security).where(Security.is_active.is_(True))).scalars().all()
     security_by_issuer = {s.issuer_id: s for s in securities}
     sector_by_id = {s.id: s.name for s in db.execute(select(Sector)).scalars().all()}
-
-    live_quotes = fetch_live_snapshots(_ALL_PILOT_COMPANIES)
-    live_by_symbol = {q["symbol"]: q for q in live_quotes}
 
     market_cap_by_issuer = _latest_by_issuer(db, "market_cap")
     roe_by_issuer = _latest_ratio_by_issuer(db, "roe")
@@ -172,20 +168,6 @@ def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
     for issuer in issuers:
         security = security_by_issuer.get(issuer.id)
         symbol = security.symbol if security else None
-        quote = live_by_symbol.get(symbol) if symbol else None
-        price = quote.get("price") if quote else None
-
-        pe_ratio = quote.get("pe_ratio") if quote else None
-        if pe_ratio is None and price and eps_by_issuer.get(issuer.id):
-            eps = eps_by_issuer[issuer.id]
-            if eps > 0:
-                pe_ratio = round(price / eps, 2)
-
-        dividend_yield = quote.get("dividend_yield") if quote else None
-        if dividend_yield is None and price and dps_by_issuer.get(issuer.id):
-            dps = dps_by_issuer[issuer.id]
-            if price > 0:
-                dividend_yield = round(dps / price * 100, 2)
 
         signal = signal_by_issuer.get(issuer.id)
         ml_signal = ml_signal_by_issuer.get(issuer.id)
@@ -217,11 +199,16 @@ def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
                 "symbol": symbol,
                 "name": issuer.name,
                 "sector": sector_by_id.get(issuer.sector_id),
-                "price": price,
-                "change_pct": quote.get("change_pct") if quote else None,
+                # price/change_pct/pe_ratio/dividend_yield are null here by design -- the
+                # frontend merges in live quotes (GET /market/live/all) client-side. eps/
+                # dividend_per_share below let it reproduce the P/E and yield fallback.
+                "price": None,
+                "change_pct": None,
                 "market_cap": market_cap_by_issuer.get(issuer.id),
-                "pe_ratio": pe_ratio,
-                "dividend_yield": dividend_yield,
+                "pe_ratio": None,
+                "dividend_yield": None,
+                "eps": eps_by_issuer.get(issuer.id),
+                "dividend_per_share": dps_by_issuer.get(issuer.id),
                 "roe": roe_by_issuer.get(issuer.id),
                 "roa": roa_by_issuer.get(issuer.id),
                 "debt_to_equity": debt_to_equity_by_issuer.get(issuer.id),

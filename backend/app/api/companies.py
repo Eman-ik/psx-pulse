@@ -19,7 +19,6 @@ from app.db.models import (
     Thesis,
 )
 from app.etl.valuation_engine import _get_assumption
-from app.ingestion.psx_live import fetch_live_snapshot
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -162,18 +161,20 @@ def _subsidiary_contributions(db: Session, issuer: Issuer, subsidiaries: list[Is
 @router.get("/{issuer_id}/overview")
 def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict | None:
     """Aggregates everything the Company Research page needs into one call: profile,
-    ownership chain, governance, live quote, financials (grouped by line item for easy
-    charting), ratios (grouped by key), payouts, recent announcements and source lineage.
+    ownership chain, governance, financials (grouped by line item for easy charting),
+    ratios (grouped by key), payouts, recent announcements and source lineage.
+
+    live_quote is deliberately NOT fetched here (used to call fetch_live_snapshot()
+    inline, holding this function's DB session open across a live scrape -- same
+    connection-abort risk as GET /companies/comparison, see that endpoint's docstring).
+    The frontend fetches it separately via GET /market/quote/{symbol} and merges it in
+    client-side once the rest of this page has already rendered.
     """
     issuer = db.get(Issuer, issuer_id)
     if issuer is None:
         return None
 
     security = db.execute(select(Security).where(Security.issuer_id == issuer.id)).scalars().first()
-
-    live_quote = None
-    if security is not None:
-        live_quote = fetch_live_snapshot(security.symbol)
 
     board = db.execute(
         select(BoardMembership, Person)
@@ -312,7 +313,7 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
         "parent_chain": _parent_chain(db, issuer),
         "subsidiaries": [{"id": s.id, "name": s.name} for s in subsidiaries],
         "board": [{"full_name": p.full_name, "role": bm.role} for bm, p in board],
-        "live_quote": live_quote,
+        "live_quote": None,
         "financials": financials_by_line_item,
         "ratios": ratios_by_key,
         "payouts": payouts,

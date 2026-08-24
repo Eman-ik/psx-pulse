@@ -122,6 +122,8 @@ export interface ComparisonRow {
   market_cap: number | null;
   pe_ratio: number | null;
   dividend_yield: number | null;
+  eps: number | null;
+  dividend_per_share: number | null;
   roe: number | null;
   roa: number | null;
   debt_to_equity: number | null;
@@ -211,14 +213,25 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8
 
 /**
  * Fetches live-ish PSX quotes from the backend (psxdata-sourced, see docs/source_registry.yaml).
- * Returns null on any failure so the dashboard can fall back to sample data instead of crashing —
- * this is a dev-only scraper-backed source with no uptime guarantee.
+ * Returns null on any failure (including timeout) so the dashboard can fall back to sample data
+ * instead of crashing or hanging -- this is a dev-only scraper-backed source with no uptime
+ * guarantee. Capped at 5s: this is still called during SSR (Dashboard, News -- pages whose live
+ * data feeds real layout decisions, not just a table cell, so they weren't moved to the
+ * client-side useLiveQuotes() pattern the Screener/Ranking/Companies/Sector/Company pages use).
+ * Without this cap, this single call could block those pages' entire render for up to 35s (the
+ * batch scrape's own cap, see psx_live.py) every time the underlying source is slow or blocked.
  */
 export async function fetchLiveQuotes(): Promise<LiveQuotesResponse | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/market/live`, { cache: "no-store" });
-    if (!res.ok) return null;
-    return (await res.json()) as LiveQuotesResponse;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const res = await fetch(`${API_BASE_URL}/market/live`, { cache: "no-store", signal: controller.signal });
+      if (!res.ok) return null;
+      return (await res.json()) as LiveQuotesResponse;
+    } finally {
+      clearTimeout(timeout);
+    }
   } catch {
     return null;
   }
@@ -314,6 +327,41 @@ export async function fetchCementLiveQuotes(): Promise<LiveQuotesResponse | null
     const res = await fetch(`${API_BASE_URL}/market/live/cement`, { cache: "no-store" });
     if (!res.ok) return null;
     return (await res.json()) as LiveQuotesResponse;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Combined fertilizer+cement live quotes (GET /market/live/all) -- meant to be called
+ * client-side via useLiveQuotes(), not awaited during SSR. This is the same up-to-35s,
+ * no-SLA psxdata scrape as fetchLiveQuotes()/fetchCementLiveQuotes(); the point of this
+ * one is where it's called from, not what it does.
+ */
+export async function fetchLiveQuotesAll(): Promise<LiveQuotesResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/market/live/all`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as LiveQuotesResponse;
+  } catch {
+    return null;
+  }
+}
+
+export interface SingleLiveQuoteResponse {
+  data_source: string;
+  disclaimer: string;
+  fetched_at: string;
+  quote: LiveQuote;
+}
+
+/** Single-symbol live quote (GET /market/quote/{symbol}) -- meant to be called client-side
+ * via useLiveQuote(), so a company page's own render never waits on this scrape. */
+export async function fetchSingleLiveQuote(symbol: string): Promise<SingleLiveQuoteResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/market/quote/${encodeURIComponent(symbol)}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as SingleLiveQuoteResponse;
   } catch {
     return null;
   }

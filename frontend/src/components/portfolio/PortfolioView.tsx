@@ -6,6 +6,7 @@ import { Trash2, Plus, AlertTriangle } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
 import { formatPct, formatPrice } from "@/lib/format";
 import { DONUT_COLORS } from "@/components/dashboard/MarketCapDonut";
+import { mergeLiveQuote, useLiveQuotes } from "@/lib/useLiveQuotes";
 
 const STORAGE_KEY = "psx_portfolio";
 
@@ -55,7 +56,15 @@ function StatCard({ label, value, color }: { label: string; value: string; color
   );
 }
 
-export default function PortfolioView({ rows }: { rows: ComparisonRow[] }) {
+export default function PortfolioView({ rows: rawRows }: { rows: ComparisonRow[] }) {
+  // rawRows arrive price-null from SSR (fast, DB-only -- see comparison.py); market value
+  // and P&L below need a real price, so live quotes are merged in before anything else.
+  const { quotesBySymbol } = useLiveQuotes();
+  const rows = useMemo(
+    () => rawRows.map((r) => (r.symbol ? mergeLiveQuote(r, quotesBySymbol[r.symbol]) : r)),
+    [rawRows, quotesBySymbol]
+  );
+
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [selectedId, setSelectedId] = useState<number | "">("");
   const [quantity, setQuantity] = useState("");

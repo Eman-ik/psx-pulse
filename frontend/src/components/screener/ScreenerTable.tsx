@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown, Info, RotateCcw, Search } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
 import { formatLiveRatio, formatMarketCap, formatMultiple, formatPct, formatPercent, formatPrice } from "@/lib/format";
+import { mergeLiveQuote, useLiveQuotes } from "@/lib/useLiveQuotes";
 
 type SortKey =
   | "price" | "change_pct" | "market_cap" | "pe_ratio" | "roe" | "roa" | "dividend_yield"
@@ -85,9 +86,18 @@ export default function ScreenerTable({
   const [sortKey, setSortKey] = useState<SortKey | null>(mode === "ranking" ? "ai_score" : null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
+  // rows arrive from SSR with price/change_pct/pe_ratio/dividend_yield null (fast,
+  // DB-only -- see comparison.py's docstring); live quotes are merged in here once the
+  // client-side scrape resolves, without blocking anything above this component.
+  const { quotesBySymbol } = useLiveQuotes();
+  const liveRows = useMemo(
+    () => rows.map((r) => (r.symbol ? mergeLiveQuote(r, quotesBySymbol[r.symbol]) : r)),
+    [rows, quotesBySymbol]
+  );
+
   const sectors = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.sector).filter((s): s is string => !!s))).sort(),
-    [rows]
+    () => Array.from(new Set(liveRows.map((r) => r.sector).filter((s): s is string => !!s))).sort(),
+    [liveRows]
   );
 
   const setFilter = (key: SortKey, bound: "min" | "max", value: string) => {
@@ -109,7 +119,7 @@ export default function ScreenerTable({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let result = rows.filter(
+    let result = liveRows.filter(
       (r) => !q || r.name.toLowerCase().includes(q) || (r.symbol ?? "").toLowerCase().includes(q)
     );
     if (sector) result = result.filter((r) => r.sector === sector);
@@ -139,7 +149,7 @@ export default function ScreenerTable({
     }
 
     return result;
-  }, [rows, query, sector, filters, sortKey, sortDirection]);
+  }, [liveRows, query, sector, filters, sortKey, sortDirection]);
 
   return (
     <div>

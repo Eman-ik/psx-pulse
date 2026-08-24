@@ -83,10 +83,24 @@ def get_quant_forecast(
             f"{payload.get('reason', 'unknown reason')}. Do not fabricate a substitute forecast."
         )
 
+    qual = payload.get("signal_qualification") or {}
+    signal = qual.get("signal", "NO_SIGNAL")
+    qualified_line = (
+        f"QUALIFIED SIGNAL: {signal} -- {qual.get('reason', 'no qualification reason available')}"
+        if qual.get("qualified")
+        else f"NOT A VALIDATED SIGNAL ({signal}) -- {qual.get('reason', 'no walk-forward validation on file')}"
+    )
+
     return (
         f"# Quant Forecast for {payload['ticker']} ({payload.get('issuer_name', 'unknown issuer')})\n"
         f"# As of real close on {payload['as_of_date']} (PKR {payload['last_real_close']})\n"
         f"# Model: {payload['model_source']}, {payload['n_samples']} independent real stochastic samples\n\n"
+        f"{qualified_line}\n"
+        f"(SRS Module 7 Signal Qualification Gate: the raw ensemble stats below are NOT "
+        f"themselves a validated trading signal -- only the QUALIFIED SIGNAL line above is. "
+        f"Do not treat a bullish/bearish trend_regime or a high P(positive return) as a "
+        f"BUY/SELL call when this ticker's real walk-forward track record hasn't cleared "
+        f"the qualification bar; relay the NOT A VALIDATED SIGNAL status honestly.)\n\n"
         f"Horizon: {payload['horizon_days']} trading days\n"
         f"P(positive return): {payload['p_positive_return'] * 100:.0f}%\n"
         f"Expected {payload['horizon_days']}D return: {payload['expected_return_pct']:+.2f}%\n"

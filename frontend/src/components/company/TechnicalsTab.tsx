@@ -73,6 +73,7 @@ export default function TechnicalsTab({
   const [adjusted, setAdjusted] = useState(false);
   const [adjustedBars, setAdjustedBars] = useState<PriceBar[] | null>(null);
   const [actionsOnFile, setActionsOnFile] = useState<number | null>(null);
+  const [unverifiedActions, setUnverifiedActions] = useState<number>(0);
   const [adjustError, setAdjustError] = useState(false);
   const fetchAttempted = adjustedBars !== null || adjustError;
   const loading = adjusted && !fetchAttempted && securityId != null;
@@ -91,6 +92,7 @@ export default function TechnicalsTab({
       }
       setAdjustedBars(res.bars);
       setActionsOnFile(res.corporate_actions_on_file ?? 0);
+      setUnverifiedActions(res.unverified_corporate_actions ?? 0);
     });
     return () => {
       cancelled = true;
@@ -152,6 +154,14 @@ export default function TechnicalsTab({
             {actionsOnFile
               ? `Backward-adjusted for ${actionsOnFile} cash dividend${actionsOnFile === 1 ? "" : "s"} on file (PSX face-value % convention). No bonus/rights/split events are on file for this pilot yet.`
               : "No corporate actions on file for this company — adjusted series is identical to raw."}
+          </p>
+        )}
+        {adjusted && adjustedBars && unverifiedActions > 0 && (
+          <p className="mb-2 text-[10px] text-amber-500">
+            ⚠ {unverifiedActions} of {actionsOnFile} corporate action{actionsOnFile === 1 ? "" : "s"} on file{" "}
+            {unverifiedActions === 1 ? "was" : "were"} detected algorithmically from a price discontinuity and{" "}
+            {unverifiedActions === 1 ? "hasn't" : "haven't"} yet been cross-checked against an actual PSX
+            announcement — treat this adjusted series with caution.
           </p>
         )}
         {adjusted && adjustError && (

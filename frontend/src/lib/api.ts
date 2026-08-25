@@ -326,21 +326,11 @@ export async function fetchCementSector(): Promise<CementSector | null> {
   }
 }
 
-export async function fetchCementLiveQuotes(): Promise<LiveQuotesResponse | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/market/live/cement`, { cache: "no-store" });
-    if (!res.ok) return null;
-    return (await res.json()) as LiveQuotesResponse;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Combined fertilizer+cement live quotes (GET /market/live/all) -- meant to be called
  * client-side via useLiveQuotes(), not awaited during SSR. This is the same up-to-35s,
- * no-SLA psxdata scrape as fetchLiveQuotes()/fetchCementLiveQuotes(); the point of this
- * one is where it's called from, not what it does.
+ * no-SLA psxdata scrape as fetchLiveQuotes(); the point of this one is where it's
+ * called from, not what it does.
  */
 export async function fetchLiveQuotesAll(): Promise<LiveQuotesResponse | null> {
   try {
@@ -375,6 +365,7 @@ export interface PricesResponse {
   adjusted: boolean;
   adjustment_methodology?: string;
   corporate_actions_on_file?: number;
+  unverified_corporate_actions?: number;
   delayed_data_notice: string;
   bars: PriceBar[];
 }

@@ -4,63 +4,21 @@
     "outcome": "CANDIDATE",
     "events": [
       {
-        "effective_date": "2009-07-29",
-        "ratio": 1.9146,
-        "hint": "looks like 1-for-2 reverse split (ratio 1.915 vs expected 2.000)"
+        "effective_date": "2023-05-23",
+        "ratio": 0.3472,
+        "hint": "looks like 3-for-1 split (ratio 0.347 vs expected 0.333)"
       },
       {
-        "effective_date": "2012-03-02",
-        "ratio": 2.0502,
-        "hint": "looks like 1-for-2 reverse split (ratio 2.050 vs expected 2.000)"
-      },
-      {
-        "effective_date": "2022-10-03",
-        "ratio": 0.3464,
-        "hint": "looks like 3-for-1 split (ratio 0.346 vs expected 0.333)"
-      },
-      {
-        "effective_date": "2023-08-24",
-        "ratio": 2.9391,
-        "hint": "looks like 1-for-3 reverse split (ratio 2.939 vs expected 3.000)"
-      },
-      {
-        "effective_date": "2023-08-25",
-        "ratio": 0.3418,
-        "hint": "looks like 3-for-1 split (ratio 0.342 vs expected 0.333)"
+        "effective_date": "2023-05-24",
+        "ratio": 2.89,
+        "hint": "looks like 1-for-3 reverse split (ratio 2.890 vs expected 3.000)"
       }
     ]
   },
   {
     "symbol": "BAFL",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 2143,
-    "sample_disagreements": [
-      {
-        "date": "2025-05-12",
-        "stored_close": 38.39,
-        "fresh_close": 76.78
-      },
-      {
-        "date": "2025-05-09",
-        "stored_close": 35.08,
-        "fresh_close": 70.15
-      },
-      {
-        "date": "2025-05-08",
-        "stored_close": 33.74,
-        "fresh_close": 67.49
-      },
-      {
-        "date": "2025-05-07",
-        "stored_close": 34.58,
-        "fresh_close": 69.15
-      },
-      {
-        "date": "2025-05-06",
-        "stored_close": 35.51,
-        "fresh_close": 71.03
-      }
-    ]
+    "outcome": "CANDIDATE",
+    "events": []
   },
   {
     "symbol": "BAPL",
@@ -96,461 +54,2017 @@
   },
   {
     "symbol": "BELA",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 31,
-    "sample_disagreements": [
-      {
-        "date": "2026-07-31",
-        "stored_close": 56.8,
-        "fresh_close": 55.0
-      },
-      {
-        "date": "2025-01-01",
-        "stored_close": 173.9,
-        "fresh_close": 170.04
-      },
-      {
-        "date": "2024-12-27",
-        "stored_close": 177.0,
-        "fresh_close": 170.08
-      },
-      {
-        "date": "2024-12-26",
-        "stored_close": 184.0,
-        "fresh_close": 168.08
-      },
-      {
-        "date": "2024-12-19",
-        "stored_close": 187.98,
-        "fresh_close": 174.68
-      }
-    ]
+    "outcome": "CANDIDATE",
+    "events": []
   },
   {
     "symbol": "BERG",
     "outcome": "REPAIRED",
-    "rows_overwritten": 803,
+    "rows_overwritten": 1,
     "sample_disagreements": [
       {
-        "date": "2026-07-30",
-        "stored_close": 147.6,
-        "fresh_close": 103.33
-      },
-      {
-        "date": "2026-07-29",
-        "stored_close": 147.6,
-        "fresh_close": 103.93
-      },
-      {
-        "date": "2026-07-28",
-        "stored_close": 147.6,
-        "fresh_close": 105.08
-      },
-      {
-        "date": "2026-07-27",
-        "stored_close": 147.6,
-        "fresh_close": 107.29
-      },
-      {
-        "date": "2026-07-24",
-        "stored_close": 147.6,
-        "fresh_close": 97.54
+        "date": "2026-08-25",
+        "stored_close": 162.35,
+        "fresh_close": 156.61
       }
     ]
   },
   {
     "symbol": "EWIC",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 90,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2026-04-09",
-        "stored_close": 53.52,
-        "fresh_close": 58.87
-      },
-      {
-        "date": "2026-04-08",
-        "stored_close": 53.52,
-        "fresh_close": 58.87
-      },
-      {
-        "date": "2026-04-07",
-        "stored_close": 49.49,
-        "fresh_close": 54.44
-      },
-      {
-        "date": "2026-03-30",
-        "stored_close": 41.2,
-        "fresh_close": 45.32
-      },
-      {
-        "date": "2026-03-27",
-        "stored_close": 41.2,
-        "fresh_close": 45.32
+        "effective_date": "2020-12-10",
+        "ratio": 2.021,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.021 vs expected 2.000)"
       }
     ]
   },
   {
     "symbol": "FIL",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 53,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2025-01-08",
-        "stored_close": 130.0,
-        "fresh_close": 133.94
-      },
-      {
-        "date": "2025-01-01",
-        "stored_close": 129.0,
-        "fresh_close": 133.94
-      },
-      {
-        "date": "2024-12-26",
-        "stored_close": 120.56,
-        "fresh_close": 133.94
-      },
-      {
-        "date": "2024-12-19",
-        "stored_close": 121.0,
-        "fresh_close": 133.94
-      },
-      {
-        "date": "2024-12-18",
-        "stored_close": 120.56,
-        "fresh_close": 133.94
+        "effective_date": "2014-06-06",
+        "ratio": 3.0329,
+        "hint": "looks like 1-for-3 reverse split (ratio 3.033 vs expected 3.000)"
       }
     ]
   },
   {
     "symbol": "GRYL",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 43,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2025-01-01",
-        "stored_close": 6.1,
-        "fresh_close": 5.88
+        "effective_date": "2009-08-12",
+        "ratio": 0.4943,
+        "hint": "looks like 2-for-1 split (ratio 0.494 vs expected 0.500)"
       },
       {
-        "date": "2024-12-31",
-        "stored_close": 6.18,
-        "fresh_close": 5.91
+        "effective_date": "2010-07-09",
+        "ratio": 0.5,
+        "hint": "looks like 2-for-1 split (ratio 0.500 vs expected 0.500)"
       },
       {
-        "date": "2024-12-30",
-        "stored_close": 6.1,
-        "fresh_close": 5.91
+        "effective_date": "2010-07-12",
+        "ratio": 2.0,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.000 vs expected 2.000)"
       },
       {
-        "date": "2024-12-20",
-        "stored_close": 6.48,
-        "fresh_close": 6.16
+        "effective_date": "2010-07-22",
+        "ratio": 1.9048,
+        "hint": "looks like 1-for-2 reverse split (ratio 1.905 vs expected 2.000)"
       },
       {
-        "date": "2024-12-18",
-        "stored_close": 5.91,
-        "fresh_close": 5.78
+        "effective_date": "2010-09-15",
+        "ratio": 1.9853,
+        "hint": "looks like 1-for-2 reverse split (ratio 1.985 vs expected 2.000)"
+      },
+      {
+        "effective_date": "2011-01-17",
+        "ratio": 1.9901,
+        "hint": "looks like 1-for-2 reverse split (ratio 1.990 vs expected 2.000)"
+      },
+      {
+        "effective_date": "2019-09-19",
+        "ratio": 2.0812,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.081 vs expected 2.000)"
       }
     ]
   },
   {
     "symbol": "GVGL",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 276,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2025-01-01",
-        "stored_close": 52.0,
-        "fresh_close": 50.17
+        "effective_date": "2018-01-01",
+        "ratio": 2.0388,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.039 vs expected 2.000)"
       },
       {
-        "date": "2024-11-15",
-        "stored_close": 41.99,
-        "fresh_close": 40.64
-      },
-      {
-        "date": "2024-11-05",
-        "stored_close": 39.95,
-        "fresh_close": 39.0
-      },
-      {
-        "date": "2024-10-23",
-        "stored_close": 41.33,
-        "fresh_close": 40.08
-      },
-      {
-        "date": "2024-10-18",
-        "stored_close": 41.0,
-        "fresh_close": 40.01
+        "effective_date": "2023-05-29",
+        "ratio": 1.9111,
+        "hint": "looks like 1-for-2 reverse split (ratio 1.911 vs expected 2.000)"
       }
     ]
   },
   {
     "symbol": "ICIBL",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 155,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2026-02-09",
-        "stored_close": 33.02,
-        "fresh_close": 4.99
+        "effective_date": "2008-05-08",
+        "ratio": 3.0384,
+        "hint": "looks like 1-for-3 reverse split (ratio 3.038 vs expected 3.000)"
       },
       {
-        "date": "2026-02-06",
-        "stored_close": 33.02,
-        "fresh_close": 4.99
-      },
-      {
-        "date": "2026-02-04",
-        "stored_close": 33.55,
-        "fresh_close": 5.07
-      },
-      {
-        "date": "2026-02-03",
-        "stored_close": 33.22,
-        "fresh_close": 5.02
-      },
-      {
-        "date": "2026-02-02",
-        "stored_close": 33.08,
-        "fresh_close": 5.0
+        "effective_date": "2020-12-18",
+        "ratio": 1.9009,
+        "hint": "looks like 1-for-2 reverse split (ratio 1.901 vs expected 2.000)"
       }
     ]
   },
   {
     "symbol": "IMS",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 101,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2017-11-21",
-        "stored_close": 7.58,
-        "fresh_close": 75.78
+        "effective_date": "2017-05-29",
+        "ratio": 10.1534,
+        "hint": "looks like 1-for-10 reverse split (ratio 10.153 vs expected 10.000)"
       },
       {
-        "date": "2017-11-20",
-        "stored_close": 7.23,
-        "fresh_close": 72.26
+        "effective_date": "2018-02-26",
+        "ratio": 0.1,
+        "hint": "looks like 10-for-1 split (ratio 0.100 vs expected 0.100)"
       },
       {
-        "date": "2017-11-17",
-        "stored_close": 6.88,
-        "fresh_close": 68.82
+        "effective_date": "2018-03-02",
+        "ratio": 9.6429,
+        "hint": "looks like 1-for-10 reverse split (ratio 9.643 vs expected 10.000)"
       },
       {
-        "date": "2017-11-16",
-        "stored_close": 7.17,
-        "fresh_close": 71.7
+        "effective_date": "2023-10-31",
+        "ratio": 0.0998,
+        "hint": "looks like 10-for-1 split (ratio 0.100 vs expected 0.100)"
       },
       {
-        "date": "2017-11-15",
-        "stored_close": 7.55,
-        "fresh_close": 75.47
+        "effective_date": "2023-11-03",
+        "ratio": 10.1231,
+        "hint": "looks like 1-for-10 reverse split (ratio 10.123 vs expected 10.000)"
+      },
+      {
+        "effective_date": "2025-06-16",
+        "ratio": 0.1016,
+        "hint": "looks like 10-for-1 split (ratio 0.102 vs expected 0.100)"
       }
     ]
   },
   {
     "symbol": "KOHC",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 1925,
-    "sample_disagreements": [
-      {
-        "date": "2024-06-28",
-        "stored_close": 50.09,
-        "fresh_close": 250.43
-      },
-      {
-        "date": "2024-06-27",
-        "stored_close": 48.84,
-        "fresh_close": 244.2
-      },
-      {
-        "date": "2024-06-26",
-        "stored_close": 48.47,
-        "fresh_close": 242.35
-      },
-      {
-        "date": "2024-06-25",
-        "stored_close": 48.8,
-        "fresh_close": 244.0
-      },
-      {
-        "date": "2024-06-24",
-        "stored_close": 48.04,
-        "fresh_close": 240.18
-      }
-    ]
+    "outcome": "CANDIDATE",
+    "events": []
   },
   {
     "symbol": "LUCK",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 1,
-    "sample_disagreements": [
-      {
-        "date": "2022-06-28",
-        "stored_close": 450.1,
-        "fresh_close": 460.47
-      }
-    ]
+    "outcome": "CANDIDATE",
+    "events": []
   },
   {
     "symbol": "PGLC",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 170,
-    "sample_disagreements": [
-      {
-        "date": "2024-12-18",
-        "stored_close": 11.25,
-        "fresh_close": 10.44
-      },
-      {
-        "date": "2024-12-16",
-        "stored_close": 10.91,
-        "fresh_close": 11.31
-      },
-      {
-        "date": "2024-12-13",
-        "stored_close": 11.62,
-        "fresh_close": 11.88
-      },
-      {
-        "date": "2024-12-11",
-        "stored_close": 11.08,
-        "fresh_close": 12.16
-      },
-      {
-        "date": "2024-12-09",
-        "stored_close": 11.45,
-        "fresh_close": 11.7
-      }
-    ]
+    "outcome": "CANDIDATE",
+    "events": []
   },
   {
     "symbol": "PIAHCLB",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 33,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2025-02-06",
-        "stored_close": 860.33,
-        "fresh_close": 948.0
+        "effective_date": "2009-07-21",
+        "ratio": 0.5,
+        "hint": "looks like 2-for-1 split (ratio 0.500 vs expected 0.500)"
       },
       {
-        "date": "2025-02-04",
-        "stored_close": 900.0,
-        "fresh_close": 948.0
+        "effective_date": "2009-07-22",
+        "ratio": 2.0,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.000 vs expected 2.000)"
       },
       {
-        "date": "2025-01-29",
-        "stored_close": 845.02,
-        "fresh_close": 890.66
+        "effective_date": "2009-12-08",
+        "ratio": 2.0673,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.067 vs expected 2.000)"
       },
       {
-        "date": "2025-01-27",
-        "stored_close": 870.0,
-        "fresh_close": 890.66
-      },
-      {
-        "date": "2025-01-17",
-        "stored_close": 899.99,
-        "fresh_close": 844.57
+        "effective_date": "2024-05-27",
+        "ratio": 10.1187,
+        "hint": "looks like 1-for-10 reverse split (ratio 10.119 vs expected 10.000)"
       }
     ]
   },
   {
     "symbol": "PIL",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 93,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2025-01-03",
-        "stored_close": 2.36,
-        "fresh_close": 2.43
-      },
-      {
-        "date": "2024-12-20",
-        "stored_close": 1.93,
-        "fresh_close": 2.0
-      },
-      {
-        "date": "2024-12-19",
-        "stored_close": 1.83,
-        "fresh_close": 1.79
-      },
-      {
-        "date": "2024-12-18",
-        "stored_close": 1.91,
-        "fresh_close": 1.82
-      },
-      {
-        "date": "2024-12-13",
-        "stored_close": 1.94,
-        "fresh_close": 1.9
+        "effective_date": "2023-06-21",
+        "ratio": 2.0667,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.067 vs expected 2.000)"
       }
     ]
   },
   {
     "symbol": "PPVC",
-    "outcome": "REPAIRED",
-    "rows_overwritten": 60,
-    "sample_disagreements": [
+    "outcome": "CANDIDATE",
+    "events": []
+  },
+  {
+    "symbol": "UVIC",
+    "outcome": "CANDIDATE",
+    "events": [
       {
-        "date": "2025-01-03",
-        "stored_close": 12.79,
-        "fresh_close": 12.02
+        "effective_date": "2023-05-31",
+        "ratio": 0.4823,
+        "hint": "looks like 2-for-1 split (ratio 0.482 vs expected 0.500)"
       },
       {
-        "date": "2025-01-02",
-        "stored_close": 11.5,
-        "fresh_close": 12.78
+        "effective_date": "2023-06-06",
+        "ratio": 2.0667,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.067 vs expected 2.000)"
       },
       {
-        "date": "2025-01-01",
-        "stored_close": 11.06,
-        "fresh_close": 11.94
-      },
-      {
-        "date": "2024-12-30",
-        "stored_close": 11.34,
-        "fresh_close": 10.13
-      },
-      {
-        "date": "2024-12-26",
-        "stored_close": 10.99,
-        "fresh_close": 10.18
+        "effective_date": "2023-08-10",
+        "ratio": 2.8571,
+        "hint": "looks like 1-for-3 reverse split (ratio 2.857 vs expected 3.000)"
       }
     ]
   },
   {
-    "symbol": "UVIC",
+    "symbol": "786",
     "outcome": "REPAIRED",
-    "rows_overwritten": 61,
+    "rows_overwritten": 81,
+    "sample_disagreements": [
+      {
+        "date": "2025-12-12",
+        "stored_close": 12.23,
+        "fresh_close": 12.98
+      },
+      {
+        "date": "2025-12-11",
+        "stored_close": 12.29,
+        "fresh_close": 13.04
+      },
+      {
+        "date": "2025-12-10",
+        "stored_close": 11.91,
+        "fresh_close": 12.63
+      },
+      {
+        "date": "2025-12-09",
+        "stored_close": 11.93,
+        "fresh_close": 12.66
+      },
+      {
+        "date": "2025-12-08",
+        "stored_close": 12.13,
+        "fresh_close": 12.87
+      }
+    ]
+  },
+  {
+    "symbol": "AHL",
+    "outcome": "CANDIDATE",
+    "events": []
+  },
+  {
+    "symbol": "ALAC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 118,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-06",
+        "stored_close": 5.9,
+        "fresh_close": 5.65
+      },
+      {
+        "date": "2025-01-03",
+        "stored_close": 5.79,
+        "fresh_close": 6.11
+      },
+      {
+        "date": "2024-12-31",
+        "stored_close": 5.9,
+        "fresh_close": 6.13
+      },
+      {
+        "date": "2024-12-27",
+        "stored_close": 6.19,
+        "fresh_close": 5.9
+      },
+      {
+        "date": "2024-12-26",
+        "stored_close": 6.12,
+        "fresh_close": 5.64
+      }
+    ]
+  },
+  {
+    "symbol": "AMBL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 523,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-06",
+        "stored_close": 11.01,
+        "fresh_close": 10.01
+      },
+      {
+        "date": "2025-01-02",
+        "stored_close": 10.8,
+        "fresh_close": 10.01
+      },
+      {
+        "date": "2025-01-01",
+        "stored_close": 10.5,
+        "fresh_close": 10.01
+      },
+      {
+        "date": "2024-12-24",
+        "stored_close": 10.99,
+        "fresh_close": 10.01
+      },
+      {
+        "date": "2024-12-16",
+        "stored_close": 9.6,
+        "fresh_close": 10.01
+      }
+    ]
+  },
+  {
+    "symbol": "AMTEX",
+    "outcome": "CANDIDATE",
+    "events": []
+  },
+  {
+    "symbol": "ARMG",
+    "outcome": "CANDIDATE",
+    "events": [
+      {
+        "effective_date": "2010-07-23",
+        "ratio": 1.9901,
+        "hint": "looks like 1-for-2 reverse split (ratio 1.990 vs expected 2.000)"
+      },
+      {
+        "effective_date": "2010-09-01",
+        "ratio": 0.4975,
+        "hint": "looks like 2-for-1 split (ratio 0.498 vs expected 0.500)"
+      },
+      {
+        "effective_date": "2010-12-10",
+        "ratio": 0.4819,
+        "hint": "looks like 2-for-1 split (ratio 0.482 vs expected 0.500)"
+      }
+    ]
+  },
+  {
+    "symbol": "ATLH",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 585,
+    "sample_disagreements": [
+      {
+        "date": "2023-12-21",
+        "stored_close": 368.0,
+        "fresh_close": 359.9
+      },
+      {
+        "date": "2023-09-06",
+        "stored_close": 280.0,
+        "fresh_close": 271.34
+      },
+      {
+        "date": "2023-08-01",
+        "stored_close": 303.23,
+        "fresh_close": 291.29
+      },
+      {
+        "date": "2023-07-05",
+        "stored_close": 264.49,
+        "fresh_close": 255.77
+      },
+      {
+        "date": "2023-06-23",
+        "stored_close": 238.13,
+        "fresh_close": 250.0
+      }
+    ]
+  },
+  {
+    "symbol": "BECO",
+    "outcome": "CANDIDATE",
+    "events": []
+  },
+  {
+    "symbol": "BGL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 22,
+    "sample_disagreements": [
+      {
+        "date": "2024-03-29",
+        "stored_close": 8.67,
+        "fresh_close": 8.47
+      },
+      {
+        "date": "2023-08-30",
+        "stored_close": 10.49,
+        "fresh_close": 10.07
+      },
+      {
+        "date": "2023-05-26",
+        "stored_close": 10.8,
+        "fresh_close": 11.07
+      },
+      {
+        "date": "2023-01-04",
+        "stored_close": 10.25,
+        "fresh_close": 10.47
+      },
+      {
+        "date": "2022-11-07",
+        "stored_close": 9.2,
+        "fresh_close": 9.42
+      }
+    ]
+  },
+  {
+    "symbol": "BLUEX",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 1,
+    "sample_disagreements": [
+      {
+        "date": "2026-08-25",
+        "stored_close": 6.94,
+        "fresh_close": 6.8
+      }
+    ]
+  },
+  {
+    "symbol": "BML",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 1,
+    "sample_disagreements": [
+      {
+        "date": "2026-08-25",
+        "stored_close": 57.11,
+        "fresh_close": 54.85
+      }
+    ]
+  },
+  {
+    "symbol": "BWCL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 14,
+    "sample_disagreements": [
+      {
+        "date": "2024-05-02",
+        "stored_close": 211.41,
+        "fresh_close": 207.01
+      },
+      {
+        "date": "2024-04-08",
+        "stored_close": 212.51,
+        "fresh_close": 220.1
+      },
+      {
+        "date": "2023-06-22",
+        "stored_close": 141.0,
+        "fresh_close": 144.64
+      },
+      {
+        "date": "2023-06-16",
+        "stored_close": 149.88,
+        "fresh_close": 143.99
+      },
+      {
+        "date": "2023-06-08",
+        "stored_close": 147.0,
+        "fresh_close": 150.64
+      }
+    ]
+  },
+  {
+    "symbol": "CJPL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 27,
     "sample_disagreements": [
       {
         "date": "2024-12-27",
-        "stored_close": 11.0,
-        "fresh_close": 11.85
+        "stored_close": 4.22,
+        "fresh_close": 4.1
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 4.28,
+        "fresh_close": 3.8
       },
       {
         "date": "2024-12-18",
-        "stored_close": 11.4,
-        "fresh_close": 10.4
-      },
-      {
-        "date": "2024-12-13",
-        "stored_close": 11.5,
-        "fresh_close": 11.08
+        "stored_close": 4.98,
+        "fresh_close": 4.74
       },
       {
         "date": "2024-12-11",
-        "stored_close": 11.0,
-        "fresh_close": 11.64
+        "stored_close": 4.9,
+        "fresh_close": 5.03
+      },
+      {
+        "date": "2024-12-10",
+        "stored_close": 5.35,
+        "fresh_close": 4.97
+      }
+    ]
+  },
+  {
+    "symbol": "CLOV",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 2357,
+    "sample_disagreements": [
+      {
+        "date": "2026-04-17",
+        "stored_close": 7.0,
+        "fresh_close": 70.01
+      },
+      {
+        "date": "2026-04-16",
+        "stored_close": 6.92,
+        "fresh_close": 69.16
+      },
+      {
+        "date": "2026-04-15",
+        "stored_close": 6.36,
+        "fresh_close": 63.59
+      },
+      {
+        "date": "2026-04-14",
+        "stored_close": 6.3,
+        "fresh_close": 62.98
+      },
+      {
+        "date": "2026-04-13",
+        "stored_close": 6.33,
+        "fresh_close": 63.31
+      }
+    ]
+  },
+  {
+    "symbol": "CSIL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 161,
+    "sample_disagreements": [
+      {
+        "date": "2026-01-15",
+        "stored_close": 7.797,
+        "fresh_close": 9.62
+      },
+      {
+        "date": "2026-01-14",
+        "stored_close": 8.664,
+        "fresh_close": 10.69
+      },
+      {
+        "date": "2026-01-13",
+        "stored_close": 9.629,
+        "fresh_close": 11.88
+      },
+      {
+        "date": "2026-01-12",
+        "stored_close": 10.034,
+        "fresh_close": 12.38
+      },
+      {
+        "date": "2026-01-09",
+        "stored_close": 10.131,
+        "fresh_close": 12.5
+      }
+    ]
+  },
+  {
+    "symbol": "DAAG",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 17,
+    "sample_disagreements": [
+      {
+        "date": "2024-11-04",
+        "stored_close": 85.21,
+        "fresh_close": 86.97
+      },
+      {
+        "date": "2024-10-23",
+        "stored_close": 76.0,
+        "fresh_close": 74.46
+      },
+      {
+        "date": "2024-10-09",
+        "stored_close": 85.49,
+        "fresh_close": 83.51
+      },
+      {
+        "date": "2024-10-02",
+        "stored_close": 88.0,
+        "fresh_close": 89.83
+      },
+      {
+        "date": "2024-10-01",
+        "stored_close": 97.79,
+        "fresh_close": 95.54
+      }
+    ]
+  },
+  {
+    "symbol": "DBCI",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 24,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-03",
+        "stored_close": 6.07,
+        "fresh_close": 5.92
+      },
+      {
+        "date": "2024-12-26",
+        "stored_close": 6.12,
+        "fresh_close": 5.99
+      },
+      {
+        "date": "2024-10-30",
+        "stored_close": 4.7,
+        "fresh_close": 4.57
+      },
+      {
+        "date": "2024-10-29",
+        "stored_close": 4.84,
+        "fresh_close": 4.69
+      },
+      {
+        "date": "2024-10-18",
+        "stored_close": 4.68,
+        "fresh_close": 4.45
+      }
+    ]
+  },
+  {
+    "symbol": "DCL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 17,
+    "sample_disagreements": [
+      {
+        "date": "2024-03-22",
+        "stored_close": 6.99,
+        "fresh_close": 6.84
+      },
+      {
+        "date": "2024-01-22",
+        "stored_close": 5.92,
+        "fresh_close": 5.7
+      },
+      {
+        "date": "2024-01-09",
+        "stored_close": 6.38,
+        "fresh_close": 6.24
+      },
+      {
+        "date": "2023-12-13",
+        "stored_close": 7.3,
+        "fresh_close": 7.46
+      },
+      {
+        "date": "2023-07-11",
+        "stored_close": 4.9,
+        "fresh_close": 5.07
+      }
+    ]
+  },
+  {
+    "symbol": "DEL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 980,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-26",
+        "stored_close": 10.68,
+        "fresh_close": 10.31
+      },
+      {
+        "date": "2024-12-24",
+        "stored_close": 11.05,
+        "fresh_close": 10.8
+      },
+      {
+        "date": "2024-12-20",
+        "stored_close": 9.9,
+        "fresh_close": 9.63
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 9.69,
+        "fresh_close": 9.47
+      },
+      {
+        "date": "2024-12-18",
+        "stored_close": 9.49,
+        "fresh_close": 9.18
+      }
+    ]
+  },
+  {
+    "symbol": "DFML",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 25,
+    "sample_disagreements": [
+      {
+        "date": "2024-05-21",
+        "stored_close": 39.3,
+        "fresh_close": 40.2
+      },
+      {
+        "date": "2024-05-06",
+        "stored_close": 29.5,
+        "fresh_close": 30.3
+      },
+      {
+        "date": "2024-04-18",
+        "stored_close": 24.52,
+        "fresh_close": 23.92
+      },
+      {
+        "date": "2022-12-30",
+        "stored_close": 12.7,
+        "fresh_close": 13.19
+      },
+      {
+        "date": "2022-10-20",
+        "stored_close": 9.53,
+        "fresh_close": 9.29
+      }
+    ]
+  },
+  {
+    "symbol": "DNCC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 802,
+    "sample_disagreements": [
+      {
+        "date": "2026-07-31",
+        "stored_close": 17.49,
+        "fresh_close": 17.02
+      },
+      {
+        "date": "2024-10-14",
+        "stored_close": 12.8,
+        "fresh_close": 12.5
+      },
+      {
+        "date": "2024-10-07",
+        "stored_close": 11.3,
+        "fresh_close": 11.95
+      },
+      {
+        "date": "2024-10-04",
+        "stored_close": 10.66,
+        "fresh_close": 11.0
+      },
+      {
+        "date": "2024-09-30",
+        "stored_close": 10.6,
+        "fresh_close": 11.15
+      }
+    ]
+  },
+  {
+    "symbol": "DWAE",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 9,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-06",
+        "stored_close": 40.75,
+        "fresh_close": 39.56
+      },
+      {
+        "date": "2024-11-26",
+        "stored_close": 40.93,
+        "fresh_close": 39.59
+      },
+      {
+        "date": "2024-10-30",
+        "stored_close": 37.95,
+        "fresh_close": 36.74
+      },
+      {
+        "date": "2024-10-25",
+        "stored_close": 39.4,
+        "fresh_close": 38.4
+      },
+      {
+        "date": "2024-10-23",
+        "stored_close": 39.5,
+        "fresh_close": 38.62
+      }
+    ]
+  },
+  {
+    "symbol": "EMCO",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 63,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-02",
+        "stored_close": 32.83,
+        "fresh_close": 32.0
+      },
+      {
+        "date": "2024-12-31",
+        "stored_close": 30.92,
+        "fresh_close": 32.0
+      },
+      {
+        "date": "2024-12-16",
+        "stored_close": 35.7,
+        "fresh_close": 34.77
+      },
+      {
+        "date": "2024-12-02",
+        "stored_close": 34.9,
+        "fresh_close": 32.0
+      },
+      {
+        "date": "2024-11-26",
+        "stored_close": 30.2,
+        "fresh_close": 31.47
+      }
+    ]
+  },
+  {
+    "symbol": "EPCL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 460,
+    "sample_disagreements": [
+      {
+        "date": "2022-06-13",
+        "stored_close": 77.73,
+        "fresh_close": 80.44
+      },
+      {
+        "date": "2021-03-11",
+        "stored_close": 45.05,
+        "fresh_close": 44.09
+      },
+      {
+        "date": "2018-06-05",
+        "stored_close": 31.85,
+        "fresh_close": 35.5
+      },
+      {
+        "date": "2018-06-04",
+        "stored_close": 31.61,
+        "fresh_close": 35.23
+      },
+      {
+        "date": "2018-06-01",
+        "stored_close": 31.19,
+        "fresh_close": 34.76
+      }
+    ]
+  },
+  {
+    "symbol": "ESBL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 745,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-06",
+        "stored_close": 6.15,
+        "fresh_close": 5.96
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 4.78,
+        "fresh_close": 4.32
+      },
+      {
+        "date": "2024-12-18",
+        "stored_close": 5.19,
+        "fresh_close": 4.99
+      },
+      {
+        "date": "2024-12-16",
+        "stored_close": 5.25,
+        "fresh_close": 5.14
       },
       {
         "date": "2024-12-04",
-        "stored_close": 10.1,
-        "fresh_close": 10.89
+        "stored_close": 6.31,
+        "fresh_close": 6.54
+      }
+    ]
+  },
+  {
+    "symbol": "FFL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 797,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-10",
+        "stored_close": 14.0,
+        "fresh_close": 13.7
+      },
+      {
+        "date": "2023-04-06",
+        "stored_close": 5.59,
+        "fresh_close": 5.47
+      },
+      {
+        "date": "2021-11-11",
+        "stored_close": 13.23,
+        "fresh_close": 12.83
+      },
+      {
+        "date": "2021-10-25",
+        "stored_close": 12.65,
+        "fresh_close": 14.95
+      },
+      {
+        "date": "2021-10-22",
+        "stored_close": 12.56,
+        "fresh_close": 15.12
+      }
+    ]
+  },
+  {
+    "symbol": "FRCL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 57,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-26",
+        "stored_close": 43.0,
+        "fresh_close": 44.03
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 33.98,
+        "fresh_close": 33.27
+      },
+      {
+        "date": "2024-12-10",
+        "stored_close": 18.0,
+        "fresh_close": 18.5
+      },
+      {
+        "date": "2024-12-03",
+        "stored_close": 16.89,
+        "fresh_close": 16.03
+      },
+      {
+        "date": "2024-11-18",
+        "stored_close": 17.0,
+        "fresh_close": 17.57
+      }
+    ]
+  },
+  {
+    "symbol": "HCAR",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 15,
+    "sample_disagreements": [
+      {
+        "date": "2024-01-16",
+        "stored_close": 250.1,
+        "fresh_close": 256.02
+      },
+      {
+        "date": "2023-08-07",
+        "stored_close": 129.05,
+        "fresh_close": 131.75
+      },
+      {
+        "date": "2022-12-30",
+        "stored_close": 161.2,
+        "fresh_close": 166.26
+      },
+      {
+        "date": "2022-12-21",
+        "stored_close": 128.52,
+        "fresh_close": 137.47
+      },
+      {
+        "date": "2022-12-20",
+        "stored_close": 131.11,
+        "fresh_close": 134.33
+      }
+    ]
+  },
+  {
+    "symbol": "HMB",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 8,
+    "sample_disagreements": [
+      {
+        "date": "2024-08-20",
+        "stored_close": 67.38,
+        "fresh_close": 69.71
+      },
+      {
+        "date": "2024-06-12",
+        "stored_close": 59.55,
+        "fresh_close": 58.22
+      },
+      {
+        "date": "2023-07-10",
+        "stored_close": 30.12,
+        "fresh_close": 31.84
+      },
+      {
+        "date": "2023-06-23",
+        "stored_close": 29.46,
+        "fresh_close": 28.8
+      },
+      {
+        "date": "2022-12-28",
+        "stored_close": 34.9,
+        "fresh_close": 33.98
+      }
+    ]
+  },
+  {
+    "symbol": "IGIL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 419,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-06",
+        "stored_close": 16.39,
+        "fresh_close": 15.49
+      },
+      {
+        "date": "2024-12-27",
+        "stored_close": 16.99,
+        "fresh_close": 15.85
+      },
+      {
+        "date": "2024-12-24",
+        "stored_close": 15.1,
+        "fresh_close": 14.71
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 15.59,
+        "fresh_close": 14.73
+      },
+      {
+        "date": "2024-12-17",
+        "stored_close": 16.6,
+        "fresh_close": 15.99
+      }
+    ]
+  },
+  {
+    "symbol": "IMAGE",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 720,
+    "sample_disagreements": [
+      {
+        "date": "2024-03-05",
+        "stored_close": 12.41,
+        "fresh_close": 14.18
+      },
+      {
+        "date": "2024-03-04",
+        "stored_close": 12.14,
+        "fresh_close": 13.78
+      },
+      {
+        "date": "2024-03-01",
+        "stored_close": 12.06,
+        "fresh_close": 13.67
+      },
+      {
+        "date": "2024-02-29",
+        "stored_close": 12.49,
+        "fresh_close": 14.23
+      },
+      {
+        "date": "2024-02-28",
+        "stored_close": 12.5,
+        "fresh_close": 14.31
+      }
+    ]
+  },
+  {
+    "symbol": "IMSL",
+    "outcome": "CANDIDATE",
+    "events": []
+  },
+  {
+    "symbol": "INKL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 71,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-07",
+        "stored_close": 16.1,
+        "fresh_close": 16.47
+      },
+      {
+        "date": "2024-12-31",
+        "stored_close": 17.0,
+        "fresh_close": 16.56
+      },
+      {
+        "date": "2024-12-20",
+        "stored_close": 15.75,
+        "fresh_close": 15.04
+      },
+      {
+        "date": "2024-12-17",
+        "stored_close": 17.0,
+        "fresh_close": 15.55
+      },
+      {
+        "date": "2024-11-29",
+        "stored_close": 16.6,
+        "fresh_close": 15.31
+      }
+    ]
+  },
+  {
+    "symbol": "ISIL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 63,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-23",
+        "stored_close": 1947.9,
+        "fresh_close": 1904.68
+      },
+      {
+        "date": "2024-12-18",
+        "stored_close": 1710.0,
+        "fresh_close": 1792.35
+      },
+      {
+        "date": "2024-12-04",
+        "stored_close": 1650.0,
+        "fresh_close": 1600.05
+      },
+      {
+        "date": "2024-11-27",
+        "stored_close": 1600.0,
+        "fresh_close": 1650.0
+      },
+      {
+        "date": "2024-11-25",
+        "stored_close": 1600.0,
+        "fresh_close": 1650.0
+      }
+    ]
+  },
+  {
+    "symbol": "JGICL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 470,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-31",
+        "stored_close": 59.0,
+        "fresh_close": 57.48
+      },
+      {
+        "date": "2024-11-08",
+        "stored_close": 45.5,
+        "fresh_close": 44.55
+      },
+      {
+        "date": "2024-11-01",
+        "stored_close": 45.98,
+        "fresh_close": 42.22
+      },
+      {
+        "date": "2024-10-28",
+        "stored_close": 44.15,
+        "fresh_close": 46.0
+      },
+      {
+        "date": "2024-10-25",
+        "stored_close": 47.74,
+        "fresh_close": 46.0
+      }
+    ]
+  },
+  {
+    "symbol": "JVDCPS",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 1,
+    "sample_disagreements": [
+      {
+        "date": "2026-08-24",
+        "stored_close": 61.0,
+        "fresh_close": 57.91
+      }
+    ]
+  },
+  {
+    "symbol": "LEUL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 108,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-07",
+        "stored_close": 24.0,
+        "fresh_close": 26.06
+      },
+      {
+        "date": "2025-01-06",
+        "stored_close": 27.99,
+        "fresh_close": 26.06
+      },
+      {
+        "date": "2025-01-03",
+        "stored_close": 25.7,
+        "fresh_close": 27.81
+      },
+      {
+        "date": "2025-01-01",
+        "stored_close": 26.5,
+        "fresh_close": 27.64
+      },
+      {
+        "date": "2024-12-31",
+        "stored_close": 27.0,
+        "fresh_close": 26.13
+      }
+    ]
+  },
+  {
+    "symbol": "LIVEN",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 36,
+    "sample_disagreements": [
+      {
+        "date": "2025-11-24",
+        "stored_close": 56.89,
+        "fresh_close": 66.97
+      },
+      {
+        "date": "2025-11-21",
+        "stored_close": 57.0,
+        "fresh_close": 67.1
+      },
+      {
+        "date": "2025-11-20",
+        "stored_close": 51.82,
+        "fresh_close": 61.0
+      },
+      {
+        "date": "2025-11-19",
+        "stored_close": 51.83,
+        "fresh_close": 61.01
+      },
+      {
+        "date": "2025-11-18",
+        "stored_close": 51.45,
+        "fresh_close": 60.56
+      }
+    ]
+  },
+  {
+    "symbol": "MARI",
+    "outcome": "CANDIDATE",
+    "events": []
+  },
+  {
+    "symbol": "MTL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 2221,
+    "sample_disagreements": [
+      {
+        "date": "2025-08-05",
+        "stored_close": 283.9,
+        "fresh_close": 567.8
+      },
+      {
+        "date": "2025-08-04",
+        "stored_close": 284.89,
+        "fresh_close": 569.78
+      },
+      {
+        "date": "2025-08-01",
+        "stored_close": 284.31,
+        "fresh_close": 568.62
+      },
+      {
+        "date": "2025-07-31",
+        "stored_close": 283.3,
+        "fresh_close": 566.61
+      },
+      {
+        "date": "2025-07-30",
+        "stored_close": 283.61,
+        "fresh_close": 567.23
+      }
+    ]
+  },
+  {
+    "symbol": "MUREB",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 504,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-30",
+        "stored_close": 740.0,
+        "fresh_close": 720.91
+      },
+      {
+        "date": "2023-07-21",
+        "stored_close": 283.0,
+        "fresh_close": 289.18
+      },
+      {
+        "date": "2023-06-02",
+        "stored_close": 289.89,
+        "fresh_close": 282.45
+      },
+      {
+        "date": "2023-04-19",
+        "stored_close": 256.5,
+        "fresh_close": 261.69
+      },
+      {
+        "date": "2023-04-13",
+        "stored_close": 324.9,
+        "fresh_close": 317.36
+      }
+    ]
+  },
+  {
+    "symbol": "NESTLE",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 4,
+    "sample_disagreements": [
+      {
+        "date": "2023-10-09",
+        "stored_close": 6815.0,
+        "fresh_close": 7100.0
+      },
+      {
+        "date": "2023-06-22",
+        "stored_close": 6640.0,
+        "fresh_close": 6447.5
+      },
+      {
+        "date": "2023-06-16",
+        "stored_close": 6400.0,
+        "fresh_close": 6550.0
+      },
+      {
+        "date": "2022-12-02",
+        "stored_close": 5949.0,
+        "fresh_close": 5781.0
+      }
+    ]
+  },
+  {
+    "symbol": "NEXT",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 1160,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-23",
+        "stored_close": 7.5,
+        "fresh_close": 7.9
+      },
+      {
+        "date": "2024-12-04",
+        "stored_close": 6.35,
+        "fresh_close": 6.2
+      },
+      {
+        "date": "2024-11-15",
+        "stored_close": 5.27,
+        "fresh_close": 5.47
+      },
+      {
+        "date": "2024-11-14",
+        "stored_close": 5.24,
+        "fresh_close": 5.04
+      },
+      {
+        "date": "2024-11-07",
+        "stored_close": 4.9,
+        "fresh_close": 4.7
+      }
+    ]
+  },
+  {
+    "symbol": "NRSL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 1242,
+    "sample_disagreements": [
+      {
+        "date": "2024-10-28",
+        "stored_close": 22.47,
+        "fresh_close": 21.7
+      },
+      {
+        "date": "2024-09-20",
+        "stored_close": 20.93,
+        "fresh_close": 20.29
+      },
+      {
+        "date": "2024-07-31",
+        "stored_close": 24.65,
+        "fresh_close": 24.0
+      },
+      {
+        "date": "2024-02-02",
+        "stored_close": 20.3,
+        "fresh_close": 19.81
+      },
+      {
+        "date": "2023-11-08",
+        "stored_close": 16.75,
+        "fresh_close": 16.32
+      }
+    ]
+  },
+  {
+    "symbol": "OBOY",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 285,
+    "sample_disagreements": [
+      {
+        "date": "2026-08-03",
+        "stored_close": 19.69,
+        "fresh_close": 18.64
+      },
+      {
+        "date": "2025-03-13",
+        "stored_close": 10.5,
+        "fresh_close": 11.0
+      },
+      {
+        "date": "2025-03-12",
+        "stored_close": 9.55,
+        "fresh_close": 10.0
+      },
+      {
+        "date": "2025-03-11",
+        "stored_close": 9.46,
+        "fresh_close": 9.91
+      },
+      {
+        "date": "2025-03-10",
+        "stored_close": 9.32,
+        "fresh_close": 9.76
+      }
+    ]
+  },
+  {
+    "symbol": "PAKRI",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 462,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-04",
+        "stored_close": 16.2,
+        "fresh_close": 15.7
+      },
+      {
+        "date": "2024-11-21",
+        "stored_close": 15.15,
+        "fresh_close": 15.47
+      },
+      {
+        "date": "2023-12-22",
+        "stored_close": 7.93,
+        "fresh_close": 7.77
+      },
+      {
+        "date": "2022-05-24",
+        "stored_close": 8.5,
+        "fresh_close": 8.85
+      },
+      {
+        "date": "2022-04-19",
+        "stored_close": 10.6,
+        "fresh_close": 32.0
+      }
+    ]
+  },
+  {
+    "symbol": "PASL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 234,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-24",
+        "stored_close": 1.55,
+        "fresh_close": 1.51
+      },
+      {
+        "date": "2024-12-16",
+        "stored_close": 1.71,
+        "fresh_close": 1.77
+      },
+      {
+        "date": "2024-12-10",
+        "stored_close": 1.54,
+        "fresh_close": 1.5
+      },
+      {
+        "date": "2024-11-25",
+        "stored_close": 1.42,
+        "fresh_close": 1.36
+      },
+      {
+        "date": "2024-11-20",
+        "stored_close": 1.43,
+        "fresh_close": 1.38
+      }
+    ]
+  },
+  {
+    "symbol": "PINL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 244,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-02",
+        "stored_close": 5.73,
+        "fresh_close": 5.61
+      },
+      {
+        "date": "2024-12-27",
+        "stored_close": 5.7,
+        "fresh_close": 5.51
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 6.18,
+        "fresh_close": 5.73
+      },
+      {
+        "date": "2024-12-17",
+        "stored_close": 6.2,
+        "fresh_close": 5.82
+      },
+      {
+        "date": "2024-12-10",
+        "stored_close": 6.2,
+        "fresh_close": 6.02
+      }
+    ]
+  },
+  {
+    "symbol": "PKGI",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 89,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-30",
+        "stored_close": 9.3,
+        "fresh_close": 9.0
+      },
+      {
+        "date": "2024-12-26",
+        "stored_close": 9.55,
+        "fresh_close": 9.04
+      },
+      {
+        "date": "2024-12-23",
+        "stored_close": 9.4,
+        "fresh_close": 9.79
+      },
+      {
+        "date": "2024-12-13",
+        "stored_close": 10.0,
+        "fresh_close": 9.54
+      },
+      {
+        "date": "2024-12-11",
+        "stored_close": 9.93,
+        "fresh_close": 9.43
+      }
+    ]
+  },
+  {
+    "symbol": "PSO",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 787,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-13",
+        "stored_close": 373.98,
+        "fresh_close": 363.76
+      },
+      {
+        "date": "2024-11-01",
+        "stored_close": 242.28,
+        "fresh_close": 237.02
+      },
+      {
+        "date": "2021-10-13",
+        "stored_close": 187.5,
+        "fresh_close": 182.7
+      },
+      {
+        "date": "2019-10-15",
+        "stored_close": 145.72,
+        "fresh_close": 174.87
+      },
+      {
+        "date": "2019-10-14",
+        "stored_close": 145.75,
+        "fresh_close": 174.9
+      }
+    ]
+  },
+  {
+    "symbol": "QUICE",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 44,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-18",
+        "stored_close": 6.36,
+        "fresh_close": 6.49
+      },
+      {
+        "date": "2024-10-02",
+        "stored_close": 5.18,
+        "fresh_close": 5.05
+      },
+      {
+        "date": "2024-09-02",
+        "stored_close": 7.4,
+        "fresh_close": 7.59
+      },
+      {
+        "date": "2024-06-25",
+        "stored_close": 4.49,
+        "fresh_close": 4.4
+      },
+      {
+        "date": "2024-06-12",
+        "stored_close": 4.35,
+        "fresh_close": 4.22
+      }
+    ]
+  },
+  {
+    "symbol": "SARC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 55,
+    "sample_disagreements": [
+      {
+        "date": "2026-07-31",
+        "stored_close": 101.99,
+        "fresh_close": 99.78
+      },
+      {
+        "date": "2025-01-06",
+        "stored_close": 34.98,
+        "fresh_close": 33.94
+      },
+      {
+        "date": "2024-12-31",
+        "stored_close": 35.7,
+        "fresh_close": 32.78
+      },
+      {
+        "date": "2024-12-27",
+        "stored_close": 36.0,
+        "fresh_close": 33.23
+      },
+      {
+        "date": "2024-12-26",
+        "stored_close": 38.0,
+        "fresh_close": 36.67
+      }
+    ]
+  },
+  {
+    "symbol": "SAZEW",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 1231,
+    "sample_disagreements": [
+      {
+        "date": "2024-09-05",
+        "stored_close": 1035.15,
+        "fresh_close": 1010.23
+      },
+      {
+        "date": "2021-10-20",
+        "stored_close": 127.98,
+        "fresh_close": 124.3
+      },
+      {
+        "date": "2021-10-15",
+        "stored_close": 116.53,
+        "fresh_close": 151.49
+      },
+      {
+        "date": "2021-10-14",
+        "stored_close": 110.78,
+        "fresh_close": 144.41
+      },
+      {
+        "date": "2021-10-13",
+        "stored_close": 105.38,
+        "fresh_close": 137.19
+      }
+    ]
+  },
+  {
+    "symbol": "SEARL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 2264,
+    "sample_disagreements": [
+      {
+        "date": "2025-10-08",
+        "stored_close": 100.97,
+        "fresh_close": 116.12
+      },
+      {
+        "date": "2025-10-07",
+        "stored_close": 103.55,
+        "fresh_close": 119.08
+      },
+      {
+        "date": "2025-10-06",
+        "stored_close": 105.17,
+        "fresh_close": 120.95
+      },
+      {
+        "date": "2025-10-03",
+        "stored_close": 104.23,
+        "fresh_close": 119.86
+      },
+      {
+        "date": "2025-10-02",
+        "stored_close": 100.77,
+        "fresh_close": 115.88
+      }
+    ]
+  },
+  {
+    "symbol": "SIBL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 147,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-10",
+        "stored_close": 4.99,
+        "fresh_close": 4.88
+      },
+      {
+        "date": "2024-12-09",
+        "stored_close": 5.25,
+        "fresh_close": 4.9
+      },
+      {
+        "date": "2024-12-05",
+        "stored_close": 5.34,
+        "fresh_close": 5.1
+      },
+      {
+        "date": "2024-11-15",
+        "stored_close": 5.4,
+        "fresh_close": 5.02
+      },
+      {
+        "date": "2024-11-12",
+        "stored_close": 5.55,
+        "fresh_close": 5.41
+      }
+    ]
+  },
+  {
+    "symbol": "SMCPL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 32,
+    "sample_disagreements": [
+      {
+        "date": "2024-11-21",
+        "stored_close": 20.75,
+        "fresh_close": 20.23
+      },
+      {
+        "date": "2024-07-19",
+        "stored_close": 28.54,
+        "fresh_close": 27.03
+      },
+      {
+        "date": "2024-07-11",
+        "stored_close": 21.95,
+        "fresh_close": 21.35
+      },
+      {
+        "date": "2024-07-01",
+        "stored_close": 20.5,
+        "fresh_close": 19.65
+      },
+      {
+        "date": "2024-06-28",
+        "stored_close": 19.75,
+        "fresh_close": 19.3
+      }
+    ]
+  },
+  {
+    "symbol": "SNBL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 12,
+    "sample_disagreements": [
+      {
+        "date": "2023-07-04",
+        "stored_close": 10.23,
+        "fresh_close": 9.85
+      },
+      {
+        "date": "2023-06-22",
+        "stored_close": 9.22,
+        "fresh_close": 9.02
+      },
+      {
+        "date": "2023-06-02",
+        "stored_close": 9.52,
+        "fresh_close": 9.1
+      },
+      {
+        "date": "2023-05-11",
+        "stored_close": 9.5,
+        "fresh_close": 9.73
+      },
+      {
+        "date": "2023-04-19",
+        "stored_close": 10.38,
+        "fresh_close": 10.04
+      }
+    ]
+  },
+  {
+    "symbol": "SUHJ",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 22,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-17",
+        "stored_close": 49.0,
+        "fresh_close": 55.95
+      },
+      {
+        "date": "2024-12-16",
+        "stored_close": 46.01,
+        "fresh_close": 53.93
+      },
+      {
+        "date": "2024-12-10",
+        "stored_close": 46.6,
+        "fresh_close": 49.06
+      },
+      {
+        "date": "2024-12-09",
+        "stored_close": 46.01,
+        "fresh_close": 49.06
+      },
+      {
+        "date": "2024-12-05",
+        "stored_close": 46.99,
+        "fresh_close": 44.67
+      }
+    ]
+  },
+  {
+    "symbol": "TPLL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 53,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-07",
+        "stored_close": 59.0,
+        "fresh_close": 54.57
+      },
+      {
+        "date": "2025-01-01",
+        "stored_close": 55.99,
+        "fresh_close": 51.25
+      },
+      {
+        "date": "2024-12-27",
+        "stored_close": 56.0,
+        "fresh_close": 51.25
+      },
+      {
+        "date": "2024-12-23",
+        "stored_close": 42.01,
+        "fresh_close": 46.59
+      },
+      {
+        "date": "2024-12-20",
+        "stored_close": 41.93,
+        "fresh_close": 46.59
+      }
+    ]
+  },
+  {
+    "symbol": "TSBL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 969,
+    "sample_disagreements": [
+      {
+        "date": "2026-02-13",
+        "stored_close": 1.91,
+        "fresh_close": 3.28
+      },
+      {
+        "date": "2026-02-12",
+        "stored_close": 1.91,
+        "fresh_close": 3.28
+      },
+      {
+        "date": "2026-02-11",
+        "stored_close": 1.99,
+        "fresh_close": 3.41
+      },
+      {
+        "date": "2026-02-10",
+        "stored_close": 2.01,
+        "fresh_close": 3.45
+      },
+      {
+        "date": "2026-02-09",
+        "stored_close": 2.0,
+        "fresh_close": 3.43
+      }
+    ]
+  },
+  {
+    "symbol": "UNIC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 2182,
+    "sample_disagreements": [
+      {
+        "date": "2026-03-19",
+        "stored_close": 12.63,
+        "fresh_close": 15.16
+      },
+      {
+        "date": "2026-03-18",
+        "stored_close": 12.54,
+        "fresh_close": 15.05
+      },
+      {
+        "date": "2026-03-17",
+        "stored_close": 12.66,
+        "fresh_close": 15.19
+      },
+      {
+        "date": "2026-03-16",
+        "stored_close": 12.77,
+        "fresh_close": 15.32
+      },
+      {
+        "date": "2026-03-13",
+        "stored_close": 12.63,
+        "fresh_close": 15.16
+      }
+    ]
+  },
+  {
+    "symbol": "UNITY",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 682,
+    "sample_disagreements": [
+      {
+        "date": "2024-07-09",
+        "stored_close": 33.2,
+        "fresh_close": 32.46
+      },
+      {
+        "date": "2023-07-07",
+        "stored_close": 18.02,
+        "fresh_close": 19.12
+      },
+      {
+        "date": "2020-07-15",
+        "stored_close": 11.41,
+        "fresh_close": 12.56
+      },
+      {
+        "date": "2020-07-14",
+        "stored_close": 11.52,
+        "fresh_close": 12.86
+      },
+      {
+        "date": "2020-07-13",
+        "stored_close": 11.37,
+        "fresh_close": 12.46
+      }
+    ]
+  },
+  {
+    "symbol": "UPFL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 2,
+    "sample_disagreements": [
+      {
+        "date": "2023-08-04",
+        "stored_close": 25299.0,
+        "fresh_close": 24000.0
+      },
+      {
+        "date": "2023-04-11",
+        "stored_close": 18000.0,
+        "fresh_close": 18400.0
       }
     ]
   }

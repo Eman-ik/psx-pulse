@@ -146,22 +146,28 @@ def main() -> None:
     import sys
     report = json.loads(Path("scripts/price_discontinuity_report.json").read_text())
     from collections import Counter
-    clean_symbols = set()
+    # Every symbol with at least one SEVERE (>=50%) move -- not just the ones whose move
+    # happens to match a clean split ratio. A "no clean ratio match" severe move still
+    # needs the same fresh-data cross-check: it might be corrupted rows (repaired, same
+    # as the clean-ratio cases), or a real move with no clean-ratio classification
+    # (confirmed-real, left alone -- resolve_symbol's CANDIDATE path only creates a
+    # corporate_action row for a clean-ratio match, never fabricates one for an
+    # unclassified move). Narrowing this to clean-ratio-only earlier was an artificial
+    # scope cut for a first pass, not a real boundary on what needed checking.
+    target_symbols = set()
     for symbol, findings in report.items():
-        for m in findings["large_moves"]:
-            if m["severity"] == "SEVERE" and "looks like" in m["classification_hint"]:
-                clean_symbols.add(symbol)
+        if any(m["severity"] == "SEVERE" for m in findings["large_moves"]):
+            target_symbols.add(symbol)
 
-    # Optional: python verify_and_repair_discontinuities.py SYM1 SYM2 ... to rerun (now
-    # full-history, see resolve_symbol's comment) only symbols already resolved once with
-    # a narrow window, instead of re-hitting every UNRESOLVED symbol for no new information.
+    # Optional: python verify_and_repair_discontinuities.py SYM1 SYM2 ... to run only
+    # specific symbols (e.g. resuming after an interrupted run, or re-checking one name).
     if len(sys.argv) > 1:
-        clean_symbols &= set(sys.argv[1:])
+        target_symbols &= set(sys.argv[1:])
 
-    print(f"Resolving {len(clean_symbols)} flagged symbols...\n")
+    print(f"Resolving {len(target_symbols)} flagged symbols...\n")
     results = []
     with SessionLocal() as db:
-        for symbol in sorted(clean_symbols):
+        for symbol in sorted(target_symbols):
             try:
                 result = resolve_symbol(db, symbol, report[symbol])
             except Exception as exc:
@@ -170,10 +176,19 @@ def main() -> None:
             results.append(result)
             print(f"  {symbol}: {result['outcome']}" + (f" -- {result.get('reason', '')}" if result['outcome'] in ('UNRESOLVED', 'ERROR') else ''))
 
-    Path("scripts/discontinuity_resolution_report.json").write_text(json.dumps(results, indent=2))
+    # Merge into (not overwrite) any prior run's results -- this script gets rerun in
+    # batches (see the sys.argv filter above), and each run's own record is worth
+    # keeping, not just the last one's.
+    report_path = Path("scripts/discontinuity_resolution_report.json")
+    prior = json.loads(report_path.read_text()) if report_path.exists() else []
+    merged = {r["symbol"]: r for r in prior}
+    merged.update({r["symbol"]: r for r in results})
+    report_path.write_text(json.dumps(list(merged.values()), indent=2))
+
     outcomes = Counter(r["outcome"] for r in results)
-    print(f"\n{dict(outcomes)}")
-    print("Saved to scripts/discontinuity_resolution_report.json")
+    print(f"\nThis run: {dict(outcomes)}")
+    print(f"All runs combined: {dict(Counter(r['outcome'] for r in merged.values()))}")
+    print(f"Saved to {report_path}")
 
 
 if __name__ == "__main__":

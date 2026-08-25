@@ -128,16 +128,27 @@ underlying accuracy problem is addressed, independent of any process fix in this
 **What this does and doesn't establish.** The precise, defensible claim is: *this specific
 implementation, on this specific data, has failed to demonstrate a statistically significant
 predictive edge.* It is not evidence that PSX price/volume data carries no predictive
-information at all — several real confounds were still present or only partially addressed
-when these numbers were measured: known corrupted price rows across the wider universe
-(discovered and partially repaired this session, see `scripts/verify_and_repair_discontinuities.py`'s
-own results — 15 of 36 audited symbols needed repair, and the audit itself hasn't
-covered all 465 tracked companies), an incomplete `corporate_action` record (most entries are
-`verified=False`, algorithmically detected rather than document-sourced), and no systematic,
-automated data-quality validation gate ahead of either model. Before concluding the *data*
-lacks signal (as opposed to this implementation, on this data, at this point), that data
-foundation needs to be solid first — retraining or re-tuning on top of it now would just
-build a better model on the same uncertain ground.
+information at all.
+
+Phase 1 (data integrity) is now substantially more complete than when the numbers above were
+measured: every one of the 272 securities with any price history was audited
+(`scripts/audit_price_discontinuities.py`), and every symbol with a severe (>=50%) single-day
+move was cross-checked against a fresh re-scrape (`scripts/verify_and_repair_discontinuities.py`)
+-- 59 symbols / 24,803 rows of genuinely corrupted data repaired, 22 symbols' real,
+fresh-confirmed corporate actions recorded (`corporate_action` went from a handful of ingested
+dividend/merger rows to 65, including 46 newly-detected splits -- still `verified=False`,
+algorithmically detected against a fresh scrape rather than cross-checked against an actual
+PSX announcement, but confirmed-real in the sense that matters for price continuity). Zero
+symbols remained unresolved after the full pass. Not yet done: the 193 of 465 tracked
+companies with no price history at all (nothing to audit without first backfilling them,
+a decision deferred earlier this session -- see the fertilizer+cement-only backfill scoping),
+and cross-referencing the 46 unverified splits against real PSX announcements.
+
+Even with Phase 1 substantially done, the measured accuracy/AUC numbers above predate this
+repair -- they haven't been re-run against the now-cleaner data. Before concluding the *data*
+lacks signal (as opposed to this implementation, on this data, at this point), re-running the
+walk-forward validation on the repaired data is the next real step, not assumed to change the
+outcome either way.
 
 ## Who approves public activation
 

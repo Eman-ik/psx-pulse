@@ -4,7 +4,13 @@
 # stale in exactly that way before this was set up (2026-07-24 to 2026-08-24, discovered
 # and manually backfilled 2026-08-23).
 #
-# years=1/sector=all is deliberately generous: backfill_security_prices only inserts
+# "pilot" (fertilizer+cement): this used to pass "all", which psx_prices.py's CLI
+# silently treated the same way -- but that's a real footgun, since it reads as "every
+# security" and isn't. psx_prices.py now also supports "market" (every active Security)
+# for whenever coverage actually expands past the fertilizer+cement pilot -- not used
+# here on purpose, to avoid a ~450-security/~45min daily job for data nothing reads yet.
+#
+# years=1/sector=pilot is deliberately generous: backfill_security_prices only inserts
 # dates not already on file (checked against the uq_price_ohlcv_security_date
 # constraint too), so re-fetching a wide window daily is safe and cheap, not wasteful --
 # it just re-confirms most of the year is already there and inserts whatever's new.
@@ -30,7 +36,7 @@ Add-Content -Path $logFile -Value "===== $timestamp =====" -Encoding utf8
 # command's streams on Windows PowerShell 5.1 (confirmed: a real early test run of this
 # script produced a log file that was unreadable garbage -- every character spaced out
 # with nulls -- for exactly this reason), inconsistent with Add-Content's utf8 above.
-& "$backendDir\.venv\Scripts\python.exe" -m app.ingestion.psx_prices 1 all 2>&1 |
+& "$backendDir\.venv\Scripts\python.exe" -m app.ingestion.psx_prices 1 pilot 2>&1 |
     Out-File -FilePath $logFile -Append -Encoding utf8
 $exitCode = $LASTEXITCODE
 Add-Content -Path $logFile -Value "===== exit code $exitCode =====" -Encoding utf8

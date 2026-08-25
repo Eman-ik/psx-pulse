@@ -87,6 +87,13 @@ def backfill_all(db: Session, securities: list[Security], start: date, end: date
     return results
 
 
+def db_active_securities(db: Session) -> list[Security]:
+    """Every active Security already on file (seeded by seed_full_market -- this doesn't
+    seed identity rows itself, it just reads what's there), for a genuine full-market
+    price backfill rather than the fertilizer+cement-only pilot scope."""
+    return list(db.execute(select(Security).where(Security.is_active.is_(True))).scalars().all())
+
+
 if __name__ == "__main__":
     import sys
     from datetime import timedelta
@@ -97,7 +104,13 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     # Usage: python -m app.ingestion.psx_prices [years] [sector]
-    # sector: "fertilizer" (default), "cement", or "all"
+    # sector: "fertilizer" (default), "cement", "pilot" (both), or "market" (every
+    # active Security, ~466 as of 2026-08 -- NOT what "all" used to mean here: it was
+    # silently just fertilizer+cement, which is exactly why every other ticker's price
+    # data went stale and started dropping out of app/etl/ml_signal_engine.py's
+    # "full PSX universe" pool (31 symbols shrank to 13 within the same day). "all" is
+    # kept as an alias for "market" -- the old fert+cement-only meaning is gone, since
+    # nothing should reasonably expect "all" to mean "two of ~40 sectors".
     years = int(sys.argv[1]) if len(sys.argv) > 1 else 2
     sector_arg = sys.argv[2] if len(sys.argv) > 2 else "fertilizer"
     end_date = date.today()
@@ -105,10 +118,12 @@ if __name__ == "__main__":
 
     with SessionLocal() as session:
         securities: list[Security] = []
-        if sector_arg in ("fertilizer", "all"):
+        if sector_arg in ("fertilizer", "pilot"):
             securities += seed_fertilizer_sector(session)
-        if sector_arg in ("cement", "all"):
+        if sector_arg in ("cement", "pilot"):
             securities += seed_cement_sector(session)
+        if sector_arg in ("market", "all"):
+            securities = db_active_securities(session)
 
         summary = backfill_all(session, securities, start_date, end_date)
         for symbol, stats in summary.items():

@@ -124,6 +124,10 @@ export interface ComparisonRow {
   dividend_yield: number | null;
   eps: number | null;
   dividend_per_share: number | null;
+  /** "live" = live price + financials on file. "historical" = price history but no
+   * live quote. "partial" = some financials but no price history. "unverified" = an
+   * identity record only, no price or financial data yet. See comparison.py. */
+  coverage_status: "live" | "historical" | "partial" | "unverified";
   roe: number | null;
   roa: number | null;
   debt_to_equity: number | null;

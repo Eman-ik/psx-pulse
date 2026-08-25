@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Info, RotateCcw, Search } from "lucide
 import type { ComparisonRow } from "@/lib/api";
 import { formatLiveRatio, formatMarketCap, formatMultiple, formatPct, formatPercent, formatPrice } from "@/lib/format";
 import { mergeLiveQuote, useLiveQuotes } from "@/lib/useLiveQuotes";
+import CoverageBadge from "@/components/shared/CoverageBadge";
 
 type SortKey =
   | "price" | "change_pct" | "market_cap" | "pe_ratio" | "roe" | "roa" | "dividend_yield"
@@ -268,7 +269,10 @@ export default function ScreenerTable({
                     )}
                     <span className="font-medium hover:text-accent">{row.name}</span>
                   </Link>
-                  {row.sector && <span className="ml-1 text-[10px] text-muted">{row.sector}</span>}
+                  <div className="mt-0.5 flex items-center gap-1.5">
+                    {row.sector && <span className="text-[10px] text-muted">{row.sector}</span>}
+                    <CoverageBadge status={row.coverage_status} />
+                  </div>
                 </td>
                 {COLUMNS.map((column) => (
                   <td

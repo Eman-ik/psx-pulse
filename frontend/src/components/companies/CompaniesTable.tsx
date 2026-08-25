@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
 import { formatLiveRatio, formatMarketCap, formatPct, formatPercent, formatPrice } from "@/lib/format";
+import CoverageBadge from "@/components/shared/CoverageBadge";
 import { mergeLiveQuote, useLiveQuotes } from "@/lib/useLiveQuotes";
 
 function SignalPill({ signal }: { signal: string | null }) {
@@ -58,6 +59,7 @@ export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
           <thead>
             <tr className="border-b border-border text-xs text-muted">
               <th className="px-4 py-3 font-medium">Company</th>
+              <th className="px-4 py-3 font-medium">Coverage</th>
               <th className="px-4 py-3 font-medium">Price</th>
               <th className="px-4 py-3 font-medium">Chg %</th>
               <th className="px-4 py-3 font-medium">Market Cap <span className="font-normal text-muted/60">(est.)</span></th>
@@ -70,7 +72,7 @@ export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
           <tbody className="divide-y divide-border">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-xs text-muted">
+                <td colSpan={9} className="px-4 py-6 text-center text-xs text-muted">
                   No companies match &quot;{query}&quot;.
                 </td>
               </tr>
@@ -86,6 +88,9 @@ export default function CompaniesTable({ rows }: { rows: ComparisonRow[] }) {
                     )}
                     <span className="font-medium hover:text-accent">{row.name}</span>
                   </Link>
+                </td>
+                <td className="px-4 py-3">
+                  <CoverageBadge status={row.coverage_status} />
                 </td>
                 <td className="px-4 py-3">{formatPrice(row.price)}</td>
                 <td className={`px-4 py-3 font-medium ${(row.change_pct ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>

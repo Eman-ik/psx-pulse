@@ -107,8 +107,9 @@ export default async function SectorDetailPage({ params }: Props) {
             ) : (
               <>
                 <p className="mb-4 text-sm text-muted">
-                  {rows.length} companies covered — search, compare, and click through for full
-                  research pages.
+                  {rows.length} companies tracked in this sector —{" "}
+                  {rows.filter((r) => r.coverage_status === "live").length} with full live
+                  coverage (🟢). Search, compare, and click through for full research pages.
                 </p>
                 <CompaniesTable rows={rows} />
               </>

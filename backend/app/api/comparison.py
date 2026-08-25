@@ -7,12 +7,22 @@ from app.db.models import (
     FinancialFact,
     Issuer,
     MlSignalScore,
+    PriceOHLCV,
     RatioDefinition,
     RatioValue,
     Sector,
     Security,
     SignalScore,
 )
+from app.ingestion.psx_live import CEMENT_SECTOR_COMPANIES, FERTILIZER_SECTOR_COMPANIES
+
+# Symbols psxdata actually serves a live quote for -- see live.py's /market/live/all.
+# Everything else in the DB has a real Issuer/Security row (seed_full_market sourced
+# it from psxdata.symbols()) but no live pricing, and for most of them no scheduled
+# price backfill either (see run_price_backfill.ps1 -- deliberately scoped to just
+# this list for now). "465 companies covered" conflated "a row exists" with "this is
+# actually covered" -- coverage_status below is the honest version of that distinction.
+_LIVE_SYMBOLS = {c["symbol"] for c in FERTILIZER_SECTOR_COMPANIES + CEMENT_SECTOR_COMPANIES}
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -164,10 +174,29 @@ def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
     signal_by_issuer = _latest_signals(db)
     ml_signal_by_issuer = _latest_ml_signals(db)
 
+    issuers_with_price = set(
+        db.execute(
+            select(Security.issuer_id).join(PriceOHLCV, PriceOHLCV.security_id == Security.id).distinct()
+        ).scalars().all()
+    )
+    issuers_with_financials = set(
+        db.execute(select(FinancialFact.issuer_id).distinct()).scalars().all()
+    )
+
     rows = []
     for issuer in issuers:
         security = security_by_issuer.get(issuer.id)
         symbol = security.symbol if security else None
+        has_price = issuer.id in issuers_with_price
+        has_financials = issuer.id in issuers_with_financials
+        if symbol in _LIVE_SYMBOLS and has_price and has_financials:
+            coverage_status = "live"
+        elif has_price:
+            coverage_status = "historical"
+        elif has_financials:
+            coverage_status = "partial"
+        else:
+            coverage_status = "unverified"
 
         signal = signal_by_issuer.get(issuer.id)
         ml_signal = ml_signal_by_issuer.get(issuer.id)
@@ -209,6 +238,7 @@ def companies_comparison(db: Session = Depends(get_db)) -> list[dict]:
                 "dividend_yield": None,
                 "eps": eps_by_issuer.get(issuer.id),
                 "dividend_per_share": dps_by_issuer.get(issuer.id),
+                "coverage_status": coverage_status,
                 "roe": roe_by_issuer.get(issuer.id),
                 "roa": roa_by_issuer.get(issuer.id),
                 "debt_to_equity": debt_to_equity_by_issuer.get(issuer.id),

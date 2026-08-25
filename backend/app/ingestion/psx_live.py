@@ -10,12 +10,35 @@ Finnhub was evaluated first and dropped — it does not cover PSX-listed securit
 """
 
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import date, timedelta
 
 import psxdata
 
 logger = logging.getLogger(__name__)
+
+# Per-symbol timeout for the single-fetch path (fetch_live_snapshot, not the batch --
+# see _LIVE_QUOTE_BATCH_TIMEOUT_S below for that one's own cap). psxdata exposes no
+# request-level timeout, so this uses the same "run it in a thread, cap how long we
+# wait" pattern the batch path already relies on. 15s is generous for the ~3-8s a
+# single quote+stocks pair actually takes (measured), while still bounding the worst
+# case for callers with no batch-level cap of their own (ratio_engine.py,
+# valuation_engine.py, GET /market/quote/{symbol}).
+_SINGLE_FETCH_TIMEOUT_S = 15
+_single_fetch_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="psxdata-single")
+
+# Lightweight circuit breaker: once this many consecutive fetch_live_snapshot calls
+# have failed or timed out in a row, stop actually attempting new ones for a cooldown
+# window and fail fast instead. Protects against every request in a burst paying the
+# full 15s timeout back-to-back when the underlying source is down or blocking us --
+# a real, observed risk given psxdata has no SLA (see FERTILIZER_SECTOR_COMPANIES'
+# docstring) and this module already logs live-quote batches returning 0/16 within
+# their own cap under concurrent load.
+_CIRCUIT_FAILURE_THRESHOLD = 5
+_CIRCUIT_COOLDOWN_S = 60
+_circuit_consecutive_failures = 0
+_circuit_open_until: float = 0.0
 
 # psxdata exposes no request-level timeout (checked its public quote()/stocks() signatures --
 # neither takes one), and a Python thread blocked on a hung socket read can't be forcibly
@@ -101,17 +124,64 @@ def _clean(value: object) -> object:
         return None
 
 
-def fetch_live_snapshot(symbol: str, use_cache: bool = True) -> dict | None:
-    """Best-effort live-ish snapshot for one symbol. Returns None if the source has nothing.
+def fetch_live_snapshot(symbol: str, use_cache: bool = True, retry: bool = True) -> dict | None:
+    """Best-effort live-ish snapshot for one symbol. Returns None if the source has nothing
+    (including: timed out, or the circuit breaker is currently open -- a caller can't tell
+    those apart from "PSX genuinely has nothing for this symbol" from the return value
+    alone, same as every other failure mode this function already collapses to None).
 
     use_cache=False for fetch_live_snapshots' concurrent callers only (see that function):
     psxdata's on-disk parquet cache isn't safe for concurrent writers -- multiple threads
     caching different symbols at once were observed real-failing with "Parquet serialisation
     failed for key 'X_historical'" (confirmed via a direct 16-symbol concurrent run, 13/16
-    failed this way). Single-symbol sequential callers (app/api/companies.py,
-    app/etl/ratio_engine.py, app/etl/valuation_engine.py) keep caching -- there's no writer
-    contention when only one fetch runs at a time.
+    failed this way). Single-symbol sequential callers (app/etl/ratio_engine.py,
+    app/etl/valuation_engine.py, GET /market/quote/{symbol}) keep caching -- there's no
+    writer contention when only one fetch runs at a time.
+
+    retry=False for fetch_live_snapshots' concurrent callers: that path already races
+    against its own 35s batch-wide deadline (see _LIVE_QUOTE_BATCH_TIMEOUT_S), so a retry
+    here would just spend part of that shared budget on one symbol instead of leaving
+    every symbol exactly one attempt within it.
     """
+    global _circuit_consecutive_failures, _circuit_open_until
+
+    if time.monotonic() < _circuit_open_until:
+        logger.warning(
+            "Circuit breaker open for psxdata single-fetch (%d consecutive failures) -- "
+            "skipping %s without attempting a call", _circuit_consecutive_failures, symbol,
+        )
+        return None
+
+    attempts = 2 if retry else 1
+    for attempt in range(attempts):
+        future = _single_fetch_pool.submit(_fetch_live_snapshot_once, symbol, use_cache)
+        try:
+            result = future.result(timeout=_SINGLE_FETCH_TIMEOUT_S)
+        except Exception as exc:
+            logger.warning(
+                "fetch_live_snapshot(%s) attempt %d/%d failed or timed out: %s",
+                symbol, attempt + 1, attempts, exc,
+            )
+            result = None
+
+        if result is not None:
+            _circuit_consecutive_failures = 0
+            return result
+
+        if attempt < attempts - 1:
+            time.sleep(1.0)  # brief backoff before the one retry
+
+    _circuit_consecutive_failures += 1
+    if _circuit_consecutive_failures >= _CIRCUIT_FAILURE_THRESHOLD:
+        _circuit_open_until = time.monotonic() + _CIRCUIT_COOLDOWN_S
+        logger.warning(
+            "psxdata single-fetch circuit breaker OPEN for %ds after %d consecutive failures",
+            _CIRCUIT_COOLDOWN_S, _circuit_consecutive_failures,
+        )
+    return None
+
+
+def _fetch_live_snapshot_once(symbol: str, use_cache: bool) -> dict | None:
     try:
         quote_rows = psxdata.quote(symbol, cache=use_cache).to_dict(orient="records")
         quote_row = quote_rows[0] if quote_rows else {}
@@ -180,13 +250,18 @@ def fetch_live_snapshots(companies: list[dict[str, str]] = FERTILIZER_SECTOR_COM
     the caller/page indefinitely -- see that constant's comment for why this can't be a per-
     request timeout instead.
 
-    Calls fetch_live_snapshot with use_cache=False: psxdata's parquet cache isn't safe for
-    concurrent writers (see that function's docstring) -- this batch is the only concurrent
-    caller, so it's the only one that needs caching off.
+    Calls _fetch_live_snapshot_once directly (not the public fetch_live_snapshot) with
+    use_cache=False: psxdata's parquet cache isn't safe for concurrent writers (see that
+    function's docstring) -- this batch is the only concurrent caller, so it's the only
+    one that needs caching off. Going through fetch_live_snapshot's own timeout/retry/
+    circuit-breaker wrapper here would nest this batch's pool inside _single_fetch_pool
+    (only 4 workers) for no benefit -- this function already has its own outer deadline
+    (_LIVE_QUOTE_BATCH_TIMEOUT_S) and its own "return what completed" resilience, and a
+    batch symbol timing out shouldn't count toward the single-fetch circuit breaker.
     """
     pool = ThreadPoolExecutor(max_workers=min(len(companies), _LIVE_QUOTE_MAX_WORKERS))
     future_to_company = {
-        pool.submit(fetch_live_snapshot, c["symbol"], use_cache=False): c for c in companies
+        pool.submit(_fetch_live_snapshot_once, c["symbol"], False): c for c in companies
     }
     done, not_done = wait(future_to_company, timeout=_LIVE_QUOTE_BATCH_TIMEOUT_S)
 

@@ -78,15 +78,24 @@ today, and any future model must implement the same shape:
 
 ## Required validation metrics (current, per model — update if thresholds change)
 
-| Model | Min. accuracy | Significance test | Min. observations | Where enforced |
-|---|---|---|---|---|
-| Kronos quant forecast | 55% | exact two-sided binomial, p < 0.10 | 15 | `signal_qualification.py` (`MIN_ACCURACY`, `SIGNIFICANCE_P_VALUE`, `MIN_OBSERVATIONS`) |
-| ML signal engine (pooled logistic) | 60% (on buy-precision, not raw accuracy) | — (no significance test; accuracy floor only) | 30 | `ml_signal_engine.py` (`ModelConfig.minimum_validated_accuracy`, `minimum_observations`) |
+| Model | Min. accuracy | Significance test | Beats naive baseline | Min. observations | Where enforced |
+|---|---|---|---|---|---|
+| Kronos quant forecast | 55% | exact two-sided binomial, p < 0.10 | required | 15 | `signal_qualification.py` (`MIN_ACCURACY`, `SIGNIFICANCE_P_VALUE`, `beats_naive_baseline`, `MIN_OBSERVATIONS`) |
+| ML signal engine (pooled logistic) | 60% (on buy-precision, not raw accuracy) | — (no significance test; accuracy floor only) | not implemented | 30 | `ml_signal_engine.py` (`ModelConfig.minimum_validated_accuracy`, `minimum_observations`) |
 
-The ML signal engine's gate is weaker than Kronos's (no significance test) — noted here as
-a real gap, not something to quietly leave inconsistent. Before `ml_signals_enabled` is
-ever considered, that gate should be brought up to the same standard the Kronos path
-already has, or an explicit written reason recorded here for why it doesn't need one.
+"Beats naive baseline" (added after EFERT's real record cleared accuracy and significance
+but still lost to trivially predicting its test window's own trend, see "Current models: real
+status" below): the track record's accuracy must exceed always guessing the window's own
+majority realized direction, computed per ticker by `build_validation_record.py`. A record
+can be statistically significant against a 50/50 coin flip purely because the market moved
+one direction during the test window, not because the model out-forecasts that movement --
+this catches exactly that case instead of treating "significant" as sufficient on its own.
+
+The ML signal engine's gate is weaker than Kronos's (no significance test, no naive-baseline
+check) — noted here as a real gap, not something to quietly leave inconsistent. Before
+`ml_signals_enabled` is ever considered, that gate should be brought up to the same two
+checks the Kronos path already has, or an explicit written reason recorded here for why it
+doesn't need them.
 
 ## Required backtesting period
 
@@ -144,11 +153,33 @@ companies with no price history at all (nothing to audit without first backfilli
 a decision deferred earlier this session -- see the fertilizer+cement-only backfill scoping),
 and cross-referencing the 46 unverified splits against real PSX announcements.
 
-Even with Phase 1 substantially done, the measured accuracy/AUC numbers above predate this
-repair -- they haven't been re-run against the now-cleaner data. Before concluding the *data*
-lacks signal (as opposed to this implementation, on this data, at this point), re-running the
-walk-forward validation on the repaired data is the next real step, not assumed to change the
-outcome either way.
+**Update, same day: re-ran on the repaired data.** Only MARI's underlying prices actually
+changed enough to matter (LUCK's Phase 1 check found zero disagreements against fresh data --
+its record was already sound); MARI can no longer be evaluated at all -- its real 2024-09-16
+split leaves too little post-split history (~200 trading days, below Kronos's 286-bar
+minimum) given its price data is frozen outside the fertilizer+cement live-pricing scope.
+The other 6 tickers' organically-grown anchor counts (53-92, driven by how many times this
+script has been rerun across the session, not a fixed design) were otherwise unaffected.
+
+Re-running surfaced a second, more serious gap than "not enough data" -- one in the gate
+itself, not just the numbers. EFERT's real record reached 60.8% accuracy over 74 anchors,
+p=0.081 (significant vs. random) -- clearing every check `signal_qualification.py` had.
+It would have qualified as a real BUY signal. But 68.9% of EFERT's anchors in that window
+realized negative: trivially always predicting "down" scores 68.9%, beating the model
+outright. The significance was explained by the test window's own trend, not by the model
+out-forecasting it -- exactly the trap `true_holdout_eval.py`'s results had already caught
+for FFC/LUCK on a different (genuinely-unseen) window, now found inside the walk-forward
+path too. Fixed by adding a `beats_naive_baseline` check (`build_validation_record.py`
+computes it, `signal_qualification.py` now requires it) -- a track record must beat trivially
+predicting its own window's dominant direction, not just beat a 50/50 coin flip. Covered by
+a real test suite now too (`tests/test_signal_qualification.py`, all 10 gate branches).
+With this fixed, current status: no ticker qualifies. EFERT and FFC are both significant vs.
+random and both lose to their own naive baseline; the rest don't clear accuracy or
+significance at all. See `walk_forward_validation.json` for exact per-ticker numbers.
+
+This is a stronger, not weaker, confirmation of the original finding: it took a real second
+data-integrity pass *and* a real second look at the gate's own logic to be confident there's
+still no validated edge here -- not a coincidence found once and left unquestioned.
 
 ## Who approves public activation
 

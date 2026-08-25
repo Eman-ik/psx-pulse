@@ -29,6 +29,17 @@ def _dividend(effective_date: date, pct: float) -> CorporateAction:
     )
 
 
+def _split(effective_date: date, ratio: float, verified: bool = False) -> CorporateAction:
+    return CorporateAction(
+        security_id=1,
+        action_type="split",
+        effective_date=effective_date,
+        ratio_or_amount=ratio,
+        currency=None,
+        verified=verified,
+    )
+
+
 def test_single_dividend_scales_only_prior_bars():
     bars = [
         _bar(date(2026, 1, 1), 100.0),
@@ -88,5 +99,51 @@ def test_dividend_exceeding_prior_close_is_skipped():
     actions = [_dividend(date(2026, 1, 2), 100.0)]
 
     factors = compute_adjustment_factors(bars, actions)
+
+    assert factors[date(2026, 1, 1)] == pytest.approx(1.0)
+
+
+def test_split_scales_prior_bars_by_the_observed_price_ratio():
+    # KOHC's real 2025-08-25 split: close went 549.99 -> 108.18, ratio ~0.1967 -- see
+    # scripts/verify_and_repair_discontinuities.py. A pre-split PKR 549.99 bar should
+    # come out comparable to the post-split price level once adjusted.
+    bars = [_bar(date(2025, 8, 22), 549.99), _bar(date(2025, 8, 25), 108.18)]
+    actions = [_split(date(2025, 8, 25), 0.1967)]
+
+    factors = compute_adjustment_factors(bars, actions)
+
+    assert factors[date(2025, 8, 25)] == pytest.approx(1.0)
+    assert factors[date(2025, 8, 22)] == pytest.approx(0.1967)
+
+    adjusted = apply_adjustment(bars, actions)
+    by_date = {b["date"]: b for b in adjusted}
+    assert by_date["2025-08-22"]["close"] == pytest.approx(549.99 * 0.1967, rel=1e-6)
+    assert by_date["2025-08-25"]["close"] == pytest.approx(108.18)
+
+
+def test_split_and_dividend_compound_on_the_same_prior_bar():
+    bars = [_bar(date(2026, 1, 1), 100.0), _bar(date(2026, 1, 5), 100.0), _bar(date(2026, 1, 10), 20.0)]
+    actions = [
+        _dividend(date(2026, 1, 5), 10.0),  # PKR 1/share, prior close (01-01) = 100
+        _split(date(2026, 1, 10), 0.2),  # 5-for-1-shaped, applies to every bar before it
+    ]
+
+    factors = compute_adjustment_factors(bars, actions)
+
+    assert factors[date(2026, 1, 10)] == pytest.approx(1.0)
+    # 01-05 is before the split only
+    assert factors[date(2026, 1, 5)] == pytest.approx(0.2)
+    # 01-01 is before both the dividend and the split -- both factors compound
+    assert factors[date(2026, 1, 1)] == pytest.approx((1 - 1 / 100) * 0.2)
+
+
+def test_split_with_null_ratio_is_skipped_not_treated_as_zero():
+    bars = [_bar(date(2026, 1, 1), 100.0), _bar(date(2026, 1, 2), 100.0)]
+    bad_split = CorporateAction(
+        security_id=1, action_type="split", effective_date=date(2026, 1, 2),
+        ratio_or_amount=None, currency=None, verified=False,
+    )
+
+    factors = compute_adjustment_factors(bars, [bad_split])
 
     assert factors[date(2026, 1, 1)] == pytest.approx(1.0)

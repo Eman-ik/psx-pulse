@@ -10,6 +10,7 @@ by manual verification (see the async-live-quotes work) and by
 tests/test_price_adjustment.py at the pure-function level.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -17,6 +18,7 @@ from app.main import app
 client = TestClient(app)
 
 
+@pytest.mark.requires_seeded_data
 def test_list_companies_returns_active_issuers_with_required_fields():
     response = client.get("/companies")
     assert response.status_code == 200
@@ -30,6 +32,7 @@ def test_list_companies_returns_active_issuers_with_required_fields():
         assert "symbol" in c
 
 
+@pytest.mark.requires_seeded_data
 def test_comparison_returns_one_row_per_active_issuer_with_coverage_status():
     response = client.get("/companies/comparison")
     assert response.status_code == 200
@@ -44,6 +47,7 @@ def test_comparison_returns_one_row_per_active_issuer_with_coverage_status():
         assert row["change_pct"] is None
 
 
+@pytest.mark.requires_seeded_data
 def test_comparison_live_rows_are_a_small_subset_of_the_full_universe():
     # Regression guard for the "465 companies covered" framing bug: coverage_status
     # must actually discriminate, not label everything "live" (or everything anything else).
@@ -62,6 +66,7 @@ def test_ratio_benchmarks_returns_mean_and_count_per_ratio_key():
         assert "count" in stats and stats["count"] > 0
 
 
+@pytest.mark.requires_seeded_data
 def test_company_overview_for_known_pilot_issuer():
     # FFC is issuer id 1 in this pilot's seed order (see seed_fertilizer_sector) --
     # if that ever changes, this test's failure is itself useful signal.
@@ -82,6 +87,7 @@ def test_company_overview_for_nonexistent_issuer_returns_null():
     assert response.json() is None
 
 
+@pytest.mark.requires_seeded_data
 def test_market_prices_unadjusted_matches_raw_bar_count():
     response = client.get("/market/1/prices")
     assert response.status_code == 200
@@ -93,6 +99,7 @@ def test_market_prices_unadjusted_matches_raw_bar_count():
         assert bar["low"] <= bar["close"] <= bar["high"]
 
 
+@pytest.mark.requires_seeded_data
 def test_market_prices_adjusted_reports_corporate_actions_and_verification_status():
     response = client.get("/market/1/prices?adjusted=true")
     assert response.status_code == 200
@@ -105,6 +112,7 @@ def test_market_prices_adjusted_reports_corporate_actions_and_verification_statu
         assert "adjustment_factor" in bar
 
 
+@pytest.mark.requires_seeded_data
 def test_sector_endpoints_return_only_that_sectors_companies():
     fert = client.get("/sectors/fertilizer").json()
     cement = client.get("/sectors/cement").json()

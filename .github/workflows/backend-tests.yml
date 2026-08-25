@@ -1,0 +1,64 @@
+name: Backend tests
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: psx
+          POSTGRES_PASSWORD: psx
+          POSTGRES_DB: psx_fertilizer
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://psx:psx@localhost:5432/psx_fertilizer
+      ENVIRONMENT: development
+      PUBLIC_LAUNCH_ENABLED: "false"
+      PUBLIC_SIGNALS_ENABLED: "false"
+      COMMERCIAL_DATA_ENABLED: "false"
+      ML_SIGNALS_ENABLED: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      # Real schema, no seed data -- this is a freshly-created database, not a copy of
+      # the dev DB. Tests that need actual pilot company data (issuer_id=1=FFC, price
+      # history, etc.) are marked @pytest.mark.requires_seeded_data and skipped below;
+      # see pytest.ini and tests/test_api_endpoints.py for which ones and why. Seeding
+      # real data here would mean either committing a data dump (stale the moment PSX
+      # prices move) or hitting psxdata's live scrape in CI (slow, no SLA, exactly the
+      # flakiness tests/test_api_endpoints.py's own docstring already avoids for the
+      # live-quote endpoints) -- not worth it for what this job is actually checking.
+      - run: alembic upgrade head
+
+      - run: pytest -m "not requires_seeded_data" -v

@@ -5,12 +5,19 @@ use: for each corporate action, every bar strictly before its effective date is 
 factor derived from the actual (raw) close on the last trading day before that date, so a chart
 of adjusted prices shows total return instead of an artificial cliff on the ex-date.
 
-v1 only handles cash dividends with currency == "PKR_PCT" (PSX's own convention: percentage of
-the PKR 10 ordinary-share face value) since that's the only corporate-action type actually
-ingested so far (app/ingestion/psx_payouts.py — no bonus/rights/split rows exist in this pilot's
-data yet). Bonus/rights/split events use a different formula entirely (they change share count,
-not just cash-out value); an unsupported action type is skipped with a warning rather than
-adjusted for using the wrong math, so a future bonus issue doesn't get silently mishandled.
+Two action types are handled, with different math:
+  - "dividend" with currency == "PKR_PCT" (PSX's own convention: percentage of the PKR 10
+    ordinary-share face value), via app/ingestion/psx_payouts.py.
+  - "split": ratio_or_amount is the raw observed price ratio (post-event close / pre-event
+    close) -- unlike dividends this isn't derived from face value, it's read directly off
+    the actual price discontinuity (see scripts/verify_and_repair_discontinuities.py,
+    which populates these after confirming the jump against a fresh re-scrape). Covers
+    bonus/rights issues too, not just literal splits -- they all show up in raw price data
+    the same way (a share-count change with no corresponding change in company value), and
+    v1 has no way to tell them apart from price data alone.
+
+Any other action type is skipped with a warning rather than adjusted for using the wrong
+math, so an unrecognized future event type doesn't get silently mishandled.
 """
 
 import logging
@@ -54,21 +61,24 @@ def compute_adjustment_factors(
     factors_by_date: dict[date, float] = {b.trade_date: 1.0 for b in sorted_bars}
 
     for action in sorted(actions, key=lambda a: a.effective_date):
-        if action.action_type != "dividend" or action.currency != "PKR_PCT":
-            logger.info(
-                "Skipping unsupported corporate action for price adjustment: %s on %s "
-                "(only PKR_PCT dividends are handled in v1)",
-                action.action_type,
-                action.effective_date,
-            )
-            continue
-
         prior_bars = [b for b in sorted_bars if b.trade_date < action.effective_date]
         if not prior_bars:
             continue
         prev_close = float(prior_bars[-1].close)
 
-        factor = _dividend_adjustment_factor(action, prev_close)
+        if action.action_type == "dividend" and action.currency == "PKR_PCT":
+            factor = _dividend_adjustment_factor(action, prev_close)
+        elif action.action_type == "split":
+            factor = float(action.ratio_or_amount) if action.ratio_or_amount else None
+        else:
+            logger.info(
+                "Skipping unsupported corporate action for price adjustment: %s on %s "
+                "(only PKR_PCT dividends and splits are handled in v1)",
+                action.action_type,
+                action.effective_date,
+            )
+            continue
+
         if factor is None:
             continue
 

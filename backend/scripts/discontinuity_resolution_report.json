@@ -1,0 +1,557 @@
+[
+  {
+    "symbol": "AHCL",
+    "outcome": "CANDIDATE",
+    "events": [
+      {
+        "effective_date": "2009-07-29",
+        "ratio": 1.9146,
+        "hint": "looks like 1-for-2 reverse split (ratio 1.915 vs expected 2.000)"
+      },
+      {
+        "effective_date": "2012-03-02",
+        "ratio": 2.0502,
+        "hint": "looks like 1-for-2 reverse split (ratio 2.050 vs expected 2.000)"
+      },
+      {
+        "effective_date": "2022-10-03",
+        "ratio": 0.3464,
+        "hint": "looks like 3-for-1 split (ratio 0.346 vs expected 0.333)"
+      },
+      {
+        "effective_date": "2023-08-24",
+        "ratio": 2.9391,
+        "hint": "looks like 1-for-3 reverse split (ratio 2.939 vs expected 3.000)"
+      },
+      {
+        "effective_date": "2023-08-25",
+        "ratio": 0.3418,
+        "hint": "looks like 3-for-1 split (ratio 0.342 vs expected 0.333)"
+      }
+    ]
+  },
+  {
+    "symbol": "BAFL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 2143,
+    "sample_disagreements": [
+      {
+        "date": "2025-05-12",
+        "stored_close": 38.39,
+        "fresh_close": 76.78
+      },
+      {
+        "date": "2025-05-09",
+        "stored_close": 35.08,
+        "fresh_close": 70.15
+      },
+      {
+        "date": "2025-05-08",
+        "stored_close": 33.74,
+        "fresh_close": 67.49
+      },
+      {
+        "date": "2025-05-07",
+        "stored_close": 34.58,
+        "fresh_close": 69.15
+      },
+      {
+        "date": "2025-05-06",
+        "stored_close": 35.51,
+        "fresh_close": 71.03
+      }
+    ]
+  },
+  {
+    "symbol": "BAPL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 78,
+    "sample_disagreements": [
+      {
+        "date": "2024-11-29",
+        "stored_close": 33.98,
+        "fresh_close": 32.15
+      },
+      {
+        "date": "2024-11-19",
+        "stored_close": 34.3,
+        "fresh_close": 33.6
+      },
+      {
+        "date": "2024-11-08",
+        "stored_close": 29.3,
+        "fresh_close": 28.51
+      },
+      {
+        "date": "2024-11-06",
+        "stored_close": 29.99,
+        "fresh_close": 29.28
+      },
+      {
+        "date": "2024-10-31",
+        "stored_close": 30.0,
+        "fresh_close": 29.3
+      }
+    ]
+  },
+  {
+    "symbol": "BELA",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 31,
+    "sample_disagreements": [
+      {
+        "date": "2026-07-31",
+        "stored_close": 56.8,
+        "fresh_close": 55.0
+      },
+      {
+        "date": "2025-01-01",
+        "stored_close": 173.9,
+        "fresh_close": 170.04
+      },
+      {
+        "date": "2024-12-27",
+        "stored_close": 177.0,
+        "fresh_close": 170.08
+      },
+      {
+        "date": "2024-12-26",
+        "stored_close": 184.0,
+        "fresh_close": 168.08
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 187.98,
+        "fresh_close": 174.68
+      }
+    ]
+  },
+  {
+    "symbol": "BERG",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 803,
+    "sample_disagreements": [
+      {
+        "date": "2026-07-30",
+        "stored_close": 147.6,
+        "fresh_close": 103.33
+      },
+      {
+        "date": "2026-07-29",
+        "stored_close": 147.6,
+        "fresh_close": 103.93
+      },
+      {
+        "date": "2026-07-28",
+        "stored_close": 147.6,
+        "fresh_close": 105.08
+      },
+      {
+        "date": "2026-07-27",
+        "stored_close": 147.6,
+        "fresh_close": 107.29
+      },
+      {
+        "date": "2026-07-24",
+        "stored_close": 147.6,
+        "fresh_close": 97.54
+      }
+    ]
+  },
+  {
+    "symbol": "EWIC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 90,
+    "sample_disagreements": [
+      {
+        "date": "2026-04-09",
+        "stored_close": 53.52,
+        "fresh_close": 58.87
+      },
+      {
+        "date": "2026-04-08",
+        "stored_close": 53.52,
+        "fresh_close": 58.87
+      },
+      {
+        "date": "2026-04-07",
+        "stored_close": 49.49,
+        "fresh_close": 54.44
+      },
+      {
+        "date": "2026-03-30",
+        "stored_close": 41.2,
+        "fresh_close": 45.32
+      },
+      {
+        "date": "2026-03-27",
+        "stored_close": 41.2,
+        "fresh_close": 45.32
+      }
+    ]
+  },
+  {
+    "symbol": "FIL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 53,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-08",
+        "stored_close": 130.0,
+        "fresh_close": 133.94
+      },
+      {
+        "date": "2025-01-01",
+        "stored_close": 129.0,
+        "fresh_close": 133.94
+      },
+      {
+        "date": "2024-12-26",
+        "stored_close": 120.56,
+        "fresh_close": 133.94
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 121.0,
+        "fresh_close": 133.94
+      },
+      {
+        "date": "2024-12-18",
+        "stored_close": 120.56,
+        "fresh_close": 133.94
+      }
+    ]
+  },
+  {
+    "symbol": "GRYL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 43,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-01",
+        "stored_close": 6.1,
+        "fresh_close": 5.88
+      },
+      {
+        "date": "2024-12-31",
+        "stored_close": 6.18,
+        "fresh_close": 5.91
+      },
+      {
+        "date": "2024-12-30",
+        "stored_close": 6.1,
+        "fresh_close": 5.91
+      },
+      {
+        "date": "2024-12-20",
+        "stored_close": 6.48,
+        "fresh_close": 6.16
+      },
+      {
+        "date": "2024-12-18",
+        "stored_close": 5.91,
+        "fresh_close": 5.78
+      }
+    ]
+  },
+  {
+    "symbol": "GVGL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 276,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-01",
+        "stored_close": 52.0,
+        "fresh_close": 50.17
+      },
+      {
+        "date": "2024-11-15",
+        "stored_close": 41.99,
+        "fresh_close": 40.64
+      },
+      {
+        "date": "2024-11-05",
+        "stored_close": 39.95,
+        "fresh_close": 39.0
+      },
+      {
+        "date": "2024-10-23",
+        "stored_close": 41.33,
+        "fresh_close": 40.08
+      },
+      {
+        "date": "2024-10-18",
+        "stored_close": 41.0,
+        "fresh_close": 40.01
+      }
+    ]
+  },
+  {
+    "symbol": "ICIBL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 155,
+    "sample_disagreements": [
+      {
+        "date": "2026-02-09",
+        "stored_close": 33.02,
+        "fresh_close": 4.99
+      },
+      {
+        "date": "2026-02-06",
+        "stored_close": 33.02,
+        "fresh_close": 4.99
+      },
+      {
+        "date": "2026-02-04",
+        "stored_close": 33.55,
+        "fresh_close": 5.07
+      },
+      {
+        "date": "2026-02-03",
+        "stored_close": 33.22,
+        "fresh_close": 5.02
+      },
+      {
+        "date": "2026-02-02",
+        "stored_close": 33.08,
+        "fresh_close": 5.0
+      }
+    ]
+  },
+  {
+    "symbol": "IMS",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 101,
+    "sample_disagreements": [
+      {
+        "date": "2017-11-21",
+        "stored_close": 7.58,
+        "fresh_close": 75.78
+      },
+      {
+        "date": "2017-11-20",
+        "stored_close": 7.23,
+        "fresh_close": 72.26
+      },
+      {
+        "date": "2017-11-17",
+        "stored_close": 6.88,
+        "fresh_close": 68.82
+      },
+      {
+        "date": "2017-11-16",
+        "stored_close": 7.17,
+        "fresh_close": 71.7
+      },
+      {
+        "date": "2017-11-15",
+        "stored_close": 7.55,
+        "fresh_close": 75.47
+      }
+    ]
+  },
+  {
+    "symbol": "KOHC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 1925,
+    "sample_disagreements": [
+      {
+        "date": "2024-06-28",
+        "stored_close": 50.09,
+        "fresh_close": 250.43
+      },
+      {
+        "date": "2024-06-27",
+        "stored_close": 48.84,
+        "fresh_close": 244.2
+      },
+      {
+        "date": "2024-06-26",
+        "stored_close": 48.47,
+        "fresh_close": 242.35
+      },
+      {
+        "date": "2024-06-25",
+        "stored_close": 48.8,
+        "fresh_close": 244.0
+      },
+      {
+        "date": "2024-06-24",
+        "stored_close": 48.04,
+        "fresh_close": 240.18
+      }
+    ]
+  },
+  {
+    "symbol": "LUCK",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 1,
+    "sample_disagreements": [
+      {
+        "date": "2022-06-28",
+        "stored_close": 450.1,
+        "fresh_close": 460.47
+      }
+    ]
+  },
+  {
+    "symbol": "PGLC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 170,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-18",
+        "stored_close": 11.25,
+        "fresh_close": 10.44
+      },
+      {
+        "date": "2024-12-16",
+        "stored_close": 10.91,
+        "fresh_close": 11.31
+      },
+      {
+        "date": "2024-12-13",
+        "stored_close": 11.62,
+        "fresh_close": 11.88
+      },
+      {
+        "date": "2024-12-11",
+        "stored_close": 11.08,
+        "fresh_close": 12.16
+      },
+      {
+        "date": "2024-12-09",
+        "stored_close": 11.45,
+        "fresh_close": 11.7
+      }
+    ]
+  },
+  {
+    "symbol": "PIAHCLB",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 33,
+    "sample_disagreements": [
+      {
+        "date": "2025-02-06",
+        "stored_close": 860.33,
+        "fresh_close": 948.0
+      },
+      {
+        "date": "2025-02-04",
+        "stored_close": 900.0,
+        "fresh_close": 948.0
+      },
+      {
+        "date": "2025-01-29",
+        "stored_close": 845.02,
+        "fresh_close": 890.66
+      },
+      {
+        "date": "2025-01-27",
+        "stored_close": 870.0,
+        "fresh_close": 890.66
+      },
+      {
+        "date": "2025-01-17",
+        "stored_close": 899.99,
+        "fresh_close": 844.57
+      }
+    ]
+  },
+  {
+    "symbol": "PIL",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 93,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-03",
+        "stored_close": 2.36,
+        "fresh_close": 2.43
+      },
+      {
+        "date": "2024-12-20",
+        "stored_close": 1.93,
+        "fresh_close": 2.0
+      },
+      {
+        "date": "2024-12-19",
+        "stored_close": 1.83,
+        "fresh_close": 1.79
+      },
+      {
+        "date": "2024-12-18",
+        "stored_close": 1.91,
+        "fresh_close": 1.82
+      },
+      {
+        "date": "2024-12-13",
+        "stored_close": 1.94,
+        "fresh_close": 1.9
+      }
+    ]
+  },
+  {
+    "symbol": "PPVC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 60,
+    "sample_disagreements": [
+      {
+        "date": "2025-01-03",
+        "stored_close": 12.79,
+        "fresh_close": 12.02
+      },
+      {
+        "date": "2025-01-02",
+        "stored_close": 11.5,
+        "fresh_close": 12.78
+      },
+      {
+        "date": "2025-01-01",
+        "stored_close": 11.06,
+        "fresh_close": 11.94
+      },
+      {
+        "date": "2024-12-30",
+        "stored_close": 11.34,
+        "fresh_close": 10.13
+      },
+      {
+        "date": "2024-12-26",
+        "stored_close": 10.99,
+        "fresh_close": 10.18
+      }
+    ]
+  },
+  {
+    "symbol": "UVIC",
+    "outcome": "REPAIRED",
+    "rows_overwritten": 61,
+    "sample_disagreements": [
+      {
+        "date": "2024-12-27",
+        "stored_close": 11.0,
+        "fresh_close": 11.85
+      },
+      {
+        "date": "2024-12-18",
+        "stored_close": 11.4,
+        "fresh_close": 10.4
+      },
+      {
+        "date": "2024-12-13",
+        "stored_close": 11.5,
+        "fresh_close": 11.08
+      },
+      {
+        "date": "2024-12-11",
+        "stored_close": 11.0,
+        "fresh_close": 11.64
+      },
+      {
+        "date": "2024-12-04",
+        "stored_close": 10.1,
+        "fresh_close": 10.89
+      }
+    ]
+  }
+]

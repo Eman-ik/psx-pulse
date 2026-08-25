@@ -50,14 +50,24 @@ def list_prices(
     actions = db.execute(
         select(CorporateAction).where(CorporateAction.security_id == security_id)
     ).scalars().all()
+    unverified_count = sum(1 for a in actions if not a.verified)
     return {
         "adjusted": True,
         "adjustment_methodology": (
-            "Backward-adjusted for cash dividends only (PSX PKR_PCT convention, PKR 10 face "
-            "value). No bonus/rights/split events are on file for this pilot yet — see "
-            "app/etl/price_adjustment.py for the exact formula and what it deliberately skips."
+            "Backward-adjusted for cash dividends (PSX PKR_PCT convention, PKR 10 face value) "
+            "and splits/bonus/rights issues (see app/etl/price_adjustment.py for the exact "
+            "formula and what it deliberately skips). "
+            + (
+                f"{unverified_count} of {len(actions)} corporate action(s) on file for this "
+                "security are unverified — detected algorithmically from a real price "
+                "discontinuity a fresh re-scrape confirmed, but not yet cross-checked against "
+                "an actual PSX announcement."
+                if unverified_count
+                else ""
+            )
         ),
         "corporate_actions_on_file": len(actions),
+        "unverified_corporate_actions": unverified_count,
         "delayed_data_notice": settings.data_delay_disclaimer,
         "bars": apply_adjustment(bars, actions),
     }

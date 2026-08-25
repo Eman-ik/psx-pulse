@@ -20,7 +20,15 @@ CORPORATE_ACTION_TYPES = (
 
 
 class CorporateAction(Base):
-    """Structured corporate action record; price adjustment must derive from this, not be hardcoded."""
+    """Structured corporate action record; price adjustment must derive from this, not be hardcoded.
+
+    verified distinguishes a row backed by a real source document (source_document_id
+    set, verified=True) from one an algorithmic detector produced by noticing a price
+    discontinuity that a fresh re-scrape confirms is real -- confirmed real data, but
+    not yet cross-checked against an actual PSX announcement. Both kinds are applied by
+    price_adjustment.py (an unadjusted chart is a worse default than a best-effort one),
+    but the distinction stays visible in every response that surfaces these rows.
+    """
 
     __tablename__ = "corporate_action"
 
@@ -32,6 +40,7 @@ class CorporateAction(Base):
     ratio_or_amount: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
     source_document_id: Mapped[int | None] = mapped_column(ForeignKey("source_document.id"), nullable=True)
+    verified: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

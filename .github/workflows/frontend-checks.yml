@@ -1,0 +1,45 @@
+name: Frontend checks
+
+on:
+  push:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-checks.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-checks.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # npm install, not npm ci: package-lock.json is generated on the maintainer's
+      # Windows machine and only records Windows-target optional native deps -- a
+      # Linux npm ci here fails the same way it did building frontend/Dockerfile
+      # ("Missing: @emnapi/... from lock file"). npm install tolerates that
+      # cross-platform gap; ci's strict 1:1 lockfile match doesn't. Same fix, same
+      # reason, as frontend/Dockerfile's own deps stage.
+      - run: npm install
+
+      - run: npm run lint
+
+      # No frontend test suite exists yet (a real, separate gap -- see
+      # backend/docs/model_governance.md's sibling notes). This build step is still
+      # real coverage: `next build` runs a full TypeScript typecheck that `next dev`
+      # doesn't, which is what caught two real bugs in PortfolioView.tsx this session
+      # (recharts Tooltip formatter types) -- neither would have been caught by
+      # anything that ran before this workflow existed.
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8001

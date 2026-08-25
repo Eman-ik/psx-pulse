@@ -2,6 +2,10 @@ import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle (Dockerfile copies only .next/standalone +
+  // .next/static + public/, not the full node_modules) -- has no effect on
+  // `next dev`, only `next build`+`next start`, so this doesn't touch local dev.
+  output: "standalone",
   // recharts 3.x ships as ESM; without this the SWC worker crashes in dev
   transpilePackages: ["recharts"],
   turbopack: {

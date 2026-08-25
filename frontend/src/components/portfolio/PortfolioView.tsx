@@ -218,7 +218,7 @@ export default function PortfolioView({ rows: rawRows }: { rows: ComparisonRow[]
                     </Pie>
                     <Tooltip
                       contentStyle={{ background: "#161a26", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
-                      formatter={(value: number, name) => [formatCurrency(value), name]}
+                      formatter={(value, name) => [formatCurrency(Number(value)), name]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -236,7 +236,7 @@ export default function PortfolioView({ rows: rawRows }: { rows: ComparisonRow[]
                     </Pie>
                     <Tooltip
                       contentStyle={{ background: "#161a26", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }}
-                      formatter={(value: number, name) => [`${value} holding${value === 1 ? "" : "s"}`, name]}
+                      formatter={(value, name) => [`${value} holding${Number(value) === 1 ? "" : "s"}`, name]}
                     />
                   </PieChart>
                 </ResponsiveContainer>

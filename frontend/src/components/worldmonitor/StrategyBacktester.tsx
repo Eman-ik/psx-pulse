@@ -423,7 +423,7 @@ export const StrategyBacktester: React.FC<StrategyBacktesterProps> = ({ onAskAge
                       color: '#fafafa',
                       fontSize: '11px'
                     }}
-                    formatter={(val: any, name: any) => [
+                    formatter={(val, name) => [
                       `PKR ${Number(val).toLocaleString()}`,
                       name === 'strategyValue' ? 'Strategy Portfolio' : 'Buy & Hold Benchmark'
                     ]}

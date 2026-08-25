@@ -127,7 +127,12 @@ export default function AISignalTab({
   const issuerId = data.issuer.id;
 
   useEffect(() => {
+    // localStorage isn't available during server render, so this can't be a derived
+    // value computed at render time the way react-hooks/set-state-in-effect usually
+    // wants -- reading an external system on mount is exactly the case that rule's
+    // own message calls out as legitimate.
     const list: number[] = JSON.parse(localStorage.getItem("psx_watchlist") ?? "[]");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWatchlisted(list.includes(issuerId));
   }, [issuerId]);
 

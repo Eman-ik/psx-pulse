@@ -340,7 +340,7 @@ function ThesisSection({ packet }: { packet: Record<string, unknown> }) {
   if (!scenarios && !catalysts && !risks) {
     return (
       <div className="rounded border border-border bg-bg p-4 text-center">
-        <p className="text-xs text-muted">No synthesis on file — click "Run Analysis" to generate.</p>
+        <p className="text-xs text-muted">No synthesis on file — click &quot;Run Analysis&quot; to generate.</p>
       </div>
     );
   }
@@ -456,6 +456,11 @@ export default function AnalystWorkbenchTab({ issuerId }: { issuerId: number }) 
   }, [issuerId]);
 
   useEffect(() => {
+    // loadData is async -- its setState calls run after Promise.all resolves, in a
+    // microtask, not synchronously within this effect's call stack. Standard
+    // data-fetch-on-mount pattern, not the extra-synchronous-render-pass case this
+    // rule is meant to catch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
 
@@ -635,7 +640,7 @@ export default function AnalystWorkbenchTab({ issuerId }: { issuerId: number }) 
                 <table className="w-full text-xs">
                   <thead><tr className="border-b border-border text-muted">
                     <th className="py-1 text-left font-normal">Period</th>
-                    <th className="py-1 text-right font-normal">EBIT proxy (PKR '000)</th>
+                    <th className="py-1 text-right font-normal">EBIT proxy (PKR &apos;000)</th>
                     <th className="py-1 text-right font-normal">Finance Cost</th>
                     <th className="py-1 text-right font-normal">Coverage</th>
                   </tr></thead>

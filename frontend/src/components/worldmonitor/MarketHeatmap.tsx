@@ -337,7 +337,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({
               ].map(tab => (
                 <button
                   key={tab.key}
-                  onClick={() => setMacroTab(tab.key as any)}
+                  onClick={() => setMacroTab(tab.key as 'overview' | 'factors' | 'rationale' | 'opportunities')}
                   className={`px-3 py-1.5 rounded font-bold transition-all flex items-center space-x-1.5 whitespace-nowrap ${
                     macroTab === tab.key
                       ? tab.key === 'opportunities' ? 'bg-[#10b981] text-white shadow-xs' : 'bg-[#3b82f6] text-white shadow-xs'
@@ -1014,7 +1014,7 @@ export const MarketHeatmap: React.FC<MarketHeatmapProps> = ({
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                     <XAxis dataKey="time" stroke="#a1a1aa" fontSize={10} tickLine={false} />
                     <YAxis stroke="#a1a1aa" fontSize={10} tickFormatter={(val) => `${val}%`} />
-                    <Tooltip contentStyle={{ backgroundColor: '#121214', borderColor: '#27272a', borderRadius: '8px', color: '#fafafa', fontSize: '11px' }} formatter={(val: any) => [`${val}%`, 'Change']} />
+                    <Tooltip contentStyle={{ backgroundColor: '#121214', borderColor: '#27272a', borderRadius: '8px', color: '#fafafa', fontSize: '11px' }} formatter={(val) => [`${val}%`, 'Change']} />
                     <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
                     <Line type="monotone" dataKey={comparedSectors[0] || realHeatmapData[0].sector} stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3 }} />
                     <Line type="monotone" dataKey={comparedSectors[1] || realHeatmapData[1].sector} stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} />

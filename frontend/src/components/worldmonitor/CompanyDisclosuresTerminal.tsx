@@ -259,7 +259,7 @@ export const CompanyDisclosuresTerminal: React.FC<CompanyDisclosuresTerminalProp
           <div className="bg-[#121214] border border-[#27272a] rounded-lg p-12 text-center text-[#a1a1aa] space-y-3">
             <AlertCircle className="w-8 h-8 text-[#a1a1aa] mx-auto" />
             <p className="text-sm font-bold text-[#fafafa]">No announcements matched your filters.</p>
-            <p className="text-xs">Try selecting 'All Companies' or clearing the search.</p>
+            <p className="text-xs">Try selecting &apos;All Companies&apos; or clearing the search.</p>
           </div>
         )}
       </div>

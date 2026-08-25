@@ -44,12 +44,17 @@ export function useLiveQuote(symbol: string | null): { quote: LiveQuote | null; 
   const [loading, setLoading] = useState(symbol != null);
 
   useEffect(() => {
-    if (!symbol) {
-      setQuote(null);
-      setLoading(false);
-      return;
-    }
+    // No setState here for the null-symbol case -- that's derived at render time
+    // below instead (react-hooks/set-state-in-effect: calling setState synchronously
+    // in an effect body causes an extra render; a null symbol needing a null/false
+    // result is a pure function of the prop, not something to sync via an effect).
+    if (!symbol) return;
     let cancelled = false;
+    // Needs to be synchronous: this signals "a new fetch just started" so the UI
+    // shows a loading state immediately instead of the previous symbol's stale data
+    // while the new fetch is in flight -- one of the most standard data-fetching
+    // patterns in React, not the "derive instead of sync" case this rule targets.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetchSingleLiveQuote(symbol).then((res) => {
       if (cancelled) return;
@@ -61,7 +66,7 @@ export function useLiveQuote(symbol: string | null): { quote: LiveQuote | null; 
     };
   }, [symbol]);
 
-  return { quote, loading };
+  return symbol ? { quote, loading } : { quote: null, loading: false };
 }
 
 /**

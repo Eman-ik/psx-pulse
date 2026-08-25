@@ -282,6 +282,12 @@ export function NewsTab({ announcements, companyById }: NewsTabProps) {
   // only ever be computed client-side, after mount.
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  // Date.now() can't be called directly during render (react-hooks/set-state-in-render
+  // -- impure, breaks hydration/Compiler safety). useState's lazy initializer runs
+  // exactly once at mount, which is the sanctioned way to capture an impure value then;
+  // refreshed on each poll tick below so the 7d/30d/90d date-range filter doesn't stay
+  // frozen at mount time for a terminal that's realistically left open for hours.
+  const [now, setNow] = useState<number>(() => Date.now());
   const [pollError, setPollError] = useState(false);
   const knownIdsRef = useRef<Set<number>>(new Set(announcements.map(a => a.id)));
 
@@ -304,6 +310,7 @@ export function NewsTab({ announcements, companyById }: NewsTabProps) {
         // Also replace full data to pick up updated fields
         setLiveData(fresh);
         setLastUpdated(new Date());
+        setNow(Date.now());
       } catch {
         setPollError(true);
       } finally {
@@ -383,7 +390,7 @@ export function NewsTab({ announcements, companyById }: NewsTabProps) {
     // Date range
     if (dateRange !== "all") {
       const days = dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 90;
-      const cutoff = Date.now() - days * 86_400_000;
+      const cutoff = now - days * 86_400_000;
       result = result.filter(e => new Date(e.publishedAt).getTime() >= cutoff);
     }
 
@@ -427,7 +434,7 @@ export function NewsTab({ announcements, companyById }: NewsTabProps) {
     if (sortBy === "confidence") result = [...result].sort((a, b) => b.confidence - a.confidence);
 
     return result;
-  }, [allEvents, activeView, dateRange, keyword, tickerFilter, sentimentFilter, priorityFilter, confirmFilter, sortBy]);
+  }, [allEvents, activeView, dateRange, keyword, tickerFilter, sentimentFilter, priorityFilter, confirmFilter, sortBy, now]);
 
   // ── Top themes for right rail ──────────────────────────────────────────────
   const topThemes = useMemo(() => {

@@ -315,6 +315,11 @@ Ask me anything about these companies or the fertilizer sector.`,
 
   // Run alert rules against real news on mount
   useEffect(() => {
+    // Genuinely synchronous setNotifications inside evaluateAlertRules, not behind an
+    // await -- but this accumulates alerts onto existing state as new news arrives
+    // (prev => [...newAlerts, ...prev]), it isn't a value derivable from props/state
+    // at render time, so restructuring out of an effect isn't the right fix here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (realNewsItems.length > 0) evaluateAlertRules(realNewsItems, alertRules);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realNewsItems]);

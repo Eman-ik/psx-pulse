@@ -255,7 +255,7 @@ export const WorldGeopoliticalMap: React.FC<WorldGeopoliticalMapProps> = ({
                     ))
                   ) : (
                     <div className="p-4 bg-[#0b0e16] border border-slate-800 rounded-lg text-center text-xs text-slate-500 font-mono">
-                      No fertilizer sector announcements matched this hotspot's tickers.
+                      No fertilizer sector announcements matched this hotspot&apos;s tickers.
                     </div>
                   )}
                 </div>

@@ -125,6 +125,20 @@ underlying accuracy problem is addressed, independent of any process fix in this
   0.523 (0.5 = no skill). Buy precision 48.3%, below its own 60% floor — correctly gated
   to `NO SIGNAL` for every symbol.
 
+**What this does and doesn't establish.** The precise, defensible claim is: *this specific
+implementation, on this specific data, has failed to demonstrate a statistically significant
+predictive edge.* It is not evidence that PSX price/volume data carries no predictive
+information at all — several real confounds were still present or only partially addressed
+when these numbers were measured: known corrupted price rows across the wider universe
+(discovered and partially repaired this session, see `scripts/verify_and_repair_discontinuities.py`'s
+own results — 15 of 36 audited symbols needed repair, and the audit itself hasn't
+covered all 465 tracked companies), an incomplete `corporate_action` record (most entries are
+`verified=False`, algorithmically detected rather than document-sourced), and no systematic,
+automated data-quality validation gate ahead of either model. Before concluding the *data*
+lacks signal (as opposed to this implementation, on this data, at this point), that data
+foundation needs to be solid first — retraining or re-tuning on top of it now would just
+build a better model on the same uncertain ground.
+
 ## Who approves public activation
 
 **Not filled in.** This is a real organizational decision (who at the project — presumably

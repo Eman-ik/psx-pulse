@@ -1,0 +1,193 @@
+# Model Governance (DRAFT — no signal has been approved for public activation)
+
+Status: **NOT COMPLETED**. This document defines the process; it does not itself
+constitute approval of anything. As of this writing, no model or signal on this
+platform meets the bar it sets — see [Current models: real status](#current-models-real-status)
+below, which is not hypothetical, it's this session's actual measured results.
+
+Companion to [`rights_matrix.template.md`](rights_matrix.template.md) (data licensing —
+"are we allowed to use this data at all") and [`research_disclaimer.md`](research_disclaimer.md)
+(what gets shown to a reader). This document covers a different question: "has this
+specific model's output earned the right to be called a signal."
+
+## The one distinction everything else here depends on
+
+**Research output** and **investment recommendation** are not the same claim, and this
+platform must never let the first one silently become the second.
+
+- Research output: *"This model estimates a 57% probability of positive 5-day return for
+  FFC, based on a walk-forward track record of 53% accuracy over 40 observations (not
+  statistically significant, p=0.21)."* — a measured fact about a model, with its own
+  uncertainty attached.
+- Investment recommendation: *"BUY FFC."* — a directive a reader could act on with money,
+  implying the platform has weighed the model's uncertainty on the reader's behalf and
+  found it acceptable.
+
+The second carries substantially greater regulatory exposure than the first (SECP
+research-regulation review — see `rights_matrix.template.md` — has not happened). Every
+surface this platform controls must be capable of stating the first without ever
+collapsing into the second. Concretely: `ai_signal`/`ml_signal`/Kronos `signal` values are
+labels on a probability distribution ("BUY" meaning "the gate's thresholds were cleared"),
+never phrased as an instruction, and every surface carries `SCORE_DISCLAIMER`
+(`app/api/comparison.py`) or the equivalent research-only framing already present in
+`signal_qualification.py`'s `reason` field and `ml_signal_engine.py`'s module docstring.
+
+## What the system is allowed to display
+
+Three independent gates, checked in `app/core/config.py`, none of which override the
+others:
+
+1. **`public_launch_enabled`** — can this platform be shown to anyone outside the project
+   owner at all. `False` by default; flipping it is a business decision, not a modeling one.
+2. **`public_signals_enabled`** — can `ai_signal`/`ai_score` (the rules-based composite in
+   `app/etl/signal_engine.py`) be shown to a non-internal reader. `False`.
+3. **`ml_signals_enabled`** — can `ml_signal`/`outperformance_probability` (the pooled
+   classifier in `app/etl/ml_signal_engine.py`) be shown to a non-internal reader. `False`.
+
+All three are read at compute time, not hardcoded per-row (`MlSignalScore.is_public`,
+`SignalScore` equivalent) — a flag flip doesn't require recomputing history, but it also
+means a flag flip takes effect retroactively across everything already stored. That's a
+real, sharp edge: flipping `ml_signals_enabled=True` makes every row ever computed public
+at once, including runs made under looser thresholds than whatever's current. **Rule: a
+flag flip is itself an approval action (see below) and must be preceded by a re-check that
+every currently-stored row still passes the current validation bar, not just future ones.**
+
+Even with all three `True`, the Kronos quant-forecast path (`quant_forecast.py`) and its
+`signal_qualification.py` gate are a **separate, fourth surface** with its own
+qualification logic — flipping the three flags above does not expose Kronos-derived
+signals; that gate has no corresponding `_enabled` flag yet because nothing about it has
+ever been reviewed for public exposure. Do not add one without extending this document.
+
+## What constitutes a "signal" (vs. an unqualified model estimate)
+
+A model producing a number is not the same as that number being a "signal." The
+distinction lives in `signal_qualification.py` and `ml_signal_engine.py`'s `SignalModel.rank()`
+today, and any future model must implement the same shape:
+
+- A **raw estimate** (probability, expected return, direction) may exist internally for
+  any ticker with enough history to compute one at all.
+- A **qualified signal** is a raw estimate that has cleared *both* an accuracy floor and a
+  statistical-significance test against its own real, walk-forward, never-seen-during-
+  training track record — not against training-set performance, not against a single
+  observation.
+- Anything that hasn't cleared both bars is `NO_SIGNAL` / `"NO SIGNAL"`, displayed as such,
+  never silently rounded up to the nearer of BUY or SELL. `ml_signal_engine.py`'s own
+  design already forbids SELL entirely (see its module docstring) since the classifier
+  only estimates one-sided probability — a second, independently-validated downside model
+  would be required before a SELL signal could exist at all, qualified or not.
+
+## Required validation metrics (current, per model — update if thresholds change)
+
+| Model | Min. accuracy | Significance test | Min. observations | Where enforced |
+|---|---|---|---|---|
+| Kronos quant forecast | 55% | exact two-sided binomial, p < 0.10 | 15 | `signal_qualification.py` (`MIN_ACCURACY`, `SIGNIFICANCE_P_VALUE`, `MIN_OBSERVATIONS`) |
+| ML signal engine (pooled logistic) | 60% (on buy-precision, not raw accuracy) | — (no significance test; accuracy floor only) | 30 | `ml_signal_engine.py` (`ModelConfig.minimum_validated_accuracy`, `minimum_observations`) |
+
+The ML signal engine's gate is weaker than Kronos's (no significance test) — noted here as
+a real gap, not something to quietly leave inconsistent. Before `ml_signals_enabled` is
+ever considered, that gate should be brought up to the same standard the Kronos path
+already has, or an explicit written reason recorded here for why it doesn't need one.
+
+## Required backtesting period
+
+No fixed calendar length — "enough real, non-overlapping, walk-forward observations to
+clear the significance test above" is the actual bar, and it varies by how much genuine
+history a ticker has. What's required, structurally:
+
+- Anchors must be **genuinely out-of-sample**: not sitting in whatever data influenced
+  checkpoint/model selection. This session found the Kronos fine-tune's original
+  train/val split (`config_psx_scoped.yaml`: `train_ratio: 0.9, val_ratio: 0.1,
+  test_ratio: 0.0`) had no such held-out slice at all — see
+  `true_holdout_eval.py` and its results (`true_holdout_results.json`) for the corrected
+  methodology: only anchors dated after the fine-tune's actual data export cutoff count.
+- Anchors must be checked against a **naive baseline** (e.g. "always predict the trend"),
+  not just against 50/50 chance — a model can beat chance and still lose to the trivial
+  baseline in a one-directional market window, which is exactly what the true-holdout run
+  found for FFC/LUCK/EFERT this session.
+- Re-validation is required whenever the underlying price history changes materially
+  (a corporate-action repair, a newly-discovered data-corruption fix) — this session's
+  MARI/LUCK/KOHC price corrections are exactly this trigger, and the walk-forward record
+  (`walk_forward_validation.json`) was rebuilt after them, not left stale.
+
+## Current models: real status
+
+Not aspirational — this is what was actually measured this session, and it is the reason
+both `public_signals_enabled` and `ml_signals_enabled` should stay `False` until the
+underlying accuracy problem is addressed, independent of any process fix in this document:
+
+- **Kronos, 40-anchor walk-forward (393 total anchors, 8 tickers)**: no ticker clears both
+  the accuracy and significance bars. Closest: EFERT (58.3%, p=0.31, not significant).
+  FFC is significantly *worse* than chance (35.9%, p=0.053) — correctly rejected by the
+  accuracy floor regardless of that inverted significance. See `walk_forward_validation.json`.
+- **Kronos, true holdout (41 genuinely-unseen anchors, FFC/EFERT/LUCK)**: no ticker beats a
+  naive trend-following baseline in the tested window. See `true_holdout_results.json`.
+- **ML signal engine (pooled, 31 symbols, 109,906 walk-forward observations)**: ROC AUC
+  0.523 (0.5 = no skill). Buy precision 48.3%, below its own 60% floor — correctly gated
+  to `NO SIGNAL` for every symbol.
+
+## Who approves public activation
+
+**Not filled in.** This is a real organizational decision (who at the project — presumably
+the project owner, possibly plus outside counsel per `rights_matrix.template.md`'s
+Capital Stake/PSX licensing question) that this document cannot make on its own. Record
+here once decided: name/role, and whether one approver suffices or a second reviewer is
+required for any of the three flags in "What the system is allowed to display."
+
+## Required documentation, per activation decision
+
+A flag flip (or a new model's first activation) must be recorded as a dated entry below,
+not just as a git commit message — a commit explains code, not a business/compliance
+decision. Minimum fields, matching the user's own requested shape:
+
+| Field | Required |
+|---|---|
+| Model name + version | e.g. `psx_scoped_8_daily` fine-tune checkpoint identifier, or `ml_signal_engine.py`'s `MODEL_VERSION` |
+| Approval date | |
+| Reviewer(s) | matches "Who approves public activation" above |
+| Validation metrics at approval time | accuracy, p-value, n, exact numbers — not "looked fine" |
+| Backtesting period covered | date range, anchor count, whether true-holdout or contaminated walk-forward |
+| Risk disclosures shown alongside | which disclaimer text, on which surfaces |
+| Flags changed | which of the three, from/to |
+
+No rows exist yet — nothing has been approved.
+
+## Audit logs
+
+Not yet implemented. What this needs, concretely: every change to
+`public_signals_enabled` / `ml_signals_enabled` / `public_launch_enabled` (env var or
+`.env` change) should be traceable to who changed it and when, separate from application
+logs. `MlSignalScore` and `SignalScore` rows already carry `is_public` and
+`model_version`/`policy_version` per-row (real, existing), which is necessary but not
+sufficient — it shows what was public at compute time, not who decided the flag should be
+`True` at all. A minimal fix: a `flag_change_log` table (settings key, old value, new
+value, changed_by, changed_at, reason) written whenever these flags are toggled in a
+running environment, not just in `.env` at deploy time.
+
+## Model versioning
+
+Partially real already:
+- `ml_signal_engine.py`: `MODEL_VERSION = 1`, stored on every `MlSignalScore` row.
+- `signal_engine.py`'s rules-based composite: `policy_version` on `SignalScore` (per
+  earlier project work, not touched this session).
+- Kronos: the fine-tune checkpoint is identified by `exp_name: "psx_scoped_8_daily"` in
+  `config_psx_scoped.yaml`, but this string is **not** currently stored on
+  `quant_forecast.py`'s output or on `walk_forward_validation.json` — if the checkpoint is
+  ever retrained, there's no field recording which checkpoint produced which stored
+  validation result. Gap: add a `model_checkpoint_id` (or similar) to both.
+
+## Risk disclosures
+
+Already real and in force, not aspirational:
+- `research_disclaimer.md` — shown per `PUBLIC_SIGNALS_ENABLED`.
+- `SCORE_DISCLAIMER` (`app/api/comparison.py`) — attached to every row with a
+  score, internal-only framing.
+- `signal_qualification.py`'s `reason` field — a specific, numeric explanation
+  (not generic boilerplate) for every qualified-or-not determination, shown directly in
+  the Quant Forecast UI.
+
+Gap: none of these currently distinguish "this specific number is a raw model estimate"
+from "this specific number is a qualified signal" *visually* as strongly as the
+underlying data does — the frontend badge (`NO_SIGNAL`/`BUY`/etc.) carries the real
+distinction, but a reader skimming past the badge to the raw probability number could
+still read it as more validated than it is. Worth a design pass before any public
+activation, not before.

@@ -181,6 +181,47 @@ This is a stronger, not weaker, confirmation of the original finding: it took a 
 data-integrity pass *and* a real second look at the gate's own logic to be confident there's
 still no validated edge here -- not a coincidence found once and left unquestioned.
 
+**Update, 2026-08-25: root-cause diagnostic on the "no edge" finding, plus a third,
+independent check.** "No ticker qualifies" answers *whether* there's a validated edge, not
+*why* -- open question was whether that's a training/capacity problem (Kronos-mini, 5 epochs,
+predictor LR 1e-6 -- a light touch, see `config_psx_scoped.yaml`) or something more
+fundamental. `diagnose_signal.py` re-used the existing 511 walk-forward anchor results (zero
+new model inference) to check:
+
+- Pooled correlation between the model's continuous prediction and realized return: r=0.061,
+  Spearman rho=-0.051 -- indistinguishable from zero. Confirms the binary-accuracy null result
+  isn't an artifact of thresholding a real continuous signal at 50%.
+- The model's prediction is consistently *negatively* correlated with trailing 5-day momentum
+  (pooled r=-0.366, negative on 7 of 8 tickers) -- the fine-tune has learned a genuine,
+  structural mean-reversion bias, not pure noise. This is a real, identifiable pattern, and it
+  qualitatively matches the market's own behavior in this window (trailing-momentum's own
+  correlation with realized return is also mostly negative, pooled r=-0.177).
+- That raised the obvious next question: is the market-wide short-term-reversal effect (a
+  well-documented classical factor, zero Kronos involvement -- literally "bet against the
+  trailing move") itself exploitable here, independent of whether this specific fine-tune
+  expresses it well? Tested on the identical anchors/tickers with the identical significance
+  test and naive-baseline gate this document already requires. Per-ticker, 2 of 8 (LUCK
+  p=0.038, OGDC p=0.013) clear p<0.10 -- but testing 8 tickers separately at alpha=0.10
+  produces ~0.8 false positives by chance alone (the same multiple-comparisons trap the
+  naive-baseline gate exists to catch, one level up), so that alone isn't evidence. The single,
+  pre-specified pooled test across all 511 anchors: 278/511 = 54.4% vs random, p=0.0515
+  (borderline) -- but against the pooled naive baseline (290/511 = 56.8%), the reversal factor
+  **does not win**. Same trap as EFERT, again: marginal significance vs. chance, still loses to
+  the trivial baseline.
+
+**Conclusion:** this is a third, methodologically independent line of evidence for "no
+validated edge," not a restatement of the first two. It also answers the "is this fixable with
+more training" question in the negative for the current approach specifically: the model's
+mean-reversion bias is directionally sensible, but even its purest, best-case classical form
+doesn't clear the real bar on this data/window, so more epochs on the same task framing
+(5-day price direction from OHLCV alone) is unlikely to be the fix. Genuine next steps, not
+attempted here because each is a real compute or product-scope commitment, not a quick
+follow-up: testing other horizons (1-day, 20-day) comprehensively (report all tried, not the
+best one -- anything less repeats this exact mistake at a different layer); expanding beyond
+these 8 tickers to see if a cross-sectional, not time-series, signal exists; or reconsidering
+whether Kronos's product role should be a standalone BUY/SELL signal generator at all, versus
+context/input to a human-reviewed process. See `diagnose_signal.py` for the exact methodology.
+
 ## Who approves public activation
 
 **Not filled in.** This is a real organizational decision (who at the project — presumably

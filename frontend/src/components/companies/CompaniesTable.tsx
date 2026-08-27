@@ -14,9 +14,9 @@ function SignalPill({ signal }: { signal: string | null }) {
   }
   const label = signal.replace("_", " ");
   const colorClass =
-    signal === "STRONG_BUY" || signal === "BUY"
+    signal === "strong_buy" || signal === "buy"
       ? "bg-emerald-500/15 text-emerald-400"
-      : signal === "STRONG_SELL" || signal === "SELL"
+      : signal === "strong_sell" || signal === "sell"
       ? "bg-red-500/15 text-red-400"
       : "bg-surface-alt text-muted";
   return (

@@ -9,14 +9,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { messages?: unknown[]; systemPrompt?: string };
+  let body: { message?: string; chatHistory?: { role: string; content: string }[]; systemPrompt?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { messages = [], systemPrompt } = body;
+  const { message, chatHistory = [], systemPrompt } = body;
+  if (!message || !message.trim()) {
+    return NextResponse.json({ error: 'message is required' }, { status: 400 });
+  }
+  const messages = [...chatHistory, { role: 'user', content: message }];
 
   const system = systemPrompt ?? `You are PSX QuantAgent, an AI research assistant specializing in the Pakistan Stock Exchange (PSX) fertilizer sector. Your pilot universe is: FFC (Fauji Fertilizer Company), EFERT (Engro Fertilizer — listed entity), FATIMA (Fatima Fertilizer), AGL (Agritech Limited), AHCL (Al-Hamd Chemical). You provide analysis grounded in Pakistani agricultural economics, SBP monetary policy, gas feedstock pricing, and PSX regulatory filings. Be concise, data-oriented, and always note when you are reasoning rather than citing a live source. Never fabricate specific prices, EPS figures, or dividend announcements.`;
 
@@ -44,7 +48,7 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await response.json();
-  const text: string = data?.content?.[0]?.text ?? '';
+  const reply: string = data?.content?.[0]?.text ?? '';
 
-  return NextResponse.json({ text });
+  return NextResponse.json({ reply });
 }

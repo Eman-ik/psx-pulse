@@ -54,20 +54,20 @@ export const QuantAgentPanel: React.FC<QuantAgentPanelProps> = ({
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="font-bold font-mono text-slate-100 text-sm sm:text-base">PSX QuantAgent v3.6</h3>
+              <h3 className="font-bold font-mono text-slate-100 text-sm sm:text-base">PSX QuantAgent</h3>
               <span className="px-1.5 py-0.5 text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded">
-                GROUNDED SEARCH ENGINE
+                LLM REASONING, NO LIVE SEARCH
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-sans">
-              Autonomous Macroeconomic, Geopolitical & PSX Equity AI Research Engine
+              Claude-backed research assistant, reasoning from its training knowledge — not a live data or search feed
             </p>
           </div>
         </div>
 
         <div className="hidden sm:flex items-center space-x-2 text-xs font-mono text-slate-400">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>GEMINI-3.6-FLASH SEARCH READY</span>
+          <span>CLAUDE HAIKU READY</span>
         </div>
       </div>
 
@@ -203,7 +203,7 @@ export const QuantAgentPanel: React.FC<QuantAgentPanelProps> = ({
             <div className="p-3 bg-[#0f1522] border border-slate-800 rounded-lg space-y-1">
               <div className="flex items-center space-x-2 text-emerald-400 font-bold">
                 <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                <span>Running grounded Gemini-3.6 search and quant models...</span>
+                <span>Generating response...</span>
               </div>
               <p className="text-[11px] text-slate-400">
                 Scanning PSX market disclosures, SBP MPS data, and global commodity transmissions.

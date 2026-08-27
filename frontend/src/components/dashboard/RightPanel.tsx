@@ -6,7 +6,6 @@ import { DONUT_COLORS } from "./MarketCapDonut";
 interface RightPanelProps {
   companies: CompanySummary[];
   sectorMarketCapPkrBn: number;
-  sectorMarketCapChangePct: number;
   isLive: boolean;
   companyIdBySymbol?: Record<string, number>;
 }
@@ -14,7 +13,6 @@ interface RightPanelProps {
 export default function RightPanel({
   companies,
   sectorMarketCapPkrBn,
-  sectorMarketCapChangePct,
   isLive,
   companyIdBySymbol = {},
 }: RightPanelProps) {
@@ -51,7 +49,6 @@ export default function RightPanel({
             <p className="text-xl font-semibold">
               PKR {sectorMarketCapPkrBn.toLocaleString()} bn
             </p>
-            <p className="text-xs text-positive">+{sectorMarketCapChangePct}% this week</p>
           </div>
         </div>
       </div>

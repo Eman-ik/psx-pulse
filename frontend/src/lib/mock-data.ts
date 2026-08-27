@@ -69,4 +69,3 @@ export const announcements: AnnouncementRow[] = [
 ];
 
 export const sectorMarketCapPkrBn = pilotCompanies.reduce((sum, c) => sum + c.marketCapPkrBn, 0);
-export const sectorMarketCapChangePct = 1.4;

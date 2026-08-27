@@ -13,7 +13,6 @@ import { fetchCompanies, fetchIndexPrices, fetchLiveQuotes, fetchNewsAnnouncemen
 import {
   announcements as mockAnnouncements,
   pilotCompanies,
-  sectorMarketCapChangePct,
   sectorMarketCapPkrBn,
   sectorRisk as mockSectorRisk,
 } from "@/lib/mock-data";
@@ -216,7 +215,6 @@ export default async function DashboardPage() {
           <RightPanel
             companies={companies}
             sectorMarketCapPkrBn={sectorMarketCapPkrBn}
-            sectorMarketCapChangePct={sectorMarketCapChangePct}
             isLive={isLive}
             companyIdBySymbol={companyIdBySymbol}
           />

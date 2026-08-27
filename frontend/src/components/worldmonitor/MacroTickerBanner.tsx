@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { MacroIndicator } from './types';
-import { ArrowUpRight, ArrowDownRight, Minus, Activity, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Minus, Activity } from 'lucide-react';
 
 interface MacroTickerBannerProps {
   indicators: MacroIndicator[];
@@ -99,10 +99,6 @@ export const MacroTickerBanner: React.FC<MacroTickerBannerProps> = ({
           })}
         </div>
 
-        <div className="hidden xl:flex items-center space-x-1.5 text-[10px] font-mono text-[#a1a1aa] bg-[#121214] px-2 py-1 rounded border border-[#27272a] shrink-0">
-          <ShieldCheck className="w-3 h-3 text-[#10b981]" />
-          <span>Regulation Compliant Web-Scan</span>
-        </div>
       </div>
     </div>
   );

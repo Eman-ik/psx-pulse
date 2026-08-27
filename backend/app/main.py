@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.api import admin, analyst, comparison, companies, equity_research, financials, live, macro, market, ml_signals, news, quant_forecast, screener, sectors, signals
 from app.core.config import get_settings
@@ -31,6 +32,14 @@ app.include_router(ml_signals.router)
 app.include_router(admin.router)
 app.include_router(equity_research.router)
 app.include_router(quant_forecast.router)
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    """This is an API-only backend with nothing to render at the bare root -- redirect
+    anyone who lands here (a person, not the frontend, which never calls "/") to the
+    interactive API docs instead of a bare {"detail": "Not Found"}."""
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health")

@@ -331,6 +331,49 @@ mixed with tiny floating-point probabilities. scipy is already a hard dependency
 existing rows default to `significant_at_10pct=False` (correctly conservative, same reasoning as
 every prior gate-tightening migration in this file).
 
+**Update, 2026-08-27: added market/sector-relative features (real KSE-100 + FERTIX/CEMENTIX
+index returns), and ran the same clean, controlled A/B the fundamentals result got.**
+`load_market_index_panel()`/`load_sector_context_panel()` join real index data in -- distinct
+from `TECHNICAL_FEATURE_COLUMNS`' existing `relative_21d`/`relative_63d`, which compare each
+stock only against the synthetic pooled-universe benchmark (an equal-weighted average across
+all ~250 sectors mixed together), not its own actual sector. Real coverage constraint, flagged
+up front this time rather than discovered after building: KSE100/FERTIX/CEMENTIX only have ~500
+trading days on file (2024-07 to 2026-07) against decades of price history for many pooled
+symbols, and sector coverage is additionally restricted to Fertilizer/Cement (33 of ~250 pooled
+issuers) -- the only two sectors with a real index.
+
+Controlled result (`SignalModel(fundamentals=X, market_index=Y, sector_context=Z)`, baseline =
+technical+fundamentals since that's the current production feature set, vs. baseline +
+market/sector, identical price panel both runs):
+
+| | Baseline (tech+fund) | + market/sector | Delta |
+|---|---|---|---|
+| buy_precision | 46.60% | 45.98% | -0.62pp |
+| roc_auc | 0.5258 | 0.5273 | +0.0015 |
+| accuracy | 52.82% | 52.77% | -0.06pp |
+| brier_score | 0.2518 | 0.2527 | +0.0009 (worse) |
+
+**Market/sector features did not help either.** Mixed, not uniformly negative like the
+fundamentals result -- ROC AUC moved very slightly in the right direction -- but the metric that
+actually gates BUY (buy_precision) moved worse by more than AUC moved better, and accuracy and
+Brier both moved worse too. Net: no case for keeping this on by default. Most likely
+explanation: the real coverage constraint stated above is severe enough (~500 of a possible
+several-thousand-day history, for a subset of symbols) that these columns are NaN for the large
+majority of the walk-forward panel, diluting whatever real signal exists in the ~500-day window
+where they're populated.
+
+**This is the second feature source tested this session, and the second to fail to help.**
+Fundamentals and market/sector features are conceptually different (company-specific vs.
+market-context, annual vs. daily granularity) and failed for different specific reasons (narrow
+issuer coverage vs. narrow date coverage) -- this is not one bug repeating, it's two independent
+negative results. Combined with Kronos's own three independent "no edge" confirmations from
+earlier this session, the pattern across every tested angle (a foundation model, a classical
+factor, a logistic regression on price/volume, +fundamentals, +market/sector) is now
+consistent: nothing tested so far has produced a real, validated edge on this task as currently
+framed (5-day excess-return direction). Worth treating as a real signal about the task/data,
+not a reason to mechanically try a third feature source next without first asking whether the
+problem is which features are used at all.
+
 ## Who approves public activation
 
 **Not filled in.** This is a real organizational decision (who at the project — presumably

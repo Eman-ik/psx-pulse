@@ -245,6 +245,48 @@ value here is closing the gap before a future run's precision ever clears 60% fo
 reason -- the EFERT case was exactly this kind of gap sitting unnoticed until a real run happened
 to expose it.
 
+**Update, 2026-08-27: added fundamental features (EPS/revenue/PAT growth, net margin, ROE,
+debt/equity, current ratio, P/E, dividend payout) to the ML signal engine's input set.** Prior
+baseline was price/volume-only. `load_fundamental_panel()` joins `ratio_engine.py`'s
+already-computed `RatioValue` rows in -- the real work was making that point-in-time-safe:
+neither `financial_fact` nor `ratio_value` carries a genuine "when this became public"
+timestamp (`source_document.published_at` is 0% populated; `created_at` is just this app's
+own one-off backfill date, not tied to any fiscal period), so both were anchored instead to
+the issuer's own real `results`-category announcement date -- the earliest one published on
+or after each ratio's `period_end`. A ratio/period with no matching announcement is dropped,
+not guessed at. Verified via `pd.merge_asof` that a price bar can never see a fundamental
+fact dated after that bar's own date (new tests in `tests/test_ml_signal_engine.py`).
+
+Coverage is honest and narrow: 15-17 of the ~250 pooled issuers (varies by which specific
+ratio) have both real fundamental data and a matching results announcement. The pool was
+NOT restricted down to those issuers -- fundamental columns are nullable/imputed
+(`TECHNICAL_FEATURE_COLUMNS` vs `FEATURE_COLUMNS`: only the technical set is required for a
+row to enter training/scoring at all), so the model keeps the full universe's statistical
+breadth and only gets real fundamental signal where it genuinely exists.
+
+Also fixed in the same pass, discovered while running this for real: `load_price_panel()` was
+including 46 rows (of 208,113) with `open <= 0` -- a real, confirmed scraping artifact on
+thin-trading days for 9 mostly-illiquid small-caps (AHCL, ALAC, AMBL, ATLH, BAPL, BELA, BERG,
+BWCL, KOHC) where high/low/close are real but no open was reported. This crashed
+`validate_prices()` and blocked the *entire* pooled run over 0.02% of rows -- now dropped
+(same "skip, don't guess" convention as `app/ingestion/psx_prices.py`), not imputed. Separately,
+`run_for_all_issuers()`'s DB session was found to die silently during the multi-minute CPU-bound
+walk-forward step (the connection sits open but idle the whole time; `pool_pre_ping` only
+re-validates a connection at checkout, which never happens mid-session) -- fixed with
+`db.invalidate()` before the first DB call after that gap, reproduced and confirmed fixed via
+two real, live end-to-end runs of this pipeline.
+
+**Real result of the first run with fundamentals included** (68 symbols, 188,799 walk-forward
+observations -- up from 109,906, reflecting more backfilled history plus the row-count fix, not
+solely the new features): buy precision 48.0%, naive baseline (positive_rate) 40.95%,
+`beats_naive_baseline: true`. This is the first real run where that flag has been true. It is
+still below the fixed 60% floor, so every symbol is correctly gated to `NO SIGNAL`, same overall
+conclusion as before. This run bundles three real changes at once (fundamentals, more history,
+the zero-open fix), so it is **not** a clean before/after test of whether fundamentals
+specifically helped -- that would need a controlled re-run holding the other two constant. Noted
+here as an honest limitation of this specific comparison, not a claim fundamentals moved the
+needle.
+
 ## Who approves public activation
 
 **Not filled in.** This is a real organizational decision (who at the project — presumably

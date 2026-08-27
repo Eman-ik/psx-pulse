@@ -3,9 +3,13 @@ import pytest
 
 from app.etl.ml_signal_engine import (
     FEATURE_COLUMNS,
+    FUNDAMENTAL_FEATURE_COLUMNS,
+    TECHNICAL_FEATURE_COLUMNS,
     ModelConfig,
     SignalModel,
     build_features,
+    load_fundamental_panel,
+    load_price_panel,
     synthetic_benchmark,
     synthetic_market,
     validate_prices,
@@ -38,11 +42,92 @@ def test_validate_prices_rejects_missing_columns(prices):
 
 def test_features_use_past_and_labels_use_future(prices):
     features = build_features(prices)
-    row = features[features["symbol"] == "MARI"].dropna(subset=FEATURE_COLUMNS + ["target"]).iloc[100]
+    row = features[features["symbol"] == "MARI"].dropna(subset=TECHNICAL_FEATURE_COLUMNS + ["target"]).iloc[100]
     symbol_prices = prices[prices["symbol"] == "MARI"].reset_index(drop=True)
     idx = symbol_prices.index[symbol_prices["date"] == row["date"]][0]
     expected_5d = symbol_prices.loc[idx, "close"] / symbol_prices.loc[idx - 5, "close"] - 1
     assert row["return_5d"] == pytest.approx(expected_5d)
+
+
+def test_build_features_fundamentals_never_leak_before_known_as_of(prices):
+    # The whole point of the point-in-time join: a price bar dated BEFORE a fundamental
+    # fact's known_as_of must never see that fact's value, only bars on/after it.
+    mari_dates = sorted(prices.loc[prices["symbol"] == "MARI", "date"].unique())
+    known_as_of = mari_dates[400]
+    fundamentals = pd.DataFrame({
+        "symbol": ["MARI"],
+        "known_as_of": [known_as_of],
+        **{col: [42.0] for col in FUNDAMENTAL_FEATURE_COLUMNS},
+    })
+    features = build_features(prices, fundamentals=fundamentals)
+    mari = features[features["symbol"] == "MARI"].sort_values("date")
+
+    before = mari[mari["date"] < known_as_of]
+    on_or_after = mari[mari["date"] >= known_as_of]
+    assert before["eps_growth_yoy"].isna().all(), "fundamental leaked into a bar before its known_as_of date"
+    assert (on_or_after["eps_growth_yoy"] == 42.0).all()
+
+
+def test_build_features_symbol_with_no_fundamental_coverage_gets_real_nan(prices):
+    # Only MARI has a fundamentals row; every other pooled symbol must get real NaN, not a
+    # fabricated value or another symbol's data bleeding across via the merge.
+    fundamentals = pd.DataFrame({
+        "symbol": ["MARI"],
+        "known_as_of": [prices["date"].min()],
+        **{col: [10.0] for col in FUNDAMENTAL_FEATURE_COLUMNS},
+    })
+    features = build_features(prices, fundamentals=fundamentals)
+    other_symbols = features[features["symbol"] != "MARI"]
+    assert other_symbols["roe"].isna().all()
+
+
+def test_signal_model_fits_with_partial_fundamental_coverage(prices):
+    # Real production shape: most pooled symbols have no fundamental coverage at all, one
+    # or two do. The imputer must handle that mix without the pipeline crashing or silently
+    # dropping the majority of the pool (see TECHNICAL_FEATURE_COLUMNS' role in dropna).
+    fundamentals = pd.DataFrame({
+        "symbol": ["MARI", "FFC"],
+        "known_as_of": [prices["date"].min(), prices["date"].min()],
+        **{col: [5.0, -2.0] for col in FUNDAMENTAL_FEATURE_COLUMNS},
+    })
+    model = SignalModel(fundamentals=fundamentals).fit(prices)
+    rankings = model.rank(prices)
+    assert len(rankings) == prices["symbol"].nunique()
+    assert model.metrics.observations > 0
+
+
+@pytest.mark.requires_seeded_data
+def test_load_price_panel_drops_zero_open_rows_real_data():
+    # Real, confirmed artifact (2026-08-27): some illiquid symbols have open=0 on thin-
+    # trading days (high/low/close are real, open just wasn't reported). validate_prices()
+    # requires every OHLC column strictly positive, so these must never reach build_features.
+    from app.db.session import SessionLocal
+
+    with SessionLocal() as db:
+        panel = load_price_panel(db)
+
+    assert not panel.empty
+    assert (panel["open"] > 0).all()
+    assert (panel["high"] > 0).all()
+    assert (panel["low"] > 0).all()
+    assert (panel["close"] > 0).all()
+
+
+@pytest.mark.requires_seeded_data
+def test_load_fundamental_panel_returns_point_in_time_anchored_real_data():
+    # Hits the real dev DB (same convention as test_api_endpoints.py) -- proves the actual
+    # ratio_value -> announcement join works against real rows, not just synthetic ones.
+    from app.db.session import SessionLocal
+
+    with SessionLocal() as db:
+        panel = load_fundamental_panel(db)
+
+    assert not panel.empty
+    assert set(panel.columns) == {"symbol", "known_as_of", *FUNDAMENTAL_FEATURE_COLUMNS}
+    assert panel["symbol"].nunique() > 0
+    # known_as_of must be a real, populated timestamp for every row -- an unanchored ratio
+    # should never have made it past load_fundamental_panel's inner-join filtering.
+    assert panel["known_as_of"].notna().all()
 
 
 def test_signal_gate_never_issues_unvalidated_trade(prices):

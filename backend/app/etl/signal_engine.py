@@ -113,13 +113,24 @@ def peer_relative_score(value: float, peer_mean: float, higher_is_better: bool) 
     return 50.0 + deviation * 50.0
 
 
-def _latest_ratio_values(db: Session, ratio_key: str, sector_id: int | None = None) -> dict[int, float]:
+def _latest_ratio_values(
+    db: Session, ratio_key: str, sector_id: int | None = None, cache: dict | None = None
+) -> dict[int, float]:
     """issuer_id -> latest value on file for this ratio key.
 
     When sector_id is supplied, only issuers in that sector are included so peer-relative
     scores compare within-sector (cement vs cement, fertilizer vs fertilizer). Without a
     sector_id, all issuers are included — useful for cross-sector benchmarks.
+
+    `cache`, when passed, is a plain dict scoped to one run_for_all_issuers() call: every
+    issuer in the same sector needs the exact same peer map for a given ratio_key, so without
+    this the whole sector's ratio table gets re-queried from scratch once per issuer
+    (O(issuers x ratio_keys) queries instead of O(sectors x ratio_keys)).
     """
+    cache_key = ("ratio", ratio_key, sector_id)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
     conditions = [RatioDefinition.key == ratio_key]
     if sector_id is not None:
         conditions.append(
@@ -137,15 +148,22 @@ def _latest_ratio_values(db: Session, ratio_key: str, sector_id: int | None = No
         key = (ratio_value.period_end, ratio_value.id)
         if ratio_value.issuer_id not in latest or key > latest[ratio_value.issuer_id][0]:
             latest[ratio_value.issuer_id] = (key, float(ratio_value.value))
-    return {issuer_id: v for issuer_id, (_, v) in latest.items()}
+    result = {issuer_id: v for issuer_id, (_, v) in latest.items()}
+    if cache is not None:
+        cache[cache_key] = result
+    return result
 
 
 def compute_dimension_score(
-    db: Session, issuer_id: int, metrics: list[tuple[str, bool]], sector_id: int | None = None
+    db: Session,
+    issuer_id: int,
+    metrics: list[tuple[str, bool]],
+    sector_id: int | None = None,
+    cache: dict | None = None,
 ) -> float | None:
     sub_scores = []
     for ratio_key, higher_is_better in metrics:
-        by_issuer = _latest_ratio_values(db, ratio_key, sector_id=sector_id)
+        by_issuer = _latest_ratio_values(db, ratio_key, sector_id=sector_id, cache=cache)
         value = by_issuer.get(issuer_id)
         if value is None or len(by_issuer) < 2:  # need at least one peer to compare against
             continue
@@ -201,31 +219,56 @@ def compute_momentum_pct(bars: Sequence[tuple[date, float]], as_of: date) -> flo
     return (latest_close - anchor_close) / anchor_close
 
 
-def _latest_momentum_values(db: Session, as_of: date, sector_id: int | None = None) -> dict[int, float]:
+def _latest_momentum_values(
+    db: Session, as_of: date, sector_id: int | None = None, cache: dict | None = None
+) -> dict[int, float]:
     """issuer_id -> trailing momentum for issuers within the given sector (or all issuers if
     sector_id is None). Same shape as _latest_ratio_values.
+
+    Fetches every issuer's price bars in one batched query rather than one query per issuer
+    (the previous per-issuer loop meant a sector of size S issued S separate PriceOHLCV
+    queries just to compute momentum for one issuer, and `cache` -- see _latest_ratio_values --
+    avoids repeating that across every issuer in the same sector within one scoring run).
     """
+    cache_key = ("momentum", sector_id, as_of)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
     conditions = [Issuer.securities.any()]
     if sector_id is not None:
         conditions.append(Issuer.sector_id == sector_id)
     issuers: Sequence[Issuer] = db.execute(select(Issuer).where(*conditions)).scalars().all()
-    momentum_by_issuer: dict[int, float] = {}
+
+    security_id_to_issuer_id: dict[int, int] = {}
     for issuer in issuers:
         security = issuer.securities[0] if issuer.securities else None
-        if security is None:
-            continue
-        bars = [
-            (b.trade_date, float(b.close))
-            for b in db.execute(select(PriceOHLCV).where(PriceOHLCV.security_id == security.id)).scalars()
-        ]
-        momentum = compute_momentum_pct(bars, as_of)
+        if security is not None:
+            security_id_to_issuer_id[security.id] = issuer.id
+
+    bars_by_security: dict[int, list[tuple[date, float]]] = {sid: [] for sid in security_id_to_issuer_id}
+    if security_id_to_issuer_id:
+        rows = db.execute(
+            select(PriceOHLCV.security_id, PriceOHLCV.trade_date, PriceOHLCV.close).where(
+                PriceOHLCV.security_id.in_(security_id_to_issuer_id.keys())
+            )
+        ).all()
+        for security_id, trade_date, close in rows:
+            bars_by_security[security_id].append((trade_date, float(close)))
+
+    momentum_by_issuer: dict[int, float] = {}
+    for security_id, issuer_id in security_id_to_issuer_id.items():
+        momentum = compute_momentum_pct(bars_by_security[security_id], as_of)
         if momentum is not None:
-            momentum_by_issuer[issuer.id] = momentum
+            momentum_by_issuer[issuer_id] = momentum
+    if cache is not None:
+        cache[cache_key] = momentum_by_issuer
     return momentum_by_issuer
 
 
-def compute_momentum_score(db: Session, issuer_id: int, as_of: date, sector_id: int | None = None) -> float | None:
-    by_issuer = _latest_momentum_values(db, as_of, sector_id=sector_id)
+def compute_momentum_score(
+    db: Session, issuer_id: int, as_of: date, sector_id: int | None = None, cache: dict | None = None
+) -> float | None:
+    by_issuer = _latest_momentum_values(db, as_of, sector_id=sector_id, cache=cache)
     value = by_issuer.get(issuer_id)
     if value is None or len(by_issuer) < 2:  # need at least one peer to compare against
         return None
@@ -233,10 +276,14 @@ def compute_momentum_score(db: Session, issuer_id: int, as_of: date, sector_id: 
     return peer_relative_score(value, peer_mean, higher_is_better=True)
 
 
-def _latest_beta_values(db: Session, sector_id: int | None = None) -> dict[int, float]:
+def _latest_beta_values(db: Session, sector_id: int | None = None, cache: dict | None = None) -> dict[int, float]:
     """issuer_id -> latest beta on file (CapmAssumption rows), within sector when sector_id
     is provided, excluding the market-wide issuer_id-is-null default row.
     """
+    cache_key = ("beta", sector_id)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
     conditions = [CapmAssumption.issuer_id.is_not(None), CapmAssumption.beta.is_not(None)]
     if sector_id is not None:
         conditions.append(
@@ -249,14 +296,19 @@ def _latest_beta_values(db: Session, sector_id: int | None = None) -> dict[int, 
     for row in rows:
         if row.issuer_id not in latest or row.as_of_date > latest[row.issuer_id][0]:
             latest[row.issuer_id] = (row.as_of_date, float(row.beta))
-    return {issuer_id: v for issuer_id, (_, v) in latest.items()}
+    result = {issuer_id: v for issuer_id, (_, v) in latest.items()}
+    if cache is not None:
+        cache[cache_key] = result
+    return result
 
 
-def compute_risk_score(db: Session, issuer_id: int, sector_id: int | None = None) -> float | None:
+def compute_risk_score(
+    db: Session, issuer_id: int, sector_id: int | None = None, cache: dict | None = None
+) -> float | None:
     """Peer-relative score on beta -- lower beta than peers scores higher here, i.e. "lower
     measured systematic risk", not a general quality judgment (see module docstring).
     """
-    by_issuer = _latest_beta_values(db, sector_id=sector_id)
+    by_issuer = _latest_beta_values(db, sector_id=sector_id, cache=cache)
     value = by_issuer.get(issuer_id)
     if value is None or len(by_issuer) < 2:  # need at least one peer to compare against
         return None
@@ -300,7 +352,9 @@ def compose_signal(dimension_scores: dict[str, float | None], is_delisted: bool)
     }
 
 
-def compute_signal(db: Session, issuer: Issuer, security: Security | None, as_of: date) -> SignalScore:
+def compute_signal(
+    db: Session, issuer: Issuer, security: Security | None, as_of: date, cache: dict | None = None
+) -> SignalScore:
     settings = get_settings()
     # Peer comparison is always within-sector so that cement companies are scored against
     # other cement companies and fertilizer against fertilizer — cross-sector peer means
@@ -308,12 +362,12 @@ def compute_signal(db: Session, issuer: Issuer, security: Security | None, as_of
     sector_id: int | None = issuer.sector_id
 
     dimension_scores: dict[str, float | None] = {
-        dim: compute_dimension_score(db, issuer.id, metrics, sector_id=sector_id)
+        dim: compute_dimension_score(db, issuer.id, metrics, sector_id=sector_id, cache=cache)
         for dim, metrics in DIMENSION_METRICS.items()
     }
     dimension_scores["catalyst_risk"] = compute_catalyst_risk_score(db, issuer.id, as_of)
-    dimension_scores["momentum"] = compute_momentum_score(db, issuer.id, as_of, sector_id=sector_id)
-    dimension_scores["risk"] = compute_risk_score(db, issuer.id, sector_id=sector_id)
+    dimension_scores["momentum"] = compute_momentum_score(db, issuer.id, as_of, sector_id=sector_id, cache=cache)
+    dimension_scores["risk"] = compute_risk_score(db, issuer.id, sector_id=sector_id, cache=cache)
 
     policy = compose_signal(dimension_scores, is_delisted=security is None or not security.is_active)
 
@@ -344,10 +398,17 @@ def run_for_all_issuers(db: Session, as_of: date | None = None) -> dict[str, dic
     as_of = as_of or date.today()
     issuers: Sequence[Issuer] = db.execute(select(Issuer).where(Issuer.securities.any())).scalars().all()
 
+    # Every issuer in the same sector needs the identical peer map for a given dimension, so
+    # this cache (scoped to just this one run) turns what was an O(issuers x dimensions) fan-out
+    # of queries -- each re-scanning its whole sector's ratio/price/beta data from scratch --
+    # into O(sectors x dimensions). At the now-market-wide (~465 security) scale this ingestion
+    # was scoped to before, that fan-out meant tens of thousands of redundant DB round trips.
+    cache: dict = {}
+
     results = {}
     for issuer in issuers:
         security = issuer.securities[0] if issuer.securities else None
-        score = compute_signal(db, issuer, security, as_of)
+        score = compute_signal(db, issuer, security, as_of, cache=cache)
 
         existing = db.execute(
             select(SignalScore).where(SignalScore.issuer_id == issuer.id, SignalScore.as_of_date == as_of)

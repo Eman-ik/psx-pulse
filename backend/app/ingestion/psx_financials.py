@@ -325,20 +325,29 @@ if __name__ == "__main__":
     import sys
 
     from app.db.session import SessionLocal
+    from app.ingestion.psx_prices import db_active_securities
     from app.ingestion.seed_identity import seed_cement_sector, seed_fertilizer_sector
 
     logging.basicConfig(level=logging.INFO)
 
     # Usage: python -m app.ingestion.psx_financials [sector]
-    # sector: "fertilizer" (default), "cement", or "all"
+    # sector: "fertilizer" (default), "cement", "pilot" (both, the OLD meaning of "all"), or
+    # "market" (every active Security). ingest_company_financials() itself was always
+    # symbol-agnostic -- this CLI just never exposed a way to run it past the fertilizer+
+    # cement pilot, the exact same "all" footgun app/ingestion/psx_prices.py already had and
+    # fixed (see that module's __main__ comment). "all" now means "market", not "pilot" --
+    # keeping the old fert+cement-only meaning under "all" here after fixing it everywhere
+    # else would just move the footgun, not remove it.
     sector_arg = sys.argv[1] if len(sys.argv) > 1 else "fertilizer"
 
     with SessionLocal() as session:
-        securities = []
-        if sector_arg in ("fertilizer", "all"):
+        securities: list = []
+        if sector_arg in ("fertilizer", "pilot"):
             securities += seed_fertilizer_sector(session)
-        if sector_arg in ("cement", "all"):
+        if sector_arg in ("cement", "pilot"):
             securities += seed_cement_sector(session)
+        if sector_arg in ("market", "all"):
+            securities = db_active_securities(session)
 
         for security in securities:
             stats = ingest_company_financials(session, security, security.symbol)

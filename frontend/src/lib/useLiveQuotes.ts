@@ -4,12 +4,25 @@ import { useEffect, useState } from "react";
 import type { ComparisonRow, LiveQuote } from "@/lib/api";
 import { fetchLiveQuotesAll, fetchSingleLiveQuote } from "@/lib/api";
 
+// The batch scrape behind fetchLiveQuotesAll() is an unofficial, no-SLA site scrape
+// (see app/ingestion/psx_live.py) that empirically sometimes comes back with zero
+// quotes on a transient failure and succeeds again moments later -- confirmed directly
+// (2026-08-27): one call returned quotes: [], a retry ~30s later returned real data for
+// every symbol. Without a retry, that one bad scrape left every "live" price/chg%/P-E/
+// div-yield cell blank for the rest of the page's session. Short backoff, then a longer
+// one, before accepting "no live data" as the real answer.
+const RETRY_DELAYS_MS = [5000, 15000];
+// Keeps a page left open self-healing rather than frozen on whatever the scrape
+// returned at mount -- same "live" framing this data already claims elsewhere.
+const REFRESH_INTERVAL_MS = 90_000;
+
 /**
  * Fetches the combined fertilizer+cement live-quote batch client-side, after the page
  * that calls this has already rendered with fast DB-only data (see comparison.py's
  * docstring for why this moved off the SSR critical path). `loading` starts true and
- * flips to false once the scrape resolves (up to ~35s) or fails -- callers should treat
- * `loading` as "prices not in yet", not as a blocking state.
+ * flips to false once the scrape resolves (up to ~35s, plus retries) or exhausts its
+ * retries -- callers should treat `loading` as "prices not in yet", not as a blocking
+ * state.
  */
 export function useLiveQuotes(options?: { skip?: boolean }): {
   quotesBySymbol: Record<string, LiveQuote>;
@@ -23,15 +36,40 @@ export function useLiveQuotes(options?: { skip?: boolean }): {
   useEffect(() => {
     if (skip) return;
     let cancelled = false;
-    fetchLiveQuotesAll().then((res) => {
-      if (cancelled) return;
-      const map: Record<string, LiveQuote> = {};
-      for (const q of res?.quotes ?? []) map[q.symbol] = q;
-      setQuotesBySymbol(map);
-      setLoading(false);
-    });
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const load = (attempt: number) => {
+      fetchLiveQuotesAll().then((res) => {
+        if (cancelled) return;
+        const quotes = res?.quotes ?? [];
+        if (quotes.length === 0 && attempt < RETRY_DELAYS_MS.length) {
+          timers.push(setTimeout(() => load(attempt + 1), RETRY_DELAYS_MS[attempt]));
+          return;
+        }
+        // Merge rather than replace: the batch itself is best-effort per-symbol (see
+        // _LIVE_QUOTE_BATCH_TIMEOUT_S's comment in psx_live.py -- a symbol that hasn't
+        // responded by the batch deadline is just dropped from that response, not
+        // retried server-side). A single fetch is very often partial, so each poll
+        // should only ever fill in gaps, never erase a symbol that a previous poll
+        // already got real data for.
+        if (quotes.length > 0) {
+          setQuotesBySymbol((prev) => {
+            const next = { ...prev };
+            for (const q of quotes) next[q.symbol] = q;
+            return next;
+          });
+        }
+        setLoading(false);
+      });
+    };
+
+    load(0);
+    const refresh = setInterval(() => load(0), REFRESH_INTERVAL_MS);
+
     return () => {
       cancelled = true;
+      timers.forEach(clearTimeout);
+      clearInterval(refresh);
     };
   }, [skip]);
 

@@ -36,6 +36,18 @@ required (financial_fact/ratio_value have no real "when this became public" time
 their own; this anchors each ratio to the issuer's actual results-announcement date instead).
 Coverage is narrow (17 of ~250 pooled issuers as of 2026-08-27) and deliberately NOT required
 for a row to enter training/scoring -- see TECHNICAL_FEATURE_COLUMNS vs FEATURE_COLUMNS below.
+
+Market/sector-relative features (2026-08-27): load_market_index_panel()/load_sector_context_
+panel() join real KSE-100 + FERTIX/CEMENTIX index returns in, distinct from TECHNICAL_FEATURE_
+COLUMNS' relative_21d/relative_63d (which compare against the synthetic pooled-universe
+benchmark, not a real index). See those functions' own docstrings for the real coverage
+constraint (~500 trading days on file, sector limited to Fertilizer/Cement).
+
+Classifier choice (2026-08-27): ModelConfig.classifier selects "logistic" (production
+default) or "gbm" (HistGradientBoostingClassifier) -- see ModelConfig's own comment. "gbm"
+is a real, promising walk-forward result (every metric improved over logistic on the
+identical feature set) but is not yet the default: still below the qualification floor on
+an untuned run. See model_governance.md for the numbers.
 """
 
 from __future__ import annotations
@@ -49,6 +61,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import binomtest
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.frozen import FrozenEstimator
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
@@ -146,6 +159,9 @@ MARKET_FEATURE_COLUMNS = [
 FEATURE_COLUMNS = TECHNICAL_FEATURE_COLUMNS + FUNDAMENTAL_FEATURE_COLUMNS + MARKET_FEATURE_COLUMNS
 
 
+CLASSIFIERS = ("logistic", "gbm")
+
+
 @dataclass(frozen=True)
 class ModelConfig:
     horizon_days: int = 5
@@ -158,6 +174,18 @@ class ModelConfig:
     sell_probability: float = 0.40
     minimum_validated_accuracy: float = 0.60
     minimum_observations: int = 30
+    # "logistic" is still the production default -- "gbm" (HistGradientBoostingClassifier) is
+    # a real, promising diagnostic result (2026-08-27: +3.18pp buy_precision, every metric
+    # improved, holding the exact same feature set fixed) but still below
+    # minimum_validated_accuracy on an untuned run, so switching the default would not
+    # currently change any live signal outcome -- still gated to NO_SIGNAL either way. See
+    # model_governance.md for the real numbers before treating "gbm" as anything more than
+    # an option to keep validating, not a proven replacement.
+    classifier: str = "logistic"
+
+    def __post_init__(self) -> None:
+        if self.classifier not in CLASSIFIERS:
+            raise ValueError(f"classifier must be one of {CLASSIFIERS}, got {self.classifier!r}")
 
 
 @dataclass
@@ -310,7 +338,22 @@ def build_features(
     return result
 
 
-def _base_model() -> Pipeline:
+def _base_model(config: ModelConfig = ModelConfig()) -> Pipeline:
+    """"logistic" is still the production default; "gbm" is a real, promising diagnostic
+    result (see ModelConfig.classifier's own comment) not yet promoted to default. Both
+    still route through the same SimpleImputer -- HistGradientBoostingClassifier has its own
+    native NaN handling, but keeping the imputer here makes the two pipelines an
+    apples-to-apples comparison (same preprocessing, only the classifier differs), matching
+    the diagnostic script this was promoted from.
+    """
+    if config.classifier == "gbm":
+        return Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("model", HistGradientBoostingClassifier(
+                max_iter=200, max_depth=4, learning_rate=0.05,
+                class_weight="balanced", random_state=42,
+            )),
+        ])
     return Pipeline([
         ("imputer", SimpleImputer(strategy="median")),
         ("scale", StandardScaler()),
@@ -336,7 +379,7 @@ def walk_forward_predictions(features: pd.DataFrame, config: ModelConfig = Model
         if train["target"].nunique() < 2 or test.empty:
             cursor += config.test_days
             continue
-        model = _base_model().fit(train[FEATURE_COLUMNS], train["target"].astype(int))
+        model = _base_model(config).fit(train[FEATURE_COLUMNS], train["target"].astype(int))
         fold = test[["date", "symbol", "target", "forward_excess_return", "net_forward_excess_return"]].copy()
         fold["probability"] = model.predict_proba(test[FEATURE_COLUMNS])[:, 1]
         outputs.append(fold)
@@ -407,7 +450,7 @@ class SignalModel:
         calibration = labelled[labelled["date"].isin(dates[calibration_start:])]
         if train["target"].nunique() < 2 or calibration["target"].nunique() < 2:
             raise ValueError("Training and calibration periods must contain both target classes")
-        fitted = _base_model().fit(train[FEATURE_COLUMNS], train["target"].astype(int))
+        fitted = _base_model(self.config).fit(train[FEATURE_COLUMNS], train["target"].astype(int))
         self.model = CalibratedClassifierCV(FrozenEstimator(fitted), method="sigmoid")
         self.model.fit(calibration[FEATURE_COLUMNS], calibration["target"].astype(int))
         return self

@@ -220,6 +220,26 @@ def test_signal_gate_never_issues_unvalidated_trade(prices):
     assert all(x["signal"] in {"HOLD", "NO SIGNAL"} for x in model.rank(prices))
 
 
+def test_model_config_rejects_unknown_classifier():
+    with pytest.raises(ValueError, match="classifier must be one of"):
+        ModelConfig(classifier="random_forest")
+
+
+def test_signal_model_runs_end_to_end_with_gbm_classifier(prices):
+    # Real, promising diagnostic result (2026-08-27): HistGradientBoostingClassifier beat
+    # logistic regression on every walk-forward metric with the same feature set, still
+    # below the qualification floor on an untuned run. This proves the "gbm" option
+    # actually runs through the full SignalModel.fit()/.rank() path -- walk-forward
+    # validation AND the real CalibratedClassifierCV calibration step -- not just the
+    # standalone diagnostic script it was promoted from.
+    config = ModelConfig(min_train_days=252, test_days=63, embargo_days=5, classifier="gbm")
+    model = SignalModel(config).fit(prices)
+    assert model.metrics.observations > 0
+    rankings = model.rank(prices)
+    assert len(rankings) == prices["symbol"].nunique()
+    assert all(0 <= r["outperformance_probability"] <= 1 for r in rankings)
+
+
 def test_validation_metrics_flags_precision_that_only_matches_base_rate():
     # 70% of this population beats the benchmark (target=1). A "confident" (p>=0.6) subset
     # of 20 rows with 13 true positives has 65% precision -- clears the engine's old fixed

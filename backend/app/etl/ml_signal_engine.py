@@ -59,7 +59,18 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db.models import Announcement, MlSignalScore, PriceOHLCV, RatioDefinition, RatioValue, Security
+from app.db.models import (
+    Announcement,
+    IndexOHLCV,
+    Issuer,
+    MarketIndex,
+    MlSignalScore,
+    PriceOHLCV,
+    RatioDefinition,
+    RatioValue,
+    Sector,
+    Security,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +123,27 @@ FUNDAMENTAL_FEATURE_COLUMNS = [
     "eps_growth_yoy", "revenue_growth_yoy", "pat_growth_yoy", "net_profit_margin",
     "roe", "debt_to_equity", "current_ratio", "price_to_earnings", "dividend_payout_ratio",
 ]
+# KSE100 = real broad-market index; sector = FERTIX/CEMENTIX, the only two sector indices this
+# DB has (see load_sector_index_panel). Distinct from TECHNICAL_FEATURE_COLUMNS' relative_21d/
+# relative_63d, which are already computed against the synthetic pooled-universe benchmark
+# (see synthetic_benchmark()) -- these use the REAL index instead, and add a genuinely
+# different comparison (sector-specific, not "vs. an equal-weighted average of the whole
+# pool"). Real, narrower-than-fundamentals coverage constraint: KSE100/FERTIX/CEMENTIX only
+# have ~500 trading days on file (2024-07 to 2026-07) versus decades of price history for
+# many pooled symbols -- these columns are NaN outside that window for every symbol, and
+# sector_* is additionally NaN for every symbol outside Fertilizer/Cement (33 of ~250 pooled
+# issuers). See load_market_index_panel/load_sector_index_panel's own docstrings.
+MARKET_FEATURE_COLUMNS = [
+    "market_return_5d", "market_return_21d", "stock_minus_market_5d", "stock_minus_market_21d",
+    "sector_return_5d", "sector_return_21d", "stock_minus_sector_5d", "stock_minus_sector_21d",
+]
 # Passed to the model's .fit()/.predict_proba() -- the sklearn pipeline's SimpleImputer handles
 # NaN here. NOT the same list used to decide whether a row is eligible for training/scoring at
 # all (see TECHNICAL_FEATURE_COLUMNS' use in walk_forward_predictions/SignalModel.rank): requiring
-# fundamentals there would silently shrink the pooled universe down to the ~17 issuers with real
-# fundamental coverage, defeating the reason this model is pooled broadly in the first place.
-FEATURE_COLUMNS = TECHNICAL_FEATURE_COLUMNS + FUNDAMENTAL_FEATURE_COLUMNS
+# fundamentals or market/sector features there would silently shrink the pooled universe down to
+# whichever narrow slice has real coverage, defeating the reason this model is pooled broadly in
+# the first place.
+FEATURE_COLUMNS = TECHNICAL_FEATURE_COLUMNS + FUNDAMENTAL_FEATURE_COLUMNS + MARKET_FEATURE_COLUMNS
 
 
 @dataclass(frozen=True)
@@ -182,6 +208,8 @@ def build_features(
     prices: pd.DataFrame,
     config: ModelConfig = ModelConfig(),
     fundamentals: pd.DataFrame | None = None,
+    market_index: pd.DataFrame | None = None,
+    sector_context: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build backward-looking features and forward excess-return labels.
 
@@ -192,6 +220,12 @@ def build_features(
     guarantee, not just a date-shaped column. A symbol with no fundamental coverage, or no
     fundamentals param at all, gets real NaN in these columns (see FEATURE_COLUMNS' module-
     level comment for how the rest of the pipeline handles that).
+
+    market_index (columns ["date", "market_return_5d", "market_return_21d"], see
+    load_market_index_panel) and sector_context (columns ["symbol", "date",
+    "sector_return_5d", "sector_return_21d"], see load_sector_context_panel) are joined by
+    plain date (and symbol, for sector) -- an index close is same-day public information,
+    unlike fundamentals, so no point-in-time lag is needed here.
     """
     df = validate_prices(prices)
     groups: list[pd.DataFrame] = []
@@ -229,20 +263,19 @@ def build_features(
         g.loc[g["forward_excess_return"].isna(), "target"] = np.nan
         groups.append(g)
     result = pd.concat(groups, ignore_index=True).replace([np.inf, -np.inf], np.nan)
+    # merge_asof (and, to be safe, the plain merges below too) require the "on" columns to
+    # share an exact datetime64 unit (s/us/ns) -- real, reproduced failure: "date" (from a
+    # plain SQL DATE column, no time-of-day) and a timestamp column from a separately-loaded
+    # frame can get inferred to different units by pandas depending on the exact data,
+    # causing a MergeError unrelated to the actual values. Cast once here rather than rely on
+    # incidental dtype agreement between independently-loaded frames.
+    result["date"] = result["date"].astype("datetime64[ns]")
 
     if fundamentals is not None and not fundamentals.empty:
-        # merge_asof requires the two "on" columns to share an exact datetime64 unit (s/us/ns)
-        # -- real, reproduced failure: "date" (from a plain SQL DATE column, no time-of-day)
-        # and "known_as_of" (from a timestamp column) can get inferred to different units by
-        # pandas depending on the exact data, causing a MergeError that has nothing to do with
-        # the actual values. Cast both explicitly rather than rely on incidental dtype
-        # agreement between two independently-loaded frames.
-        left = result.copy()
         right = fundamentals.copy()
-        left["date"] = left["date"].astype("datetime64[ns]")
         right["known_as_of"] = right["known_as_of"].astype("datetime64[ns]")
         result = pd.merge_asof(
-            left.sort_values("date"),
+            result.sort_values("date"),
             right.sort_values("known_as_of"),
             left_on="date", right_on="known_as_of", by="symbol", direction="backward",
         ).sort_values(["symbol", "date"]).reset_index(drop=True)
@@ -252,6 +285,28 @@ def build_features(
     else:
         for col in FUNDAMENTAL_FEATURE_COLUMNS:
             result[col] = np.nan
+
+    if market_index is not None and not market_index.empty:
+        mi = market_index.copy()
+        mi["date"] = mi["date"].astype("datetime64[ns]")
+        result = result.merge(mi, on="date", how="left")
+    else:
+        result["market_return_5d"] = np.nan
+        result["market_return_21d"] = np.nan
+
+    if sector_context is not None and not sector_context.empty:
+        sc = sector_context.copy()
+        sc["date"] = sc["date"].astype("datetime64[ns]")
+        result = result.merge(sc, on=["symbol", "date"], how="left")
+    else:
+        result["sector_return_5d"] = np.nan
+        result["sector_return_21d"] = np.nan
+
+    result["stock_minus_market_5d"] = result["return_5d"] - result["market_return_5d"]
+    result["stock_minus_market_21d"] = result["return_21d"] - result["market_return_21d"]
+    result["stock_minus_sector_5d"] = result["return_5d"] - result["sector_return_5d"]
+    result["stock_minus_sector_21d"] = result["return_21d"] - result["sector_return_21d"]
+
     return result
 
 
@@ -324,14 +379,22 @@ def validation_metrics(predictions: pd.DataFrame) -> ValidationMetrics:
 
 
 class SignalModel:
-    def __init__(self, config: ModelConfig = ModelConfig(), fundamentals: pd.DataFrame | None = None):
+    def __init__(
+        self,
+        config: ModelConfig = ModelConfig(),
+        fundamentals: pd.DataFrame | None = None,
+        market_index: pd.DataFrame | None = None,
+        sector_context: pd.DataFrame | None = None,
+    ):
         self.config = config
         self.fundamentals = fundamentals
+        self.market_index = market_index
+        self.sector_context = sector_context
         self.model: CalibratedClassifierCV | None = None
         self.metrics: ValidationMetrics | None = None
 
     def fit(self, prices: pd.DataFrame) -> "SignalModel":
-        features = build_features(prices, self.config, self.fundamentals)
+        features = build_features(prices, self.config, self.fundamentals, self.market_index, self.sector_context)
         predictions = walk_forward_predictions(features, self.config)
         self.metrics = validation_metrics(predictions)
         labelled = features.dropna(subset=TECHNICAL_FEATURE_COLUMNS + ["target"])
@@ -352,7 +415,7 @@ class SignalModel:
     def rank(self, prices: pd.DataFrame) -> list[dict]:
         if self.model is None or self.metrics is None:
             raise RuntimeError("Model must be fitted before ranking")
-        features = build_features(prices, self.config, self.fundamentals)
+        features = build_features(prices, self.config, self.fundamentals, self.market_index, self.sector_context)
         latest = features.dropna(subset=TECHNICAL_FEATURE_COLUMNS).sort_values("date").groupby("symbol").tail(1).copy()
         latest["probability"] = self.model.predict_proba(latest[FEATURE_COLUMNS])[:, 1]
         eligible = self.metrics.observations >= self.config.minimum_observations
@@ -543,6 +606,101 @@ def load_fundamental_panel(db: Session) -> pd.DataFrame:
     )
     wide = wide.merge(issuer_symbols, on="issuer_id", how="inner")
     return wide[["symbol", "known_as_of", *FUNDAMENTAL_FEATURE_COLUMNS]].sort_values(["symbol", "known_as_of"])
+
+
+# Only these two sectors have a real index on file (see load_sector_index_panel) -- every
+# other sector gets real NaN for sector_* features, not a guess.
+_SECTOR_INDEX_CODE = {"Fertilizer": "FERTIX", "Cement": "CEMENTIX"}
+
+
+def load_market_index_panel(db: Session) -> pd.DataFrame:
+    """Real KSE-100 index returns, one row per trading date -- applies to every symbol on a
+    given date (unlike fundamentals, an index close is same-day public information, so no
+    point-in-time anchoring/lag is needed here, just a plain date join).
+
+    Real coverage constraint, not a bug: KSE-100 only has ~500 trading days on file (2024-07
+    to 2026-07) versus decades of price history for many pooled symbols -- market_return_5d/
+    21d are real NaN for every symbol on every date outside that window. build_features()'s
+    merge leaves that as-is; the model pipeline's imputer handles it the same way it already
+    handles fundamentals' narrower issuer coverage.
+    """
+    rows = db.execute(
+        select(IndexOHLCV.trade_date, IndexOHLCV.close)
+        .join(MarketIndex, MarketIndex.id == IndexOHLCV.market_index_id)
+        .where(MarketIndex.code == "KSE100")
+        .order_by(IndexOHLCV.trade_date)
+    ).all()
+    if not rows:
+        return pd.DataFrame(columns=["date", "market_return_5d", "market_return_21d"])
+    df = pd.DataFrame(rows, columns=["date", "close"])
+    df["date"] = pd.to_datetime(df["date"])
+    df["close"] = df["close"].astype(float)
+    df["market_return_5d"] = df["close"].pct_change(5)
+    df["market_return_21d"] = df["close"].pct_change(21)
+    return df[["date", "market_return_5d", "market_return_21d"]]
+
+
+def load_sector_index_panel(db: Session) -> pd.DataFrame:
+    """Real FERTIX/CEMENTIX sector-index returns, one row per (sector, trading date) --
+    the only two sector indices this DB has on file. Deliberately distinct from
+    TECHNICAL_FEATURE_COLUMNS' relative_21d/relative_63d, which compare against the
+    synthetic pooled-universe benchmark (see synthetic_benchmark()) -- an equal-weighted
+    average of the WHOLE ~250-symbol pool across every sector, not this stock's own sector.
+    A fertilizer name's true relative strength against its actual peers can look very
+    different from its relative strength against banks/textiles/insurance/etc mixed together.
+
+    Same same-day-public-information reasoning as load_market_index_panel: no point-in-time
+    lag needed, just a date+sector join. Same real coverage constraint too (~500 trading
+    days), plus a second one: only issuers in Sector "Fertilizer" or "Cement" (33 of ~250
+    pooled issuers) get anything here at all -- every other symbol/sector gets real NaN.
+    """
+    rows = db.execute(
+        select(IndexOHLCV.trade_date, MarketIndex.code, IndexOHLCV.close)
+        .join(MarketIndex, MarketIndex.id == IndexOHLCV.market_index_id)
+        .where(MarketIndex.code.in_(_SECTOR_INDEX_CODE.values()))
+        .order_by(MarketIndex.code, IndexOHLCV.trade_date)
+    ).all()
+    if not rows:
+        return pd.DataFrame(columns=["date", "sector", "sector_return_5d", "sector_return_21d"])
+    df = pd.DataFrame(rows, columns=["date", "code", "close"])
+    df["date"] = pd.to_datetime(df["date"])
+    df["close"] = df["close"].astype(float)
+    code_to_sector = {v: k for k, v in _SECTOR_INDEX_CODE.items()}
+    df["sector"] = df["code"].map(code_to_sector)
+    groups = []
+    for _, g in df.groupby("code", sort=False):
+        g = g.sort_values("date").copy()
+        g["sector_return_5d"] = g["close"].pct_change(5)
+        g["sector_return_21d"] = g["close"].pct_change(21)
+        groups.append(g)
+    out = pd.concat(groups, ignore_index=True)
+    return out[["date", "sector", "sector_return_5d", "sector_return_21d"]]
+
+
+def load_symbol_sector_map(db: Session) -> pd.DataFrame:
+    """symbol -> sector name, restricted to the two sectors with a real index on file (see
+    _SECTOR_INDEX_CODE) -- every symbol outside Fertilizer/Cement is simply absent, not
+    mapped to a placeholder."""
+    rows = db.execute(
+        select(Security.symbol, Sector.name)
+        .join(Issuer, Issuer.id == Security.issuer_id)
+        .join(Sector, Sector.id == Issuer.sector_id)
+        .where(Security.is_active.is_(True), Sector.name.in_(_SECTOR_INDEX_CODE.keys()))
+    ).all()
+    return pd.DataFrame(rows, columns=["symbol", "sector"])
+
+
+def load_sector_context_panel(db: Session) -> pd.DataFrame:
+    """load_sector_index_panel() expanded from (sector, date) to (symbol, date) via
+    load_symbol_sector_map(), so build_features() can merge it the same simple way it merges
+    market_index -- a plain (symbol, date) join, no point-in-time lag needed."""
+    sector_index = load_sector_index_panel(db)
+    symbol_sector = load_symbol_sector_map(db)
+    empty = pd.DataFrame(columns=["symbol", "date", "sector_return_5d", "sector_return_21d"])
+    if sector_index.empty or symbol_sector.empty:
+        return empty
+    merged = symbol_sector.merge(sector_index, on="sector", how="inner")
+    return merged[["symbol", "date", "sector_return_5d", "sector_return_21d"]]
 
 
 def synthetic_benchmark(panel: pd.DataFrame, base_level: float = 100_000.0) -> pd.Series:

@@ -4,12 +4,17 @@ import pytest
 from app.etl.ml_signal_engine import (
     FEATURE_COLUMNS,
     FUNDAMENTAL_FEATURE_COLUMNS,
+    MARKET_FEATURE_COLUMNS,
     TECHNICAL_FEATURE_COLUMNS,
     ModelConfig,
     SignalModel,
     build_features,
     load_fundamental_panel,
+    load_market_index_panel,
     load_price_panel,
+    load_sector_context_panel,
+    load_sector_index_panel,
+    load_symbol_sector_map,
     synthetic_benchmark,
     synthetic_market,
     validate_prices,
@@ -99,6 +104,63 @@ def test_build_features_symbol_with_no_fundamental_coverage_gets_real_nan(prices
     features = build_features(prices, fundamentals=fundamentals)
     other_symbols = features[features["symbol"] != "MARI"]
     assert other_symbols["roe"].isna().all()
+
+
+def test_build_features_market_index_applies_to_every_symbol_on_matching_dates(prices):
+    # Unlike fundamentals (per-issuer, point-in-time-lagged), a market index return is
+    # same-day public information and applies broadly -- every symbol should see the same
+    # market_return_5d on a date where the index has data.
+    some_date = prices["date"].sort_values().iloc[500]
+    market_index = pd.DataFrame({
+        "date": [some_date], "market_return_5d": [0.0123], "market_return_21d": [0.0456],
+    })
+    features = build_features(prices, market_index=market_index)
+    rows_on_date = features[features["date"] == some_date]
+    assert len(rows_on_date) == prices["symbol"].nunique()
+    assert rows_on_date["market_return_5d"].to_numpy() == pytest.approx(0.0123)
+    expected_delta = (rows_on_date["return_5d"] - 0.0123).to_numpy()
+    assert rows_on_date["stock_minus_market_5d"].to_numpy() == pytest.approx(expected_delta)
+
+
+def test_build_features_sector_context_only_applies_to_matching_symbol(prices):
+    # Only MARI is given a sector row; every other symbol must get real NaN for sector_*,
+    # never another symbol's sector borrowed by mistake.
+    some_date = prices["date"].sort_values().iloc[500]
+    sector_context = pd.DataFrame({
+        "symbol": ["MARI"], "date": [some_date],
+        "sector_return_5d": [0.02], "sector_return_21d": [0.05],
+    })
+    features = build_features(prices, sector_context=sector_context)
+    mari_row = features[(features["symbol"] == "MARI") & (features["date"] == some_date)]
+    other_row = features[(features["symbol"] != "MARI") & (features["date"] == some_date)]
+    assert mari_row["sector_return_5d"].to_numpy() == pytest.approx(0.02)
+    assert other_row["sector_return_5d"].isna().all()
+
+
+@pytest.mark.requires_seeded_data
+def test_market_and_sector_index_panels_load_real_point_in_window_data():
+    # Hits the real dev DB. KSE100/FERTIX/CEMENTIX are known to have a real but narrow
+    # (~500 trading day) window on file -- this proves the loaders actually return real,
+    # correctly-shaped data within that window, not just that they don't crash.
+    from app.db.session import SessionLocal
+
+    with SessionLocal() as db:
+        market_index = load_market_index_panel(db)
+        sector_index = load_sector_index_panel(db)
+        symbol_sector = load_symbol_sector_map(db)
+        sector_context = load_sector_context_panel(db)
+
+    assert not market_index.empty
+    assert set(market_index.columns) == {"date", "market_return_5d", "market_return_21d"}
+
+    assert not sector_index.empty
+    assert set(sector_index["sector"].unique()) <= {"Fertilizer", "Cement"}
+
+    assert not symbol_sector.empty
+    assert set(symbol_sector["sector"].unique()) <= {"Fertilizer", "Cement"}
+
+    assert not sector_context.empty
+    assert set(sector_context.columns) == {"symbol", "date", "sector_return_5d", "sector_return_21d"}
 
 
 def test_signal_model_fits_with_partial_fundamental_coverage(prices):

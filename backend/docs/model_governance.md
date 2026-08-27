@@ -81,7 +81,7 @@ today, and any future model must implement the same shape:
 | Model | Min. accuracy | Significance test | Beats naive baseline | Min. observations | Where enforced |
 |---|---|---|---|---|---|
 | Kronos quant forecast | 55% | exact two-sided binomial, p < 0.10 | required | 15 | `signal_qualification.py` (`MIN_ACCURACY`, `SIGNIFICANCE_P_VALUE`, `beats_naive_baseline`, `MIN_OBSERVATIONS`) |
-| ML signal engine (pooled logistic) | 60% (on buy-precision, not raw accuracy) | — (no significance test; accuracy floor only) | not implemented | 30 | `ml_signal_engine.py` (`ModelConfig.minimum_validated_accuracy`, `minimum_observations`) |
+| ML signal engine (pooled logistic) | 60% (on buy-precision, not raw accuracy) | — (no significance test; accuracy floor only) | required (since 2026-08-27) | 30 | `ml_signal_engine.py` (`ModelConfig.minimum_validated_accuracy`, `minimum_observations`, `ValidationMetrics.beats_naive_baseline`) |
 
 "Beats naive baseline" (added after EFERT's real record cleared accuracy and significance
 but still lost to trivially predicting its test window's own trend, see "Current models: real
@@ -221,6 +221,29 @@ best one -- anything less repeats this exact mistake at a different layer); expa
 these 8 tickers to see if a cross-sectional, not time-series, signal exists; or reconsidering
 whether Kronos's product role should be a standalone BUY/SELL signal generator at all, versus
 context/input to a human-reviewed process. See `diagnose_signal.py` for the exact methodology.
+
+**Update, 2026-08-27: closed the same naive-baseline gap for the ML signal engine.** The
+"Required validation metrics" table above listed `beats_naive_baseline` as "not implemented"
+for this model -- a real, latent version of the exact EFERT trap, just at the precision layer
+instead of the accuracy layer: `ModelConfig.minimum_validated_accuracy` (60%) was a fixed floor
+compared against `validation_buy_precision` with no reference to the walk-forward population's
+own base rate of "beats the benchmark." A confident (p>=0.6) subset with, say, 62% precision
+against a population where 65% of *all* rows already clear that hurdle has concentrated nothing
+-- a random same-sized subset would score higher by construction. Fixed by adding
+`positive_rate` (that population base rate) and `beats_naive_baseline` (`buy_precision >
+positive_rate`) to `ValidationMetrics`, and requiring both the fixed floor and this check before
+`SignalModel.rank()` emits BUY (`app/etl/ml_signal_engine.py`). Denormalized onto
+`ml_signal_score` the same way the other validation metrics already are
+(`validation_positive_rate`, `beats_naive_baseline` columns; migration `49473b019419`), so every
+row stays a self-contained, auditable record. Covered by new tests
+(`tests/test_ml_signal_engine.py`) proving the gate rejects a crafted 65%-precision-against-70%-
+base-rate case and accepts a genuinely-concentrated 90%-precision case.
+
+This does not change today's real numbers: the last real run's buy precision (48.3%) was already
+below its own 60% floor, so it was already correctly gated to `NO SIGNAL` before this fix. The
+value here is closing the gap before a future run's precision ever clears 60% for the wrong
+reason -- the EFERT case was exactly this kind of gap sitting unnoticed until a real run happened
+to expose it.
 
 ## Who approves public activation
 

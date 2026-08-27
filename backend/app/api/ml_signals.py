@@ -29,6 +29,8 @@ def _row_to_dict(row: MlSignalScore) -> dict:
         "validation_sell_precision": _f(row.validation_sell_precision),
         "validation_brier_score": _f(row.validation_brier_score),
         "validation_roc_auc": _f(row.validation_roc_auc),
+        "validation_positive_rate": _f(row.validation_positive_rate),
+        "beats_naive_baseline": row.beats_naive_baseline,
         "is_public": row.is_public,
     }
 
@@ -57,6 +59,8 @@ def get_ml_signal_evidence(db: Session = Depends(get_db)) -> dict:
         "sell_precision": float(row.validation_sell_precision) if row.validation_sell_precision is not None else None,
         "brier_score": float(row.validation_brier_score) if row.validation_brier_score is not None else None,
         "roc_auc": float(row.validation_roc_auc) if row.validation_roc_auc is not None else None,
+        "positive_rate": float(row.validation_positive_rate) if row.validation_positive_rate is not None else None,
+        "beats_naive_baseline": row.beats_naive_baseline,
         "is_research_only": True,
         "disclaimer": _DISCLAIMER,
     }

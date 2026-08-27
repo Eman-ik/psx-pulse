@@ -27,7 +27,13 @@ export default function MLModelTab({ signal }: { signal: MlSignalResearch | null
 
   const meta = SIGNAL_META[signal.signal] ?? SIGNAL_META["NO SIGNAL"];
   const accuracyPasses = signal.validation_accuracy != null && signal.validation_accuracy >= 0.5;
-  const buyPrecisionPasses = signal.validation_buy_precision != null && signal.validation_buy_precision >= 0.6;
+  const clearsPrecisionFloor = signal.validation_buy_precision != null && signal.validation_buy_precision >= 0.6;
+  const buyPrecisionPasses = clearsPrecisionFloor && signal.beats_naive_baseline === true;
+  const precisionSub = !clearsPrecisionFloor
+    ? "below 60% gate — BUY withheld"
+    : buyPrecisionPasses
+      ? "clears 60% gate + naive baseline"
+      : "clears 60% but not naive baseline — BUY withheld";
 
   return (
     <div className="flex flex-col gap-5">
@@ -75,7 +81,12 @@ export default function MLModelTab({ signal }: { signal: MlSignalResearch | null
               <Stat
                 label="Buy Precision (OOS)"
                 value={signal.validation_buy_precision != null ? `${(signal.validation_buy_precision * 100).toFixed(1)}%` : "—"}
-                sub={buyPrecisionPasses ? "clears 60% gate" : "below 60% gate — BUY withheld"}
+                sub={precisionSub}
+              />
+              <Stat
+                label="Naive Baseline"
+                value={signal.validation_positive_rate != null ? `${(signal.validation_positive_rate * 100).toFixed(1)}%` : "—"}
+                sub="buy precision must also beat this"
               />
               <Stat
                 label="Brier Score"

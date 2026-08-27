@@ -91,6 +91,8 @@ class ValidationMetrics:
     sell_precision: float
     brier_score: float
     roc_auc: float | None
+    positive_rate: float
+    beats_naive_baseline: bool
 
 
 # ─── Pure pandas/sklearn pipeline (ported from the prototype's quant_engine.py) ────────────────
@@ -212,10 +214,20 @@ def validation_metrics(predictions: pd.DataFrame) -> ValidationMetrics:
     buy_mask, sell_mask = p >= 0.6, p <= 0.4
     buy_precision = precision_score(y[buy_mask], np.ones(buy_mask.sum()), zero_division=0) if buy_mask.any() else 0.0
     sell_precision = precision_score(1 - y[sell_mask], np.ones(sell_mask.sum()), zero_division=0) if sell_mask.any() else 0.0
+    # buy_precision alone is the same trap Kronos's walk-forward gate had (see
+    # signal_qualification.py's beats_naive_baseline): a fixed 60% floor means nothing if
+    # 60%+ of the whole walk-forward population already clears the excess-return hurdle --
+    # a "confident" subset that just mirrors the population's own base rate has learned
+    # nothing, no matter how high its raw precision looks. positive_rate is what a random,
+    # size-matched subset of this exact population would score by construction; a real BUY
+    # signal must concentrate true positives at a higher rate than that, not just clear an
+    # arbitrary constant.
+    positive_rate = float(y.mean()) if len(y) else 0.0
     return ValidationMetrics(
         observations=len(y), accuracy=float(accuracy_score(y, predicted)),
         buy_precision=float(buy_precision), sell_precision=float(sell_precision),
         brier_score=float(brier_score_loss(y, p)), roc_auc=auc,
+        positive_rate=positive_rate, beats_naive_baseline=float(buy_precision) > positive_rate,
     )
 
 
@@ -255,11 +267,16 @@ class SignalModel:
         # hurdle. A low probability is not evidence of a negative return, so SELL is withheld
         # until a separate downside model is fitted and validated.
         validated_accuracy = self.metrics.buy_precision
+        qualified = (
+            eligible
+            and validated_accuracy >= self.config.minimum_validated_accuracy
+            and self.metrics.beats_naive_baseline
+        )
         records = []
         for row in latest.itertuples():
             probability = float(row.probability)
             signal = "NO SIGNAL"
-            if eligible and validated_accuracy >= self.config.minimum_validated_accuracy:
+            if qualified:
                 if probability >= self.config.buy_probability:
                     signal = "BUY"
                 else:
@@ -273,6 +290,8 @@ class SignalModel:
                 "validation_sell_precision": round(self.metrics.sell_precision, 4),
                 "validation_brier_score": round(self.metrics.brier_score, 4),
                 "validation_roc_auc": round(self.metrics.roc_auc, 4) if self.metrics.roc_auc is not None else None,
+                "validation_positive_rate": round(self.metrics.positive_rate, 4),
+                "beats_naive_baseline": self.metrics.beats_naive_baseline,
             })
         return sorted(records, key=lambda x: x["outperformance_probability"], reverse=True)
 
@@ -407,6 +426,8 @@ def run_for_all_issuers(db: Session, as_of: date | None = None) -> dict[str, dic
             validation_sell_precision=record["validation_sell_precision"],
             validation_brier_score=record["validation_brier_score"],
             validation_roc_auc=record["validation_roc_auc"],
+            validation_positive_rate=record["validation_positive_rate"],
+            beats_naive_baseline=record["beats_naive_baseline"],
             is_public=settings.ml_signals_enabled,
         )
         db.add(score)
@@ -415,6 +436,8 @@ def run_for_all_issuers(db: Session, as_of: date | None = None) -> dict[str, dic
             "outperformance_probability": score.outperformance_probability,
             "validation_accuracy": score.validation_accuracy,
             "validation_buy_precision": score.validation_buy_precision,
+            "validation_positive_rate": score.validation_positive_rate,
+            "beats_naive_baseline": score.beats_naive_baseline,
             "validation_observations": score.validation_observations,
             "is_public": score.is_public,
         }

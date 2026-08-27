@@ -9,6 +9,7 @@ from app.etl.ml_signal_engine import (
     synthetic_benchmark,
     synthetic_market,
     validate_prices,
+    validation_metrics,
 )
 
 
@@ -49,6 +50,50 @@ def test_signal_gate_never_issues_unvalidated_trade(prices):
     # never fabricate a BUY the walk-forward validation didn't actually earn.
     config = ModelConfig(min_train_days=252, test_days=63, embargo_days=5, minimum_validated_accuracy=0.99)
     model = SignalModel(config).fit(prices)
+    assert all(x["signal"] in {"HOLD", "NO SIGNAL"} for x in model.rank(prices))
+
+
+def test_validation_metrics_flags_precision_that_only_matches_base_rate():
+    # 70% of this population beats the benchmark (target=1). A "confident" (p>=0.6) subset
+    # of 20 rows with 13 true positives has 65% precision -- clears the engine's old fixed
+    # 60% floor, but a random 20-row subset of this same imbalanced population would score
+    # 70% by construction. That subset has learned nothing; same trap Kronos's EFERT case
+    # caught (60.8% accuracy, "significant" vs. chance, still below its 68.9% naive
+    # baseline), one layer down at the precision-vs-base-rate level instead of
+    # accuracy-vs-random.
+    buy_target = [1] * 13 + [0] * 7          # 20 rows, p>=0.6 -> buy_precision = 13/20 = 0.65
+    rest_target = [1] * 57 + [0] * 23         # 80 rows, p=0.5 -> excluded from buy/sell masks
+    predictions = pd.DataFrame({
+        "target": buy_target + rest_target,
+        "probability": [0.65] * 20 + [0.5] * 80,
+    })
+    metrics = validation_metrics(predictions)
+    assert metrics.buy_precision == pytest.approx(0.65)
+    assert metrics.positive_rate == pytest.approx(0.70)
+    assert metrics.beats_naive_baseline is False
+
+
+def test_validation_metrics_accepts_precision_genuinely_above_base_rate():
+    # Same 70% overall base rate, but the confident subset is 90% precision -- real
+    # concentration of true positives above what a random size-matched subset would get.
+    buy_target = [1] * 18 + [0] * 2           # 20 rows -> buy_precision = 18/20 = 0.90
+    rest_target = [1] * 52 + [0] * 28          # 80 rows, total positives = 70/100 = 0.70
+    predictions = pd.DataFrame({
+        "target": buy_target + rest_target,
+        "probability": [0.65] * 20 + [0.5] * 80,
+    })
+    metrics = validation_metrics(predictions)
+    assert metrics.beats_naive_baseline is True
+
+
+def test_signal_gate_rejects_precision_that_only_matches_base_rate(prices):
+    # Integration-level check: even with buy_precision clearing minimum_validated_accuracy
+    # and enough observations, a metrics object that fails beats_naive_baseline must never
+    # produce a BUY -- the fix belongs in SignalModel.rank(), not just validation_metrics().
+    model = SignalModel().fit(prices)
+    model.metrics.buy_precision = 0.65
+    model.metrics.positive_rate = 0.70
+    model.metrics.beats_naive_baseline = False
     assert all(x["signal"] in {"HOLD", "NO SIGNAL"} for x in model.rank(prices))
 
 

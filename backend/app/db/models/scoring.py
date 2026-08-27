@@ -84,5 +84,14 @@ class MlSignalScore(Base):
     validation_brier_score: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
     validation_roc_auc: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
 
+    # positive_rate is the base rate of "beat the benchmark" across the pooled walk-forward
+    # population -- what a random, size-matched subset would score by construction, with zero
+    # skill. beats_naive_baseline (validation_buy_precision > validation_positive_rate) gates
+    # BUY the same way signal_qualification.py's beats_naive_baseline gates Kronos: a fixed
+    # precision floor means nothing if the population's own base rate already clears it. See
+    # app/etl/ml_signal_engine.py's validation_metrics().
+    validation_positive_rate: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
+    beats_naive_baseline: Mapped[bool] = mapped_column(Boolean, default=False)
+
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -16,7 +16,8 @@ function StatCard({ label, value, sub, tone }: { label: string; value: string; s
 export default async function ModelEvidencePage() {
   const evidence = await fetchMlModelEvidence();
 
-  const buyPrecisionPasses = evidence?.buy_precision != null && evidence.buy_precision >= 0.6;
+  const clearsPrecisionFloor = evidence?.buy_precision != null && evidence.buy_precision >= 0.6;
+  const buyPrecisionPasses = clearsPrecisionFloor && evidence?.beats_naive_baseline === true;
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
@@ -49,9 +50,20 @@ export default async function ModelEvidencePage() {
                     : { borderColor: "rgba(245,158,11,0.25)", backgroundColor: "rgba(245,158,11,0.08)", color: "#f59e0b" }
                 }
               >
-                {buyPrecisionPasses
-                  ? "Buy precision clears the 60% out-of-sample gate — BUY signals are eligible to be issued."
-                  : "Buy precision has not cleared the 60% out-of-sample gate this run — every company shows \"NO SIGNAL\" or \"HOLD\" rather than a fabricated BUY. This is the model working as intended, not a bug."}
+                {buyPrecisionPasses ? (
+                  "Buy precision clears the 60% out-of-sample gate and beats this run's naive baseline — BUY signals are eligible to be issued."
+                ) : !clearsPrecisionFloor ? (
+                  "Buy precision has not cleared the 60% out-of-sample gate this run — every company shows \"NO SIGNAL\" or \"HOLD\" rather than a fabricated BUY. This is the model working as intended, not a bug."
+                ) : (
+                  <>
+                    Buy precision clears the 60% floor, but doesn&apos;t beat this run&apos;s
+                    naive baseline (
+                    {evidence.positive_rate != null ? `${(evidence.positive_rate * 100).toFixed(1)}%` : "—"}{" "}
+                    of the walk-forward population already beat the benchmark) — a random
+                    same-sized subset would score this well by chance, so BUY stays withheld.
+                    Same gate that caught Kronos&apos;s EFERT case, one layer down.
+                  </>
+                )}
               </div>
 
               <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -64,7 +76,13 @@ export default async function ModelEvidencePage() {
                   label="Buy Precision"
                   value={evidence.buy_precision != null ? `${(evidence.buy_precision * 100).toFixed(1)}%` : "—"}
                   sub="minimum 60% required to issue BUY"
-                  tone={buyPrecisionPasses ? "good" : "bad"}
+                  tone={clearsPrecisionFloor ? "good" : "bad"}
+                />
+                <StatCard
+                  label="Naive Baseline"
+                  value={evidence.positive_rate != null ? `${(evidence.positive_rate * 100).toFixed(1)}%` : "—"}
+                  sub="buy precision must also beat this"
+                  tone={evidence.beats_naive_baseline ? "good" : "bad"}
                 />
                 <StatCard
                   label="Sell Precision"
@@ -103,8 +121,16 @@ export default async function ModelEvidencePage() {
                   <li>
                     <strong className="text-foreground">Buy precision</strong> is accuracy
                     restricted to the subset of predictions where the model was confident
-                    (probability ≥ 60%) — this is the number that gates whether a BUY signal is
+                    (probability ≥ 60%) — one of two numbers that gate whether a BUY signal is
                     ever issued at all.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Naive baseline</strong> is the share of
+                    the whole walk-forward population that beat the benchmark, regardless of the
+                    model&apos;s confidence — what a random, same-sized subset would score by
+                    chance. Buy precision must exceed this, not just the fixed 60% floor: a
+                    &quot;confident&quot; subset that only matches the population&apos;s own base
+                    rate has learned nothing.
                   </li>
                   <li>
                     <strong className="text-foreground">Sell precision</strong> exists for

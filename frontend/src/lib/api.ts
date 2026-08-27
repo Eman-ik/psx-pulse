@@ -644,6 +644,8 @@ export interface MlSignalResearch {
   validation_sell_precision: number | null;
   validation_brier_score: number | null;
   validation_roc_auc: number | null;
+  validation_positive_rate: number | null;
+  beats_naive_baseline: boolean;
   is_public?: boolean;
 }
 
@@ -720,6 +722,8 @@ export interface MlModelEvidence {
   sell_precision: number | null;
   brier_score: number | null;
   roc_auc: number | null;
+  positive_rate: number | null;
+  beats_naive_baseline: boolean;
 }
 
 export async function fetchMlModelEvidence(): Promise<MlModelEvidence | null> {

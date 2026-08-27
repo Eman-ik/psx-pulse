@@ -374,6 +374,44 @@ framed (5-day excess-return direction). Worth treating as a real signal about th
 not a reason to mechanically try a third feature source next without first asking whether the
 problem is which features are used at all.
 
+**Update, same day: tested that exact question -- architecture, not features, first.** Before
+trying a third feature source (news/sentiment), held the full feature set constant (technical +
+fundamentals + market/sector, everything already built) and swapped only the classifier:
+logistic regression -> `sklearn.ensemble.HistGradientBoostingClassifier` (built-in, no new
+dependency; xgboost/lightgbm aren't installed in this venv). Diagnostic only at this point --
+not wired into `SignalModel`/`run_for_all_issuers()` yet.
+
+| | Logistic (current prod) | HistGradientBoosting | Delta |
+|---|---|---|---|
+| buy_precision | 45.98% | 49.15% | +3.18pp |
+| roc_auc | 0.5273 | 0.5358 | +0.0085 |
+| accuracy | 52.77% | 52.96% | +0.20pp |
+| brier_score | 0.2527 | 0.2508 | -0.0019 (better) |
+
+**First uniformly positive result across four experiments this session.** Every metric moved
+the right direction, by a meaningfully larger margin than either the fundamentals or
+market/sector tests. Real diagnostic value: the "no edge" finding for this model specifically
+looks partly like a linear-model limitation, not purely an absence of signal in the data.
+
+**Still not a validated signal.** 49.15% buy precision remains below the 60% floor -- this
+doesn't flip `NO_SIGNAL` to `BUY` today, on this untuned run. p-value (3.1e-57) should not be
+read as "very trustworthy": at 188,799 observations almost any real effect clears significance
+easily, so its tiny magnitude reflects sample size, not practical importance -- the +3.18pp
+buy_precision gain is the number that actually matters, and it alone doesn't clear the bar.
+
+Correction to an earlier draft of this entry: the diagnostic script *did* use the full expanding
+walk-forward loop (`walk_forward_with_model`, refitting per fold), the same methodology
+`walk_forward_predictions()` uses in production -- not a single train/test split. The validation
+numbers above carry that same rigor. What the diagnostic does NOT do yet: no final calibration
+step (`SignalModel.fit()`'s `CalibratedClassifierCV` + 80/20 train/calibration split, needed to
+actually serve live probabilities, not just measure walk-forward accuracy), and no
+hyperparameter tuning (`max_iter=200, max_depth=4, learning_rate=0.05` were reasonable defaults,
+not tuned). Real next step, not yet done: promote this from a diagnostic script into
+`SignalModel`/`_base_model()` as a configurable classifier with proper calibration wired in, and/
+or try real hyperparameter tuning or XGBoost/LightGBM specifically before concluding this is or
+isn't the fix. This result is a reason to keep pursuing gradient-boosted trees, not a reason to
+declare the problem solved.
+
 ## Who approves public activation
 
 **Not filled in.** This is a real organizational decision (who at the project — presumably

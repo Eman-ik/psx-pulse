@@ -28,12 +28,15 @@ export default function MLModelTab({ signal }: { signal: MlSignalResearch | null
   const meta = SIGNAL_META[signal.signal] ?? SIGNAL_META["NO SIGNAL"];
   const accuracyPasses = signal.validation_accuracy != null && signal.validation_accuracy >= 0.5;
   const clearsPrecisionFloor = signal.validation_buy_precision != null && signal.validation_buy_precision >= 0.6;
-  const buyPrecisionPasses = clearsPrecisionFloor && signal.beats_naive_baseline === true;
+  const clearsNaiveBaseline = clearsPrecisionFloor && signal.beats_naive_baseline === true;
+  const buyPrecisionPasses = clearsNaiveBaseline && signal.significant_at_10pct === true;
   const precisionSub = !clearsPrecisionFloor
     ? "below 60% gate — BUY withheld"
-    : buyPrecisionPasses
-      ? "clears 60% gate + naive baseline"
-      : "clears 60% but not naive baseline — BUY withheld";
+    : !clearsNaiveBaseline
+      ? "clears 60% but not naive baseline — BUY withheld"
+      : buyPrecisionPasses
+        ? "clears 60% + naive baseline + significant"
+        : "clears 60% + naive baseline but not significant — BUY withheld";
 
   return (
     <div className="flex flex-col gap-5">
@@ -87,6 +90,11 @@ export default function MLModelTab({ signal }: { signal: MlSignalResearch | null
                 label="Naive Baseline"
                 value={signal.validation_positive_rate != null ? `${(signal.validation_positive_rate * 100).toFixed(1)}%` : "—"}
                 sub="buy precision must also beat this"
+              />
+              <Stat
+                label="Significance (p-value)"
+                value={signal.validation_p_value != null ? signal.validation_p_value.toPrecision(3) : "—"}
+                sub="must be < 0.10 to issue BUY"
               />
               <Stat
                 label="Brier Score"

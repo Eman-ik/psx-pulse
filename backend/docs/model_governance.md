@@ -81,7 +81,7 @@ today, and any future model must implement the same shape:
 | Model | Min. accuracy | Significance test | Beats naive baseline | Min. observations | Where enforced |
 |---|---|---|---|---|---|
 | Kronos quant forecast | 55% | exact two-sided binomial, p < 0.10 | required | 15 | `signal_qualification.py` (`MIN_ACCURACY`, `SIGNIFICANCE_P_VALUE`, `beats_naive_baseline`, `MIN_OBSERVATIONS`) |
-| ML signal engine (pooled logistic) | 60% (on buy-precision, not raw accuracy) | — (no significance test; accuracy floor only) | required (since 2026-08-27) | 30 | `ml_signal_engine.py` (`ModelConfig.minimum_validated_accuracy`, `minimum_observations`, `ValidationMetrics.beats_naive_baseline`) |
+| ML signal engine (pooled logistic) | 60% (on buy-precision, not raw accuracy) | exact two-sided binomial vs. positive_rate, p < 0.10 (since 2026-08-27) | required (since 2026-08-27) | 30 | `ml_signal_engine.py` (`ModelConfig.minimum_validated_accuracy`, `minimum_observations`, `ValidationMetrics.beats_naive_baseline`, `significant_at_10pct`) |
 
 "Beats naive baseline" (added after EFERT's real record cleared accuracy and significance
 but still lost to trivially predicting its test window's own trend, see "Current models: real
@@ -286,6 +286,50 @@ the zero-open fix), so it is **not** a clean before/after test of whether fundam
 specifically helped -- that would need a controlled re-run holding the other two constant. Noted
 here as an honest limitation of this specific comparison, not a claim fundamentals moved the
 needle.
+
+**Update, same day: the controlled test, run.** `SignalModel(config, fundamentals=X).fit(priced)`
+called twice on the *identical* price panel (same 68 symbols, same 208,067 rows, same everything
+except `fundamentals=None` vs the real 15-symbol fundamentals panel) -- the clean comparison the
+entry above said was still needed. Result:
+
+| | Technical-only | With fundamentals | Delta |
+|---|---|---|---|
+| buy_precision | 47.04% | 46.60% | -0.44pp |
+| roc_auc | 0.5262 | 0.5258 | -0.0004 |
+| accuracy | 52.90% | 52.82% | -0.07pp |
+| brier_score | 0.2514 | 0.2518 | +0.0004 (worse) |
+
+**Fundamentals did not help. Every metric moved slightly the wrong direction.** Small effect
+sizes, but directionally consistent across all four, not a mixed bag -- this is not noise
+pointing nowhere, it's a small, consistent negative. The most likely explanation: coverage is
+narrow (15 of 68 pooled symbols in this run) and the data is annual-only, so a 5-day-horizon
+model mostly sees imputed medians rather than real signal, and what little real signal there is
+updates far too slowly to be informative at this horizon. This is the honest, complete answer to
+the open question the previous entry flagged -- not spun, not softened.
+
+This also surfaced a real bug the single bundled run had masked: `build_features()`'s
+`pd.merge_asof` failed with a dtype mismatch (`date` inferred as seconds-resolution
+datetime64, `known_as_of` as microseconds) on this exact controlled re-run, even though the
+original production run had succeeded. Fixed by explicitly casting both sides to
+`datetime64[ns]` before merging rather than relying on incidental dtype agreement between two
+independently-loaded frames -- see `tests/test_ml_signal_engine.py`'s
+`test_build_features_handles_mismatched_datetime_units`, which reproduces the exact failure
+directly so it can't silently regress.
+
+**Update, same day: closed a second parity gap with Kronos's gate -- this model had no
+significance test at all.** Only an accuracy floor and `beats_naive_baseline` existed; a
+confident subset could clear both on a small or borderline sample and still be statistically
+indistinguishable from chance. Added `p_value_vs_naive_baseline` (exact two-sided binomial test
+against `positive_rate` as the null, not a fixed 0.5 -- same reasoning as `beats_naive_baseline`
+itself) and `significant_at_10pct` (same `SIGNIFICANCE_P_VALUE=0.10` bar as Kronos's own gate),
+required alongside the existing checks before `SignalModel.rank()` emits BUY. Uses
+`scipy.stats.binomtest`, not Kronos's hand-rolled exact-PMF approach -- Kronos's n is always
+small (15-93), but this model's confident-subset n can be tens of thousands, where
+`math.comb(n, k)` produces integers with thousands of digits that overflow/lose precision when
+mixed with tiny floating-point probabilities. scipy is already a hard dependency of sklearn
+(used throughout this module), not a new one pulled in just for this. Migration `bb9a354d1c69`;
+existing rows default to `significant_at_10pct=False` (correctly conservative, same reasoning as
+every prior gate-tightening migration in this file).
 
 ## Who approves public activation
 

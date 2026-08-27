@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, JSON, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, JSON, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -92,6 +92,18 @@ class MlSignalScore(Base):
     # app/etl/ml_signal_engine.py's validation_metrics().
     validation_positive_rate: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
     beats_naive_baseline: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Added 2026-08-27 to close a real parity gap with Kronos's own gate: this model had no
+    # significance test at all before this, only the accuracy floor and beats_naive_baseline.
+    # p-value is Float (not Numeric(6,4) like the metrics above) because it needs real
+    # dynamic range -- this model's buy-confident subset can be tens of thousands of rows,
+    # where a genuinely significant result can be many orders of magnitude smaller than
+    # 0.0001 and a fixed 4-decimal column would silently round it to 0.0000, losing exactly
+    # the information "how significant" that a reviewer would want. significant_at_10pct is
+    # the same SIGNIFICANCE_P_VALUE=0.10 bar Kronos's gate uses -- see
+    # app/etl/ml_signal_engine.py's validation_metrics().
+    validation_p_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    significant_at_10pct: Mapped[bool] = mapped_column(Boolean, default=False)
 
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

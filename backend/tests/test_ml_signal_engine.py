@@ -49,6 +49,26 @@ def test_features_use_past_and_labels_use_future(prices):
     assert row["return_5d"] == pytest.approx(expected_5d)
 
 
+def test_build_features_handles_mismatched_datetime_units(prices):
+    # Real, reproduced failure (2026-08-27): pd.merge_asof requires both "on" columns to
+    # share an exact datetime64 unit (s/us/ns). "date" (a plain SQL DATE column, no
+    # time-of-day) and "known_as_of" (a timestamp column) can get inferred to different
+    # units by pandas depending on the source data -- a MergeError unrelated to the actual
+    # values. Reproduces that exact mismatch directly rather than relying on incidental
+    # dtype agreement in synthetic test data (which is why this bug shipped past every
+    # other test in this file the first time).
+    mari_dates = sorted(prices.loc[prices["symbol"] == "MARI", "date"].unique())
+    mismatched_prices = prices.copy()
+    mismatched_prices["date"] = mismatched_prices["date"].astype("datetime64[s]")
+    fundamentals = pd.DataFrame({
+        "symbol": ["MARI"],
+        "known_as_of": pd.array([mari_dates[400]], dtype="datetime64[us]"),
+        **{col: [7.0] for col in FUNDAMENTAL_FEATURE_COLUMNS},
+    })
+    features = build_features(mismatched_prices, fundamentals=fundamentals)
+    assert (features.loc[features["symbol"] == "MARI", "date"] >= mari_dates[400]).any()
+
+
 def test_build_features_fundamentals_never_leak_before_known_as_of(prices):
     # The whole point of the point-in-time join: a price bar dated BEFORE a fundamental
     # fact's known_as_of must never see that fact's value, only bars on/after it.
@@ -169,6 +189,54 @@ def test_validation_metrics_accepts_precision_genuinely_above_base_rate():
     })
     metrics = validation_metrics(predictions)
     assert metrics.beats_naive_baseline is True
+
+
+def test_validation_metrics_flags_small_sample_margin_as_not_significant():
+    # Clears the 60% floor (6/10 = 60%) and beats a 40% naive baseline -- but with only 10
+    # confident predictions, that margin is well within what chance alone could produce
+    # (exact binomial, n=10, k=6, p=0.4: p-value=0.2126, not < 0.10). Real parity gap this
+    # closes: before 2026-08-27 this model had no significance test at all, so a result
+    # exactly like this would have qualified as BUY on sample size too small to trust.
+    buy_target = [1] * 6 + [0] * 4              # n=10 confident predictions, 60% precision
+    rest_target = [1] * 34 + [0] * 56            # 90 rows -> total positives 40/100 = 0.40
+    predictions = pd.DataFrame({
+        "target": buy_target + rest_target,
+        "probability": [0.65] * 10 + [0.5] * 90,
+    })
+    metrics = validation_metrics(predictions)
+    assert metrics.buy_precision == pytest.approx(0.60)
+    assert metrics.beats_naive_baseline is True
+    assert metrics.significant_at_10pct is False
+    assert metrics.p_value_vs_naive_baseline == pytest.approx(0.2126, abs=1e-3)
+
+
+def test_validation_metrics_flags_large_sample_margin_as_significant():
+    # Same 60%-vs-40% margin as the small-sample case above, but with 1,000 confident
+    # predictions instead of 10 -- the same effect size is now overwhelming evidence
+    # (p-value ~4e-37), the real-world shape of this model's actual walk-forward runs
+    # (tens of thousands of observations, not tens).
+    buy_target = [1] * 600 + [0] * 400           # n=1000, 60% precision
+    rest_target = [1] * 200 + [0] * 800           # 1000 rows -> total positives 800/2000 = 0.40
+    predictions = pd.DataFrame({
+        "target": buy_target + rest_target,
+        "probability": [0.65] * 1000 + [0.5] * 1000,
+    })
+    metrics = validation_metrics(predictions)
+    assert metrics.beats_naive_baseline is True
+    assert metrics.significant_at_10pct is True
+    assert metrics.p_value_vs_naive_baseline < 1e-30
+
+
+def test_signal_gate_rejects_when_precision_beats_baseline_but_not_significant(prices):
+    # Integration-level check, same pattern as the naive-baseline gate test: even with
+    # buy_precision clearing the floor AND beating the naive baseline, a metrics object
+    # that fails significant_at_10pct must never produce a BUY.
+    model = SignalModel().fit(prices)
+    model.metrics.buy_precision = 0.60
+    model.metrics.positive_rate = 0.40
+    model.metrics.beats_naive_baseline = True
+    model.metrics.significant_at_10pct = False
+    assert all(x["signal"] in {"HOLD", "NO SIGNAL"} for x in model.rank(prices))
 
 
 def test_signal_gate_rejects_precision_that_only_matches_base_rate(prices):

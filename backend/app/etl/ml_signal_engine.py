@@ -47,6 +47,7 @@ from typing import Iterable
 
 import numpy as np
 import pandas as pd
+from scipy.stats import binomtest
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.frozen import FrozenEstimator
 from sklearn.impute import SimpleImputer
@@ -68,6 +69,34 @@ MODEL_VERSION = 1
 # a scoring run -- catches delisted/suspended/merged names (e.g. FFBL post FFC-FFBL merger)
 # that would otherwise get a signal computed from data that's no longer representative.
 STALENESS_TOLERANCE_DAYS = 21
+
+# Same bar as D:/khronos/signal_qualification.py's Kronos gate -- this model had no
+# significance test at all until 2026-08-27 (accuracy floor + naive-baseline only), a real
+# parity gap with Kronos's own gate. Not stricter than Kronos's bar on principle: this is
+# about bringing the two gates into alignment, not making one arbitrarily harder to clear
+# than the other.
+SIGNIFICANCE_P_VALUE = 0.10
+
+
+def binomial_two_sided_p_value(hits: int, n: int, p: float) -> float:
+    """Exact two-sided binomial test: P(X as or more extreme than `hits`) under X ~
+    Binomial(n, p). Kronos's own gate (D:/khronos/build_validation_record.py) computes this
+    via a hand-rolled exact PMF over math.comb, viable there because its n is always small
+    (15-93 observations). This model's n can be tens of thousands (buy_mask over a 180k+-row
+    pooled population) -- math.comb(n, k) for n in that range produces integers with
+    thousands of digits, and mixing that with tiny floating-point probabilities overflows or
+    loses precision. scipy.stats.binomtest is the numerically stable version of the exact
+    same test; scipy is already a hard dependency of sklearn (used throughout this module),
+    not a new one being pulled in just for this.
+
+    p is the null-hypothesis probability -- here that's positive_rate (the walk-forward
+    population's own base rate), not a fixed 0.5: the question isn't "is this better than a
+    coin flip," it's "is this confident subset's precision distinguishable from what a
+    random same-sized subset of THIS population would score by chance."
+    """
+    if n == 0:
+        return 1.0
+    return float(binomtest(hits, n, p, alternative="two-sided").pvalue)
 
 REQUIRED_COLUMNS = {"date", "symbol", "open", "high", "low", "close", "volume", "benchmark_close"}
 TECHNICAL_FEATURE_COLUMNS = [
@@ -115,6 +144,8 @@ class ValidationMetrics:
     roc_auc: float | None
     positive_rate: float
     beats_naive_baseline: bool
+    p_value_vs_naive_baseline: float
+    significant_at_10pct: bool
 
 
 # ─── Pure pandas/sklearn pipeline (ported from the prototype's quant_engine.py) ────────────────
@@ -200,9 +231,19 @@ def build_features(
     result = pd.concat(groups, ignore_index=True).replace([np.inf, -np.inf], np.nan)
 
     if fundamentals is not None and not fundamentals.empty:
+        # merge_asof requires the two "on" columns to share an exact datetime64 unit (s/us/ns)
+        # -- real, reproduced failure: "date" (from a plain SQL DATE column, no time-of-day)
+        # and "known_as_of" (from a timestamp column) can get inferred to different units by
+        # pandas depending on the exact data, causing a MergeError that has nothing to do with
+        # the actual values. Cast both explicitly rather than rely on incidental dtype
+        # agreement between two independently-loaded frames.
+        left = result.copy()
+        right = fundamentals.copy()
+        left["date"] = left["date"].astype("datetime64[ns]")
+        right["known_as_of"] = right["known_as_of"].astype("datetime64[ns]")
         result = pd.merge_asof(
-            result.sort_values("date"),
-            fundamentals.sort_values("known_as_of"),
+            left.sort_values("date"),
+            right.sort_values("known_as_of"),
             left_on="date", right_on="known_as_of", by="symbol", direction="backward",
         ).sort_values(["symbol", "date"]).reset_index(drop=True)
         for col in FUNDAMENTAL_FEATURE_COLUMNS:
@@ -267,11 +308,18 @@ def validation_metrics(predictions: pd.DataFrame) -> ValidationMetrics:
     # signal must concentrate true positives at a higher rate than that, not just clear an
     # arbitrary constant.
     positive_rate = float(y.mean()) if len(y) else 0.0
+    # Significance test against positive_rate (not a fixed 0.5) -- see
+    # binomial_two_sided_p_value's own docstring for why the null here is the population's
+    # own base rate, and why this uses scipy rather than Kronos's hand-rolled exact PMF.
+    n_buy = int(buy_mask.sum())
+    buy_hits = int(y[buy_mask].sum()) if n_buy else 0
+    p_value = binomial_two_sided_p_value(buy_hits, n_buy, positive_rate)
     return ValidationMetrics(
         observations=len(y), accuracy=float(accuracy_score(y, predicted)),
         buy_precision=float(buy_precision), sell_precision=float(sell_precision),
         brier_score=float(brier_score_loss(y, p)), roc_auc=auc,
         positive_rate=positive_rate, beats_naive_baseline=float(buy_precision) > positive_rate,
+        p_value_vs_naive_baseline=p_value, significant_at_10pct=p_value < SIGNIFICANCE_P_VALUE,
     )
 
 
@@ -316,6 +364,7 @@ class SignalModel:
             eligible
             and validated_accuracy >= self.config.minimum_validated_accuracy
             and self.metrics.beats_naive_baseline
+            and self.metrics.significant_at_10pct
         )
         records = []
         for row in latest.itertuples():
@@ -337,6 +386,8 @@ class SignalModel:
                 "validation_roc_auc": round(self.metrics.roc_auc, 4) if self.metrics.roc_auc is not None else None,
                 "validation_positive_rate": round(self.metrics.positive_rate, 4),
                 "beats_naive_baseline": self.metrics.beats_naive_baseline,
+                "validation_p_value": round(self.metrics.p_value_vs_naive_baseline, 6),
+                "significant_at_10pct": self.metrics.significant_at_10pct,
             })
         return sorted(records, key=lambda x: x["outperformance_probability"], reverse=True)
 
@@ -584,6 +635,8 @@ def run_for_all_issuers(db: Session, as_of: date | None = None) -> dict[str, dic
             validation_roc_auc=record["validation_roc_auc"],
             validation_positive_rate=record["validation_positive_rate"],
             beats_naive_baseline=record["beats_naive_baseline"],
+            validation_p_value=record["validation_p_value"],
+            significant_at_10pct=record["significant_at_10pct"],
             is_public=settings.ml_signals_enabled,
         )
         db.add(score)
@@ -594,6 +647,8 @@ def run_for_all_issuers(db: Session, as_of: date | None = None) -> dict[str, dic
             "validation_buy_precision": score.validation_buy_precision,
             "validation_positive_rate": score.validation_positive_rate,
             "beats_naive_baseline": score.beats_naive_baseline,
+            "validation_p_value": score.validation_p_value,
+            "significant_at_10pct": score.significant_at_10pct,
             "validation_observations": score.validation_observations,
             "is_public": score.is_public,
         }

@@ -17,7 +17,8 @@ export default async function ModelEvidencePage() {
   const evidence = await fetchMlModelEvidence();
 
   const clearsPrecisionFloor = evidence?.buy_precision != null && evidence.buy_precision >= 0.6;
-  const buyPrecisionPasses = clearsPrecisionFloor && evidence?.beats_naive_baseline === true;
+  const clearsNaiveBaseline = clearsPrecisionFloor && evidence?.beats_naive_baseline === true;
+  const buyPrecisionPasses = clearsNaiveBaseline && evidence?.significant_at_10pct === true;
 
   return (
     <div className="flex min-h-screen w-full bg-bg">
@@ -51,10 +52,10 @@ export default async function ModelEvidencePage() {
                 }
               >
                 {buyPrecisionPasses ? (
-                  "Buy precision clears the 60% out-of-sample gate and beats this run's naive baseline — BUY signals are eligible to be issued."
+                  "Buy precision clears the 60% out-of-sample gate, beats this run's naive baseline, and is statistically significant — BUY signals are eligible to be issued."
                 ) : !clearsPrecisionFloor ? (
                   "Buy precision has not cleared the 60% out-of-sample gate this run — every company shows \"NO SIGNAL\" or \"HOLD\" rather than a fabricated BUY. This is the model working as intended, not a bug."
-                ) : (
+                ) : !clearsNaiveBaseline ? (
                   <>
                     Buy precision clears the 60% floor, but doesn&apos;t beat this run&apos;s
                     naive baseline (
@@ -62,6 +63,15 @@ export default async function ModelEvidencePage() {
                     of the walk-forward population already beat the benchmark) — a random
                     same-sized subset would score this well by chance, so BUY stays withheld.
                     Same gate that caught Kronos&apos;s EFERT case, one layer down.
+                  </>
+                ) : (
+                  <>
+                    Buy precision clears the 60% floor and beats the naive baseline, but isn&apos;t
+                    statistically significant (p=
+                    {evidence.p_value != null ? evidence.p_value.toPrecision(3) : "—"}, needs
+                    &lt;0.10) — with this few confident predictions, a margin this size is still
+                    plausibly chance, so BUY stays withheld until there&apos;s enough evidence to
+                    trust it.
                   </>
                 )}
               </div>
@@ -83,6 +93,12 @@ export default async function ModelEvidencePage() {
                   value={evidence.positive_rate != null ? `${(evidence.positive_rate * 100).toFixed(1)}%` : "—"}
                   sub="buy precision must also beat this"
                   tone={evidence.beats_naive_baseline ? "good" : "bad"}
+                />
+                <StatCard
+                  label="Significance (p-value)"
+                  value={evidence.p_value != null ? evidence.p_value.toPrecision(3) : "—"}
+                  sub="must be < 0.10 to issue BUY"
+                  tone={evidence.significant_at_10pct ? "good" : "bad"}
                 />
                 <StatCard
                   label="Sell Precision"
@@ -121,7 +137,7 @@ export default async function ModelEvidencePage() {
                   <li>
                     <strong className="text-foreground">Buy precision</strong> is accuracy
                     restricted to the subset of predictions where the model was confident
-                    (probability ≥ 60%) — one of two numbers that gate whether a BUY signal is
+                    (probability ≥ 60%) — one of three checks that gate whether a BUY signal is
                     ever issued at all.
                   </li>
                   <li>
@@ -131,6 +147,14 @@ export default async function ModelEvidencePage() {
                     chance. Buy precision must exceed this, not just the fixed 60% floor: a
                     &quot;confident&quot; subset that only matches the population&apos;s own base
                     rate has learned nothing.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Significance (p-value)</strong> tests
+                    whether buy precision beating the naive baseline could still just be chance —
+                    the same exact two-sided binomial test, and the same 10% bar, Kronos&apos;s own
+                    gate uses. A model can clear the 60% floor and beat the naive baseline on a
+                    small or borderline sample and still not be distinguishable from luck; this
+                    is what catches that.
                   </li>
                   <li>
                     <strong className="text-foreground">Sell precision</strong> exists for

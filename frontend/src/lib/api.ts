@@ -646,6 +646,8 @@ export interface MlSignalResearch {
   validation_roc_auc: number | null;
   validation_positive_rate: number | null;
   beats_naive_baseline: boolean;
+  validation_p_value: number | null;
+  significant_at_10pct: boolean;
   is_public?: boolean;
 }
 
@@ -724,6 +726,8 @@ export interface MlModelEvidence {
   roc_auc: number | null;
   positive_rate: number | null;
   beats_naive_baseline: boolean;
+  p_value: number | null;
+  significant_at_10pct: boolean;
 }
 
 export async function fetchMlModelEvidence(): Promise<MlModelEvidence | null> {

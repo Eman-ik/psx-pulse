@@ -214,7 +214,15 @@ def get_forensics(issuer_id: int, db: Session = Depends(get_db)) -> dict:
     issuer = db.get(Issuer, issuer_id)
     if issuer is None:
         raise HTTPException(status_code=404, detail=f"Issuer {issuer_id} not found")
-    result = compute_forensic_result(db, issuer_id)
+    try:
+        result = compute_forensic_result(db, issuer_id)
+    except Exception:
+        logger.exception("compute_forensic_result failed for issuer %d", issuer_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Forensic computation failed for this company -- likely an unusual data "
+            "shape the engine doesn't handle yet. Logged for investigation.",
+        )
     return _forensic_to_dict(result)
 
 
@@ -224,7 +232,15 @@ def get_capm_diagnostics(issuer_id: int, db: Session = Depends(get_db)) -> dict:
     issuer = db.get(Issuer, issuer_id)
     if issuer is None:
         raise HTTPException(status_code=404, detail=f"Issuer {issuer_id} not found")
-    result = compute_capm_diagnostics(db, issuer_id)
+    try:
+        result = compute_capm_diagnostics(db, issuer_id)
+    except Exception:
+        logger.exception("compute_capm_diagnostics failed for issuer %d", issuer_id)
+        raise HTTPException(
+            status_code=500,
+            detail="CAPM diagnostics failed for this company -- likely an unusual data shape "
+            "the engine doesn't handle yet. Logged for investigation.",
+        )
     return _capm_to_dict(result)
 
 
@@ -234,5 +250,13 @@ def get_factor_model(issuer_id: int, db: Session = Depends(get_db)) -> dict:
     issuer = db.get(Issuer, issuer_id)
     if issuer is None:
         raise HTTPException(status_code=404, detail=f"Issuer {issuer_id} not found")
-    result = compute_factor_model(db, issuer_id)
+    try:
+        result = compute_factor_model(db, issuer_id)
+    except Exception:
+        logger.exception("compute_factor_model failed for issuer %d", issuer_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Factor model computation failed for this company -- likely an unusual "
+            "data shape the engine doesn't handle yet. Logged for investigation.",
+        )
     return _factor_to_dict(result)

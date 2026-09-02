@@ -773,6 +773,12 @@ def run_analyst_synthesis(db: Session, issuer_id: int) -> dict:
 
     except Exception as e:
         logger.error("Analyst synthesis failed for issuer %d: %s", issuer_id, e)
+        # If the exception came from a DB operation itself (e.g. an IntegrityError on
+        # db.add(packet), or a NaN/Infinity value rejected by Postgres's JSON type inside
+        # packet_json), the session is left in a failed-transaction state -- committing
+        # again without rolling back first would itself raise, masking the real error and
+        # leaving this run stuck at status="running" forever.
+        db.rollback()
         run.status = "failed"
         run.error_message = str(e)
         run.completed_at = datetime.now(timezone.utc)

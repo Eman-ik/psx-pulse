@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -9,12 +9,26 @@ router = APIRouter(prefix="/news", tags=["news"])
 
 
 @router.get("/announcements")
-def list_announcements(db: Session = Depends(get_db)) -> list[dict]:
-    rows = db.execute(
+def list_announcements(
+    db: Session = Depends(get_db),
+    limit: int | None = Query(default=None, ge=1, le=2000),
+    issuer_id: int | None = None,
+) -> list[dict]:
+    """`limit`/`issuer_id` are optional and unset by default, preserving the existing
+    unbounded full-list response the frontend's client-side news feed filtering relies on
+    today -- this just gives future/bulk callers a way to bound the query instead of always
+    pulling every Announcement row in the DB, which has no cap otherwise.
+    """
+    query = (
         select(Announcement, SourceDocument)
         .join(SourceDocument, SourceDocument.id == Announcement.source_document_id)
         .order_by(Announcement.published_at.desc())
-    ).all()
+    )
+    if issuer_id is not None:
+        query = query.where(Announcement.issuer_id == issuer_id)
+    if limit is not None:
+        query = query.limit(limit)
+    rows = db.execute(query).all()
     return [
         {
             "id": a.id,

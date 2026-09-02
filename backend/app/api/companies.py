@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -127,20 +129,26 @@ def _subsidiary_contributions(db: Session, issuer: Issuer, subsidiaries: list[Is
         for line_item in ("revenue", "profit_after_tax", "total_assets")
     }
 
+    # One query for every subsidiary x line_item pair instead of one query per pair (3N
+    # queries for N subsidiaries) -- grouped by (issuer_id, line_item) in Python below.
+    subsidiary_by_id = {sub.id: sub for sub in subsidiaries}
+    sub_facts_by_issuer_and_item: dict[tuple[int, str], list[FinancialFact]] = defaultdict(list)
+    for f in db.execute(
+        select(FinancialFact).where(
+            FinancialFact.issuer_id.in_(subsidiary_by_id.keys()),
+            FinancialFact.line_item.in_(("revenue", "profit_after_tax", "total_assets")),
+            FinancialFact.superseded_by_id.is_(None),
+        )
+    ).scalars():
+        sub_facts_by_issuer_and_item[(f.issuer_id, f.line_item)].append(f)
+
     results = []
     for sub in subsidiaries:
         for line_item in ("revenue", "profit_after_tax", "total_assets"):
             parent_by_year = parent_facts[line_item]
             if not parent_by_year:
                 continue
-            sub_facts = db.execute(
-                select(FinancialFact).where(
-                    FinancialFact.issuer_id == sub.id,
-                    FinancialFact.line_item == line_item,
-                    FinancialFact.superseded_by_id.is_(None),
-                )
-            ).scalars().all()
-            for f in sub_facts:
+            for f in sub_facts_by_issuer_and_item.get((sub.id, line_item), []):
                 parent_value = parent_by_year.get(f.period_end)
                 if parent_value is None or parent_value == 0:
                     continue

@@ -22,3 +22,11 @@ Press CTRL+C to quit
 127.0.0.1 - - [29/Sep/2026 23:08:22] "GET /api/research/companies HTTP/1.1" 200 -
 127.0.0.1 - - [29/Sep/2026 23:10:14] "GET /api/research/company/FFC HTTP/1.1" 404 -
 127.0.0.1 - - [29/Sep/2026 23:10:14] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [30/Sep/2026 00:32:29] "POST /api/research-trade/unified-flow HTTP/1.1" 404 -
+127.0.0.1 - - [30/Sep/2026 00:32:46] "POST /api/research-trade/unified-flow HTTP/1.1" 404 -
+127.0.0.1 - - [30/Sep/2026 00:33:11] "GET /api/research/health HTTP/1.1" 200 -
+127.0.0.1 - - [30/Sep/2026 00:34:55] "POST /api/research-trade/unified-flow HTTP/1.1" 404 -
+127.0.0.1 - - [30/Sep/2026 00:34:59] "GET /api/research/health HTTP/1.1" 200 -
+127.0.0.1 - - [30/Sep/2026 00:36:12] "POST /api/research-trade/unified-flow HTTP/1.1" 404 -
+127.0.0.1 - - [30/Sep/2026 00:36:19] "POST /api/research-trade/unified-flow HTTP/1.1" 404 -
+127.0.0.1 - - [30/Sep/2026 00:36:47] "GET /api/research/companies HTTP/1.1" 200 -

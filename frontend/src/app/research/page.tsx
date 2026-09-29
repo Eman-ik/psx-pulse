@@ -1,8 +1,8 @@
-import { ComprehensiveResearchStudio } from "@/components/research/ComprehensiveResearchStudio";
+import { ResearchHub } from "@/components/research/ResearchHub";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 
-export const metadata = { title: "Research Studio | PSX QuantResearch" };
+export const metadata = { title: "Research Hub | PSX QuantResearch" };
 
 export default function ResearchPage() {
   return (
@@ -10,9 +10,7 @@ export default function ResearchPage() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar isLive={false} />
-        <div className="flex-1 overflow-y-auto">
-          <ComprehensiveResearchStudio />
-        </div>
+        <ResearchHub />
       </div>
     </div>
   );

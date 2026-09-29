@@ -3,7 +3,7 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import CompanyHeader from "@/components/company/CompanyHeader";
 import CompanyTabs from "@/components/company/CompanyTabs";
-import { fetchComparison, fetchCompanyOverview, fetchIndexPrices, fetchMlSignalResearch, fetchPrices, fetchRatioBenchmarks, fetchSignalResearch } from "@/lib/api";
+import { fetchComparison, fetchCompanyOverview, fetchPrices, fetchRatioBenchmarks } from "@/lib/api";
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -13,16 +13,17 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const data = await fetchCompanyOverview(issuerId);
   if (!data) notFound();
 
-  const [comparison, benchmarks, priceData, signal, mlSignal, kseIndex, fertixIndex] = await Promise.all([
-    fetchComparison(),
-    fetchRatioBenchmarks(),
+  // Benchmarks and the peer table only feed the fundamentals-backed tabs, and only
+  // full-coverage companies get those (see @/lib/v1-scope). Skipping both for the other 20
+  // names in the universe keeps a price-only company page down to two requests.
+  const needsFundamentals = data.coverage_tier === "full";
+
+  const [comparison, benchmarks, priceData] = await Promise.all([
+    needsFundamentals ? fetchComparison() : Promise.resolve([]),
+    needsFundamentals ? fetchRatioBenchmarks() : Promise.resolve({}),
     data.security_id != null
       ? fetchPrices(data.security_id)
       : Promise.resolve({ adjusted: false, delayed_data_notice: "", bars: [] }),
-    fetchSignalResearch(issuerId),
-    fetchMlSignalResearch(issuerId),
-    fetchIndexPrices("KSE100"),
-    fetchIndexPrices("FERTIX"),
   ]);
 
   const oneYearAgo = new Date();
@@ -47,10 +48,6 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             benchmarks={benchmarks}
             prices={priceData.bars}
             securityId={data.security_id}
-            signal={signal}
-            mlSignal={mlSignal}
-            kseIndex={kseIndex}
-            fertixIndex={fertixIndex}
           />
         </main>
 

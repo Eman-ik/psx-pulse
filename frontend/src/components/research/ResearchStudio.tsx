@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Search, Loader2, AlertCircle, ChevronRight } from "lucide-react";
+import { Search, Loader2, AlertCircle, ChevronRight, TrendingUp } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { EquityResearchReportResponse } from "@/lib/api";
 import { EquityResearchSections } from "./EquityResearchSections";
 
@@ -49,6 +50,7 @@ const QUICK_TICKERS = ["FFC", "EFERT", "FATIMA", "AGL", "AHCL"];
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export function ResearchStudio() {
+  const router = useRouter();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -205,8 +207,23 @@ export function ResearchStudio() {
 
       {/* ── Report ──────────────────────────────────────────────────────── */}
       {report && !loading && (
-        <div ref={reportRef}>
+        <div ref={reportRef} className="space-y-6">
           <EquityResearchSections r={report} />
+
+          {/* ── Plan Trade Button ───────────────────────────────────────── */}
+          <div className="max-w-2xl mx-auto bg-gradient-to-r from-accent/10 to-accent/5 border border-accent/20 rounded-xl p-6 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-foreground">Ready to trade based on this research?</p>
+              <p className="text-xs text-muted">Use our position sizing calculator and decision gates to plan your entry, stop, and targets.</p>
+            </div>
+            <button
+              onClick={() => router.push(`/trade-planning?ticker=${input.toUpperCase()}`)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent/80 rounded-lg text-white text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Plan Trade
+            </button>
+          </div>
         </div>
       )}
 

@@ -21,6 +21,13 @@ from app.db.models import (
     Thesis,
 )
 from app.etl.valuation_engine import _get_assumption
+from app.universe import TIER_FULL, TIER_PRICE_ONLY, coverage_tier
+
+# source_document.document_type used by the manual financial-statement seeds. For the three
+# verified fertilizer companies this is genuinely-sourced analyst material; for the cement
+# companies it is the unchecked figures manual_financials_seed_cement.py warns about. The
+# coverage tier, not this type, decides which of those two a given company is.
+MANUAL_ENTRY_DOCUMENT_TYPE = "analyst_report_manual_entry"
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -183,6 +190,7 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
         return None
 
     security = db.execute(select(Security).where(Security.issuer_id == issuer.id)).scalars().first()
+    tier = coverage_tier(security.symbol) if security else TIER_PRICE_ONLY
 
     board = db.execute(
         select(BoardMembership, Person)
@@ -200,6 +208,35 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
             FinancialFact.superseded_by_id.is_(None),
         )
     ).scalars().all()
+
+    # Withhold anything derived from unverified figures, at the source rather than in the UI.
+    #
+    # Hiding the Ratios/Financials tabs is not enough: the Summary grid and the company header
+    # read data.ratios and data.financials directly, so a quarantined company was still
+    # rendering ROE and ROA immediately above a note promising they were withheld -- worse than
+    # showing nothing, because the note makes it look deliberate.
+    #
+    # The split is by source document, not by line item. LUCK's facts come from two places: 42
+    # from the unverified manual seed (total_assets, total_equity, gross_profit, inventory...)
+    # and 25 scraped from dps.psx.com.pk (eps, market_cap, revenue, profit_after_tax). Only the
+    # first set is tainted, so the PSX-scraped figures stay and the page keeps a real market cap
+    # and EPS instead of going blank.
+    #
+    # Ratios go entirely. Some (P/E off scraped EPS) would survive the same reasoning, but
+    # RatioValue does not record which facts fed it, so there is no cheap way to prove a given
+    # ratio is clean. Withholding all of them is the conservative read, and it is what the
+    # user-facing note already promises.
+    if tier != TIER_FULL:
+        manual_entry_doc_ids = set(
+            db.execute(
+                select(SourceDocument.id).where(
+                    SourceDocument.issuer_id == issuer.id,
+                    SourceDocument.document_type == MANUAL_ENTRY_DOCUMENT_TYPE,
+                )
+            ).scalars().all()
+        )
+        facts = [f for f in facts if f.source_document_id not in manual_entry_doc_ids]
+
     financials_by_line_item: dict[str, list[dict]] = {}
     for f in facts:
         financials_by_line_item.setdefault(f.line_item, []).append(
@@ -215,11 +252,15 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
     for series in financials_by_line_item.values():
         series.sort(key=lambda row: row["period_end"])
 
-    ratio_rows = db.execute(
-        select(RatioValue, RatioDefinition)
-        .join(RatioDefinition, RatioDefinition.id == RatioValue.ratio_definition_id)
-        .where(RatioValue.issuer_id == issuer.id)
-    ).all()
+    ratio_rows = (
+        db.execute(
+            select(RatioValue, RatioDefinition)
+            .join(RatioDefinition, RatioDefinition.id == RatioValue.ratio_definition_id)
+            .where(RatioValue.issuer_id == issuer.id)
+        ).all()
+        if tier == TIER_FULL
+        else []
+    )
     ratios_by_key: dict[str, dict] = {}
     for ratio_value, definition in ratio_rows:
         bucket = ratios_by_key.setdefault(
@@ -303,6 +344,9 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
             "name": issuer.name,
             "short_name": issuer.short_name,
             "sector_id": issuer.sector_id,
+            # The header used to hardcode "Fertilizer sector", which was harmless while the
+            # pilot was one sector and wrong for all 18 cement companies the moment it wasn't.
+            "sector_name": issuer.sector.name if issuer.sector else None,
             "business_description": issuer.business_description,
             "address": issuer.address,
             "website": issuer.website,
@@ -313,6 +357,12 @@ def get_company_overview(issuer_id: int, db: Session = Depends(get_db)) -> dict 
             "establishment_year": issuer.incorporation_date.year if issuer.incorporation_date else None,
         },
         "data_delay_notice": settings.data_delay_disclaimer,
+        # How deeply this company is actually covered -- see app/universe.py. The frontend
+        # uses this to decide whether the fundamentals-backed tabs (Ratios, Financials,
+        # Analyst) can render truthfully, so it has to come from universe.py rather than
+        # being inferred from whether the ratio dict happens to be empty: an empty ratio
+        # grid reads as "no debt", not as "not entered yet".
+        "coverage_tier": tier,
         "symbol": security.symbol if security else None,
         "security_id": security.id if security else None,
         "listing_status": security.listing_status if security else None,

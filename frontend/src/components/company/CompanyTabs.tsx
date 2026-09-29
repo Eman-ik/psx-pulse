@@ -1,40 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import type { ComparisonRow, CompanyOverview, IndexPrices, MlSignalResearch, PriceBar, RatioBenchmark, SignalResearch } from "@/lib/api";
+import type { ComparisonRow, CompanyOverview, PriceBar, RatioBenchmark } from "@/lib/api";
+import { coverageNote, visibleCompanyTabs, type V1CompanyTab } from "@/lib/v1-scope";
 import SummaryTab from "./SummaryTab";
 import CompanyProfile from "./CompanyProfile";
 import OwnershipAndGovernance from "./OwnershipAndGovernance";
 import SubsidiaryContribution from "./SubsidiaryContribution";
 import ThesisCasesPanel from "./ThesisCasesPanel";
-import OperationalKpis from "./OperationalKpis";
 import FinancialsChart from "./FinancialsChart";
 import RatioGrid from "./RatioGrid";
 import TechnicalsTab from "./TechnicalsTab";
 import PayoutsAndAnnouncements from "./PayoutsAndAnnouncements";
 import CompetitorsTab from "./CompetitorsTab";
 import DataQualityPanel from "./DataQualityPanel";
-import AISignalTab from "./AISignalTab";
 import FinancialStatementsPanel from "./FinancialStatementsPanel";
 import AnalystWorkbenchTab from "./AnalystWorkbenchTab";
-import MLModelTab from "./MLModelTab";
-import QuantForecastTab from "./QuantForecastTab";
 
-const TABS = [
-  "Summary",
-  "Profile",
-  "Operations",
-  "Financials",
-  "Ratios",
-  "Technicals",
-  "Announcements",
-  "Competitors",
-  "AI Signal",
-  "ML Model",
-  "Quant Forecast",
-  "Analyst",
-] as const;
-type Tab = (typeof TABS)[number];
+// The v1 tab set, narrowed further by how well this particular company is covered.
+// Parked tabs and the reasons they are parked live in @/lib/v1-scope. Their components
+// (OperationalKpis, CompetitorsTab, AISignalTab, MLModelTab, QuantForecastTab) are still
+// in the tree and still work -- they are just not wired into the v1 surface.
+type Tab = V1CompanyTab;
 
 export default function CompanyTabs({
   data,
@@ -42,32 +29,38 @@ export default function CompanyTabs({
   benchmarks,
   prices,
   securityId,
-  signal,
-  mlSignal,
-  kseIndex,
-  fertixIndex,
 }: {
   data: CompanyOverview;
   comparison: ComparisonRow[];
   benchmarks: Record<string, RatioBenchmark>;
   prices: PriceBar[];
   securityId: number | null;
-  signal: SignalResearch | null;
-  mlSignal: MlSignalResearch | null;
-  kseIndex: IndexPrices | null;
-  fertixIndex: IndexPrices | null;
 }) {
   const [active, setActive] = useState<Tab>("Summary");
 
+  const tabs = visibleCompanyTabs(data.coverage_tier);
+  const note = coverageNote(data.coverage_tier);
+
+  // A company can lose its fundamentals-backed tabs (tier changes, or navigation between
+  // companies reuses this component), which would otherwise leave `active` pointing at a
+  // tab that no longer renders anything -- a blank page with no tab highlighted.
+  const current: Tab = tabs.includes(active) ? active : "Summary";
+
   return (
     <div>
+      {note && (
+        <p className="mb-4 rounded-lg border border-border bg-bg-subtle px-4 py-3 text-[13px] text-muted">
+          {note}
+        </p>
+      )}
+
       <div className="mb-5 flex flex-wrap gap-1 border-b border-border">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActive(tab)}
             className={`rounded-t-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-              active === tab
+              current === tab
                 ? "border-b-2 border-accent text-accent"
                 : "text-muted hover:text-foreground"
             }`}
@@ -77,9 +70,9 @@ export default function CompanyTabs({
         ))}
       </div>
 
-      {active === "Summary" && <SummaryTab data={data} prices={prices} />}
+      {current === "Summary" && <SummaryTab data={data} prices={prices} />}
 
-      {active === "Profile" && (
+      {current === "Profile" && (
         <div className="flex flex-col gap-6">
           <CompanyProfile issuer={data.issuer} />
           <OwnershipAndGovernance data={data} />
@@ -89,9 +82,7 @@ export default function CompanyTabs({
         </div>
       )}
 
-      {active === "Operations" && <OperationalKpis metrics={data.operational_metrics} />}
-
-      {active === "Financials" && (
+      {current === "Financials" && (
         <div>
           <FinancialsChart
             revenue={data.financials["revenue"]}
@@ -102,27 +93,17 @@ export default function CompanyTabs({
         </div>
       )}
 
-      {active === "Ratios" && <RatioGrid ratios={data.ratios} benchmarks={benchmarks} />}
+      {current === "Ratios" && <RatioGrid ratios={data.ratios} benchmarks={benchmarks} />}
 
-      {active === "Technicals" && (
+      {current === "Technicals" && (
         <TechnicalsTab bars={prices} dataDelayNotice={data.data_delay_notice} securityId={securityId} />
       )}
 
-      {active === "Announcements" && <PayoutsAndAnnouncements data={data} />}
+      {current === "Announcements" && <PayoutsAndAnnouncements data={data} />}
 
-      {active === "Competitors" && <CompetitorsTab rows={comparison} issuerId={data.issuer.id} />}
+      {current === "Competitors" && <CompetitorsTab rows={comparison} issuerId={data.issuer.id} />}
 
-      {active === "AI Signal" && (
-        <AISignalTab signal={signal} prices={prices} data={data} kseIndex={kseIndex} fertixIndex={fertixIndex} />
-      )}
-
-      {active === "ML Model" && <MLModelTab signal={mlSignal} />}
-
-      {active === "Quant Forecast" && <QuantForecastTab ticker={data.symbol} />}
-
-      {active === "Analyst" && (
-        <AnalystWorkbenchTab issuerId={data.issuer.id} />
-      )}
+      {current === "Analyst" && <AnalystWorkbenchTab issuerId={data.issuer.id} />}
     </div>
   );
 }

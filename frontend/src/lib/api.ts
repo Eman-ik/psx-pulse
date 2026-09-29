@@ -1,3 +1,5 @@
+import type { CoverageTier } from "@/lib/v1-scope";
+
 export interface LiveQuote {
   symbol: string;
   name: string;
@@ -54,6 +56,7 @@ export interface CompanyOverview {
     name: string;
     short_name: string | null;
     sector_id: number | null;
+    sector_name: string | null;
     business_description: string | null;
     address: string | null;
     website: string | null;
@@ -64,6 +67,8 @@ export interface CompanyOverview {
     establishment_year: number | null;
   };
   data_delay_notice: string;
+  /** How deeply this company is covered. Source of truth is backend app/universe.py. */
+  coverage_tier: CoverageTier;
   symbol: string | null;
   security_id: number | null;
   listing_status: string | null;

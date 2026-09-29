@@ -42,7 +42,9 @@ export default function CompanyHeader({ data, weekRange }: { data: CompanyOvervi
             <span className="rounded-md bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">
               {symbol ?? "—"}
             </span>
-            <span className="text-xs text-muted">Fertilizer sector</span>
+            {issuer.sector_name && (
+              <span className="text-xs text-muted">{issuer.sector_name} sector</span>
+            )}
             {issuer.establishment_year && (
               <span className="text-xs text-muted">· Est. {issuer.establishment_year}</span>
             )}

@@ -203,11 +203,11 @@ def unified_research_trade_flow(request: UnifiedFlowRequest) -> Dict[str, Any]:
         # Transform calculator to response format
         calc = result["calculator"]
         calculator_response = CalculatorMetricsResponse(
-            position_size_shares=int(calc.position_size_shares),
-            capital_required=float(calc.capital_required),
-            risk_per_share=float(calc.risk_per_share),
-            max_loss=float(calc.max_loss),
-            allocation_pct=float(calc.allocation_pct),
+            position_size_shares=int(calc.risk_metrics.position_size),
+            capital_required=float(calc.risk_metrics.capital_required),
+            risk_per_share=float(calc.risk_metrics.risk_per_share),
+            max_loss=float(calc.risk_metrics.max_loss),
+            allocation_pct=float(calc.risk_metrics.allocation_pct),
             warnings=calc.warnings or [],
         )
 

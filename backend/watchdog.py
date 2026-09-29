@@ -9,6 +9,7 @@ that ceiling, and it recovers from worker crashes or hangs the way --reload
 would have -- without reload's Windows failure mode.
 """
 
+import os
 import signal
 import subprocess
 import sys
@@ -18,6 +19,7 @@ import urllib.request
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent
+KHRONOS_DIR = BACKEND_DIR.parent.parent
 PORT = 8001
 HEALTH_URL = f"http://127.0.0.1:{PORT}/health"
 CHECK_INTERVAL_S = 5
@@ -76,7 +78,9 @@ def _kill_stale_port_owner(port: int) -> None:
 
 def _start_worker() -> subprocess.Popen:
     _log(f"starting worker: {' '.join(UVICORN_CMD)}")
-    return subprocess.Popen(UVICORN_CMD, cwd=BACKEND_DIR)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(KHRONOS_DIR)
+    return subprocess.Popen(UVICORN_CMD, cwd=BACKEND_DIR, env=env)
 
 
 def _stop_worker(proc: subprocess.Popen) -> None:

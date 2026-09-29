@@ -1,39 +1,33 @@
-import { NextRequest, NextResponse } from "next/server";
-import { fetchEquityResearchReport } from "@/lib/api";
+import { NextRequest, NextResponse } from 'next/server';
 
-// Relays the real Equity-research pipeline's published report (backend/app/api/
-// equity_research.py -> Equity-research's own Postgres DB). This used to call the
-// Anthropic API directly with a single-shot prompt asking the model to narrate all
-// "18 stages" in one message -- fast and good-looking, but ungrounded: no citations,
-// no verification pass, none of the deterministic engines the real 8-agent pipeline
-// runs. That duplicated (and disagreed with) the real pipeline instead of using it.
-//
-// This route now does no LLM work itself. It's honest about coverage: not_covered
-// for tickers outside the pipeline's real evidence base, and per-section
-// has_real_content flags for a covered ticker whose report isn't fully populated yet.
-export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const { ticker } = body as { ticker?: string };
-  if (!ticker?.trim()) {
-    return NextResponse.json({ error: "ticker is required" }, { status: 400 });
-  }
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    // Forward to equity-research API
+    const response = await fetch('http://localhost:8000/api/research/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
 
-  const tickerUpper = ticker.trim().toUpperCase();
-  const result = await fetchEquityResearchReport(tickerUpper);
+    if (!response.ok) {
+      const error = await response.text();
+      return NextResponse.json(
+        { error: `Research API error: ${error}` },
+        { status: response.status }
+      );
+    }
 
-  if (!result) {
+    const data = await response.json();
+    return NextResponse.json({ result: data });
+  } catch (error) {
+    console.error('Research analyze error:', error);
     return NextResponse.json(
-      { error: "Could not reach the research backend." },
-      { status: 502 }
+      { error: 'Could not reach the research backend.' },
+      { status: 500 }
     );
   }
-
-  if (result.unavailable) {
-    return NextResponse.json(
-      { error: result.error ?? "Equity-research database is unavailable." },
-      { status: 503 }
-    );
-  }
-
-  return NextResponse.json({ result });
 }

@@ -1,26 +1,59 @@
 'use client';
 
 /**
- * Module 7: Unified Research-to-Trade Flow
+ * Module 7: Unified Research-to-Trade Flow (REFACTORED)
  *
- * Complete workflow: Research Report → Technical Setup → Position Sizing → Decision
+ * Decision-Support Architecture:
+ * Instead of "ENTER/CAUTION/WAIT/AVOID", emphasize case explanation
  *
- * Tabs:
- * 1. Research: Display 18-section report + quality score
- * 2. Technical Setup: Input entry/stop/targets + portfolio
- * 3. Position Calculator: Display position sizing results
- * 4. Decision Scorecard: Display unified confidence + recommendation
+ * Workflow:
+ * 1. Company Intelligence: 18-section research + evidence score
+ * 2. Trade Setup: Entry/stop/targets + thesis inputs (why/validation/invalidation/catalyst)
+ * 3. Risk & Position: Decision gates validation + position sizing
+ * 4. Decision Center: Thesis summary, pillar breakdown, ready to trade check
  */
 
-import React, { useState, useEffect } from 'react';
-import { AlertCircle, CheckCircle2, TrendingUp, TrendingDown, Zap } from 'lucide-react';
-import { EquityResearchSections } from './research/EquityResearchSections';
+import React, { useState } from 'react';
+import { AlertCircle, CheckCircle2, XCircle, TrendingUp, Lock } from 'lucide-react';
 import './UnifiedResearchTradeFlow.css';
-
 
 // ════════════════════════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
 // ════════════════════════════════════════════════════════════════════════════════
+
+interface EvidenceCoverageScore {
+  coverage_pct: number;
+  total_sections: number;
+  real_sections: number;
+  missing_evidence: string[];
+  data_freshness_score: number;
+  source_reliability: number;
+}
+
+interface DecisionGateResult {
+  gate_name: string;
+  passed: boolean;
+  issue: string | null;
+}
+
+interface PillarScores {
+  Fundamental: number;
+  Valuation: number;
+  Technical: number;
+  Market: number;
+}
+
+interface ThesisResult {
+  thesis_valid: boolean;
+  reason?: string;
+  pillar_scores: PillarScores;
+  confidence_score: number;
+  evidence_coverage: number;
+  gates_passed: boolean;
+  bull_case: string;
+  bear_case: string;
+  invalidation: string;
+}
 
 interface RiskMetrics {
   risk_per_share: number;
@@ -30,56 +63,22 @@ interface RiskMetrics {
   allocation_pct: number;
 }
 
-interface RiskRewardRatio {
-  target: number;
-  reward: number;
-  ratio: number;
-}
-
-interface CalculatorOutput {
-  risk_metrics: RiskMetrics;
-  risk_reward_ratios: RiskRewardRatio[];
-  liquidity_category: string | null;
-  warnings: string[];
-}
-
-interface ResearchQualityScore {
-  overall_score: number;
-  total_sections: number;
-  real_content_sections: number;
-  missing_evidence_count: number;
-  confidence_adjustment: number;
-}
-
-interface ConfidenceBreakdown {
-  research_quality_score: number;
-  technical_score: number;
-  market_score: number;
-  fundamental_score: number;
-  valuation_score: number;
-  events_score: number;
-  overall_confidence: number;
-  key_reasons: string[];
-}
-
-interface UnifiedResponse {
+interface UnifiedFlowResponse {
   ticker: string;
-  security_id: string | null;
-  research_report: any;
-  research_quality_score: ResearchQualityScore;
-  calculator_output: CalculatorOutput;
-  contexts: {
-    technical: any;
-    market: any;
-    fundamental: any;
-    valuation: any;
-    events: any;
-  };
-  confidence_breakdown: ConfidenceBreakdown;
-  unified_confidence_score: number;
-  entry_recommendation: 'ENTER' | 'CAUTION' | 'WAIT' | 'AVOID';
+  evidence_score: EvidenceCoverageScore;
+  gates: DecisionGateResult[];
+  gates_passed: boolean;
+  fundamental: any;
+  valuation: any;
+  technical: any;
+  market: any;
+  events: any;
+  thesis: ThesisResult;
+  calculator: any;
+  ready_to_trade: boolean;
+  confidence: number;
+  timestamp: string;
 }
-
 
 // ════════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -96,450 +95,33 @@ export function UnifiedResearchTradeFlow() {
   const [portfolio, setPortfolio] = useState('');
   const [riskPercent, setRiskPercent] = useState('2');
 
+  // Thesis state
+  const [thesisWhy, setThesisWhy] = useState('');
+  const [thesisValidation, setThesisValidation] = useState('');
+  const [thesisInvalidation, setThesisInvalidation] = useState('');
+  const [thesisCatalyst, setThesisCatalyst] = useState('');
+
   // Results state
-  const [unifiedData, setUnifiedData] = useState<UnifiedResponse | null>(null);
+  const [unifiedData, setUnifiedData] = useState<UnifiedFlowResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('intelligence');
 
-  // UI state
-  const [activeTab, setActiveTab] = useState<'research' | 'setup' | 'calculator' | 'scorecard'>('research');
-  const [showConfirmation, setShowConfirmation] = useState(false);
+  // ════════════════════════════════════════════════════════════════════════════════
+  // HANDLERS
+  // ════════════════════════════════════════════════════════════════════════════════
 
-
-  // ─── TAB 1: RESEARCH ─────────────────────────────────────────────────────────
-
-  const TabResearch = () => (
-    <div className="research-tab">
-      <div className="tab-header">
-        <h3>Company Research</h3>
-        <div className="research-quality-badge">
-          <span className="quality-label">Research Quality</span>
-          <span className="quality-score">
-            {unifiedData?.research_quality_score.overall_score.toFixed(0)}%
-          </span>
-          <span className="quality-details">
-            {unifiedData?.research_quality_score.real_content_sections}/
-            {unifiedData?.research_quality_score.total_sections} sections
-          </span>
-        </div>
-      </div>
-
-      {unifiedData?.research_report ? (
-        <EquityResearchSections r={unifiedData.research_report} />
-      ) : (
-        <div className="placeholder">
-          <p className="text-muted">Enter a ticker and click "Fetch Research" to load report</p>
-        </div>
-      )}
-    </div>
-  );
-
-
-  // ─── TAB 2: TECHNICAL SETUP ──────────────────────────────────────────────────
-
-  const TabTechnicalSetup = () => (
-    <div className="setup-tab">
-      <div className="tab-header">
-        <h3>Technical Setup</h3>
-      </div>
-
-      <div className="input-section">
-        {/* Ticker input */}
-        <div className="input-group">
-          <label htmlFor="ticker" className="input-label">Ticker</label>
-          <input
-            id="ticker"
-            type="text"
-            className="input-field"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value.toUpperCase())}
-            placeholder="e.g., FFC"
-          />
-        </div>
-
-        {/* Entry/Stop/Targets grid */}
-        <div className="price-inputs">
-          <div className="input-group">
-            <label htmlFor="stop" className="input-label">Stop Loss</label>
-            <input
-              id="stop"
-              type="number"
-              className="input-field"
-              value={stop}
-              onChange={(e) => setStop(e.target.value)}
-              placeholder="e.g., 240"
-              step="0.01"
-            />
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="entry" className="input-label">Entry Price</label>
-            <input
-              id="entry"
-              type="number"
-              className="input-field"
-              value={entry}
-              onChange={(e) => setEntry(e.target.value)}
-              placeholder="e.g., 250"
-              step="0.01"
-            />
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="target1" className="input-label">Target 1</label>
-            <input
-              id="target1"
-              type="number"
-              className="input-field"
-              value={target1}
-              onChange={(e) => setTarget1(e.target.value)}
-              placeholder="e.g., 260"
-              step="0.01"
-            />
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="target2" className="input-label">Target 2</label>
-            <input
-              id="target2"
-              type="number"
-              className="input-field"
-              value={target2}
-              onChange={(e) => setTarget2(e.target.value)}
-              placeholder="e.g., 270"
-              step="0.01"
-            />
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="target3" className="input-label">Target 3</label>
-            <input
-              id="target3"
-              type="number"
-              className="input-field"
-              value={target3}
-              onChange={(e) => setTarget3(e.target.value)}
-              placeholder="e.g., 280"
-              step="0.01"
-            />
-          </div>
-        </div>
-
-        {/* Portfolio and risk */}
-        <div className="portfolio-inputs">
-          <div className="input-group">
-            <label htmlFor="portfolio" className="input-label">Portfolio Value</label>
-            <input
-              id="portfolio"
-              type="number"
-              className="input-field"
-              value={portfolio}
-              onChange={(e) => setPortfolio(e.target.value)}
-              placeholder="e.g., 100000"
-              step="1000"
-            />
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="risk" className="input-label">Risk % per Trade</label>
-            <input
-              id="risk"
-              type="number"
-              className="input-field"
-              value={riskPercent}
-              onChange={(e) => setRiskPercent(e.target.value)}
-              placeholder="e.g., 2"
-              min="0.1"
-              max="10"
-              step="0.1"
-            />
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="action-buttons">
-          <button
-            className="button button-primary"
-            onClick={handleCalculate}
-            disabled={loading || !ticker || !entry || !stop || !target1 || !portfolio}
-          >
-            {loading ? 'Calculating...' : 'Calculate All'}
-          </button>
-        </div>
-
-        {error && (
-          <div className="alert alert-danger">
-            <AlertCircle size={16} />
-            {error}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-
-  // ─── TAB 3: POSITION CALCULATOR ──────────────────────────────────────────────
-
-  const TabPositionCalculator = () => (
-    <div className="calculator-tab">
-      <div className="tab-header">
-        <h3>Position Sizing Results</h3>
-      </div>
-
-      {unifiedData?.calculator_output ? (
-        <div className="results-container">
-          {/* Risk metrics grid */}
-          <div className="metrics-grid">
-            <div className="metric-card">
-              <div className="metric-label">Risk per Share</div>
-              <div className="metric-value">
-                PKR {unifiedData.calculator_output.risk_metrics.risk_per_share.toFixed(2)}
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-label">Max Loss</div>
-              <div className="metric-value warning">
-                PKR {unifiedData.calculator_output.risk_metrics.max_loss.toFixed(0)}
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-label">Position Size</div>
-              <div className="metric-value">
-                {unifiedData.calculator_output.risk_metrics.position_size} shares
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-label">Capital Required</div>
-              <div className="metric-value">
-                PKR {unifiedData.calculator_output.risk_metrics.capital_required.toFixed(0)}
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-label">Allocation %</div>
-              <div className="metric-value">
-                {unifiedData.calculator_output.risk_metrics.allocation_pct.toFixed(1)}%
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-label">Liquidity</div>
-              <div className="metric-value">
-                {unifiedData.calculator_output.liquidity_category || 'N/A'}
-              </div>
-            </div>
-          </div>
-
-          {/* Risk/Reward ratios */}
-          {unifiedData.calculator_output.risk_reward_ratios.length > 0 && (
-            <div className="content-card">
-              <h4>Risk/Reward Ratios</h4>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Target Price</th>
-                    <th>Reward per Share</th>
-                    <th>Ratio</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unifiedData.calculator_output.risk_reward_ratios.map((rr, i) => (
-                    <tr key={i}>
-                      <td>PKR {rr.target.toFixed(2)}</td>
-                      <td>PKR {rr.reward.toFixed(2)}</td>
-                      <td>{rr.ratio.toFixed(2)}:1</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Warnings */}
-          {unifiedData.calculator_output.warnings.length > 0 && (
-            <div className="content-card">
-              <h4>Warnings</h4>
-              {unifiedData.calculator_output.warnings.map((warning, i) => (
-                <div key={i} className="alert alert-warning">
-                  <AlertCircle size={16} />
-                  {warning}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="placeholder">
-          <p className="text-muted">Fill in the technical setup and click "Calculate All" to see results</p>
-        </div>
-      )}
-    </div>
-  );
-
-
-  // ─── TAB 4: DECISION SCORECARD ───────────────────────────────────────────────
-
-  const TabDecisionScorecard = () => (
-    <div className="scorecard-tab">
-      <div className="tab-header">
-        <h3>Decision Scorecard</h3>
-      </div>
-
-      {unifiedData ? (
-        <div className="scorecard-container">
-          {/* Confidence score - large display */}
-          <div className="confidence-section">
-            <div className="confidence-meter">
-              <div
-                className="confidence-fill"
-                style={{
-                  width: `${unifiedData.unified_confidence_score}%`,
-                  backgroundColor:
-                    unifiedData.unified_confidence_score >= 75
-                      ? '#10b981'
-                      : unifiedData.unified_confidence_score >= 60
-                      ? '#f59e0b'
-                      : '#ef4444',
-                }}
-              />
-            </div>
-            <div className="confidence-value">
-              {unifiedData.unified_confidence_score.toFixed(0)}% Confidence
-            </div>
-          </div>
-
-          {/* Entry recommendation - large badge */}
-          <div className="recommendation-section">
-            <div
-              className={`recommendation-badge recommendation-${unifiedData.entry_recommendation.toLowerCase()}`}
-            >
-              {unifiedData.entry_recommendation}
-            </div>
-            <div className="recommendation-label">
-              {unifiedData.entry_recommendation === 'ENTER' && '✅ Ready to enter'}
-              {unifiedData.entry_recommendation === 'CAUTION' && '⚠️ Proceed with caution'}
-              {unifiedData.entry_recommendation === 'WAIT' && '⏳ Wait for confirmation'}
-              {unifiedData.entry_recommendation === 'AVOID' && '❌ Do not enter'}
-            </div>
-          </div>
-
-          {/* Key reasons breakdown */}
-          <div className="content-card">
-            <h4>Key Reasons for {unifiedData.unified_confidence_score.toFixed(0)}% Confidence</h4>
-            <div className="reasons-list">
-              {unifiedData.confidence_breakdown.key_reasons.map((reason, i) => (
-                <div key={i} className="reason-item">
-                  <div className="reason-dot" />
-                  <span>{reason}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Detailed breakdown */}
-          <div className="content-card">
-            <h4>Detailed Score Breakdown</h4>
-            <div className="breakdown-grid">
-              <ScoreBar
-                label="Research Quality"
-                score={unifiedData.confidence_breakdown.research_quality_score}
-                weight={15}
-              />
-              <ScoreBar
-                label="Technical"
-                score={unifiedData.confidence_breakdown.technical_score}
-                weight={20}
-              />
-              <ScoreBar
-                label="Market"
-                score={unifiedData.confidence_breakdown.market_score}
-                weight={20}
-              />
-              <ScoreBar
-                label="Fundamental"
-                score={unifiedData.confidence_breakdown.fundamental_score}
-                weight={15}
-              />
-              <ScoreBar
-                label="Valuation"
-                score={unifiedData.confidence_breakdown.valuation_score}
-                weight={15}
-              />
-              <ScoreBar
-                label="Events"
-                score={unifiedData.confidence_breakdown.events_score}
-                weight={15}
-              />
-            </div>
-          </div>
-
-          {/* Position recap */}
-          <div className="content-card">
-            <h4>Position Summary</h4>
-            <div className="summary-grid">
-              <div className="summary-item">
-                <span className="summary-label">Shares</span>
-                <span className="summary-value">
-                  {unifiedData.calculator_output.risk_metrics.position_size}
-                </span>
-              </div>
-              <div className="summary-item">
-                <span className="summary-label">Capital</span>
-                <span className="summary-value">
-                  PKR {unifiedData.calculator_output.risk_metrics.capital_required.toFixed(0)}
-                </span>
-              </div>
-              <div className="summary-item">
-                <span className="summary-label">Max Loss</span>
-                <span className="summary-value warning">
-                  PKR {unifiedData.calculator_output.risk_metrics.max_loss.toFixed(0)}
-                </span>
-              </div>
-              <div className="summary-item">
-                <span className="summary-label">% Portfolio</span>
-                <span className="summary-value">
-                  {unifiedData.calculator_output.risk_metrics.allocation_pct.toFixed(1)}%
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="action-buttons">
-            <button className="button button-secondary" onClick={handleExportPDF}>
-              📄 Export to PDF
-            </button>
-            <button className="button button-secondary" onClick={handleSaveTradePlan}>
-              💾 Save Trade Plan
-            </button>
-            <button className="button button-primary" onClick={() => setShowConfirmation(true)}>
-              ✅ Mark Ready
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="placeholder">
-          <p className="text-muted">Calculate to see decision scorecard</p>
-        </div>
-      )}
-    </div>
-  );
-
-
-  // ─── EVENT HANDLERS ──────────────────────────────────────────────────────────
-
-  async function handleCalculate() {
-    if (!ticker || !entry || !stop || !target1 || !portfolio) {
+  const handleCalculate = async () => {
+    if (!ticker || !entry || !stop || !portfolio) {
       setError('Please fill in all required fields');
       return;
     }
 
-    const targets = [parseFloat(target1)];
-    if (target2) targets.push(parseFloat(target2));
-    if (target3) targets.push(parseFloat(target3));
+    const targets = [target1, target2, target3].filter(t => t).map(Number);
+    if (targets.length === 0) {
+      setError('Please enter at least one target');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -552,135 +134,414 @@ export function UnifiedResearchTradeFlow() {
           ticker,
           entry: parseFloat(entry),
           stop: parseFloat(stop),
-          targets,
+          targets: targets.map(Number),
           portfolio_value: parseFloat(portfolio),
           risk_percent: parseFloat(riskPercent),
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        setError(data.error || `Server error ${response.status}`);
-        return;
+        throw new Error(`API error: ${response.statusText}`);
       }
 
-      setUnifiedData(data.unified_response);
-      setActiveTab('calculator');
+      const data = await response.json();
+      setUnifiedData(data);
+      setActiveTab('decision');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Network error');
+      setError(err instanceof Error ? err.message : 'Failed to calculate');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  function handleExportPDF() {
-    alert('PDF export coming soon!');
-  }
+  const handleExportPDF = () => {
+    if (!unifiedData) return;
+    // TODO: Implement PDF export
+    console.log('Exporting to PDF...');
+  };
 
-  function handleSaveTradePlan() {
-    alert('Save to database coming soon!');
-  }
+  const handleSaveTradePlan = () => {
+    if (!unifiedData) return;
+    // TODO: Implement save to database
+    console.log('Saving trade plan...');
+  };
 
+  // ════════════════════════════════════════════════════════════════════════════════
+  // RENDER TABS
+  // ════════════════════════════════════════════════════════════════════════════════
 
-  // ─── RENDER ──────────────────────────────────────────────────────────────────
+  const renderIntelligenceTab = () => (
+    <div className="intelligence-tab">
+      <div className="tab-header">
+        <h3>Company Intelligence</h3>
+        {unifiedData && (
+          <div className="evidence-badge">
+            <span className="badge-label">Evidence Coverage</span>
+            <span className="badge-value">{Math.round(unifiedData.evidence_score.coverage_pct)}%</span>
+          </div>
+        )}
+      </div>
+
+      {!unifiedData ? (
+        <div className="placeholder">
+          <p className="text-muted">Enter ticker and run analysis to view 18-section research report</p>
+        </div>
+      ) : (
+        <div className="evidence-display">
+          <div className="coverage-stat">
+            <div className="stat-label">Data Completeness</div>
+            <div className="stat-value">{unifiedData.evidence_score.real_sections}/{unifiedData.evidence_score.total_sections} sections</div>
+            <div className="stat-detail">Freshness: {Math.round(unifiedData.evidence_score.data_freshness_score)}% | Reliability: {Math.round(unifiedData.evidence_score.source_reliability)}%</div>
+          </div>
+          {unifiedData.evidence_score.missing_evidence.length > 0 && (
+            <div className="missing-evidence">
+              <div className="label">Missing Evidence</div>
+              <ul>
+                {unifiedData.evidence_score.missing_evidence.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderSetupTab = () => (
+    <div className="setup-tab">
+      <div className="tab-header">
+        <h3>Trade Setup</h3>
+      </div>
+
+      <div className="section">
+        <h4>Technical Entry Points</h4>
+        <div className="input-section">
+          <div className="input-group">
+            <label className="input-label">Ticker</label>
+            <input
+              type="text"
+              className="input-field"
+              value={ticker}
+              onChange={(e) => setTicker(e.target.value.toUpperCase())}
+              placeholder="e.g., FFC"
+            />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Stop Loss</label>
+            <input
+              type="number"
+              className="input-field"
+              value={stop}
+              onChange={(e) => setStop(e.target.value)}
+              step="0.01"
+              placeholder="240.00"
+            />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Entry Price</label>
+            <input
+              type="number"
+              className="input-field"
+              value={entry}
+              onChange={(e) => setEntry(e.target.value)}
+              step="0.01"
+              placeholder="250.00"
+            />
+          </div>
+        </div>
+
+        <div className="price-inputs">
+          <div className="input-group">
+            <label className="input-label">Target 1</label>
+            <input type="number" className="input-field" value={target1} onChange={(e) => setTarget1(e.target.value)} step="0.01" />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Target 2</label>
+            <input type="number" className="input-field" value={target2} onChange={(e) => setTarget2(e.target.value)} step="0.01" />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Target 3</label>
+            <input type="number" className="input-field" value={target3} onChange={(e) => setTarget3(e.target.value)} step="0.01" />
+          </div>
+        </div>
+      </div>
+
+      <div className="section">
+        <h4>Position Sizing</h4>
+        <div className="input-section">
+          <div className="input-group">
+            <label className="input-label">Portfolio Value</label>
+            <input type="number" className="input-field" value={portfolio} onChange={(e) => setPortfolio(e.target.value)} placeholder="100000" />
+          </div>
+          <div className="input-group">
+            <label className="input-label">Risk per Trade (%)</label>
+            <input type="number" className="input-field" value={riskPercent} onChange={(e) => setRiskPercent(e.target.value)} min="0.1" max="10" step="0.1" />
+          </div>
+        </div>
+      </div>
+
+      <div className="section">
+        <h4>Trade Thesis</h4>
+        <div className="textarea-group">
+          <label className="input-label">Why am I buying this?</label>
+          <textarea
+            className="input-field textarea"
+            value={thesisWhy}
+            onChange={(e) => setThesisWhy(e.target.value)}
+            placeholder="Describe the fundamental or technical reason for this trade..."
+            rows={3}
+          />
+        </div>
+        <div className="textarea-group">
+          <label className="input-label">What proves me right?</label>
+          <textarea
+            className="input-field textarea"
+            value={thesisValidation}
+            onChange={(e) => setThesisValidation(e.target.value)}
+            placeholder="What price action or news would validate this thesis..."
+            rows={3}
+          />
+        </div>
+        <div className="textarea-group">
+          <label className="input-label">What proves me wrong?</label>
+          <textarea
+            className="input-field textarea"
+            value={thesisInvalidation}
+            onChange={(e) => setThesisInvalidation(e.target.value)}
+            placeholder="What would invalidate this thesis (breaking support, negative earnings, etc)..."
+            rows={3}
+          />
+        </div>
+        <div className="textarea-group">
+          <label className="input-label">Expected catalyst</label>
+          <textarea
+            className="input-field textarea"
+            value={thesisCatalyst}
+            onChange={(e) => setThesisCatalyst(e.target.value)}
+            placeholder="What event or timeframe am I waiting for..."
+            rows={2}
+          />
+        </div>
+      </div>
+
+      <div className="action-buttons">
+        <button className="button button-primary" onClick={handleCalculate} disabled={loading}>
+          {loading ? 'Analyzing...' : 'Run Analysis'}
+        </button>
+      </div>
+
+      {error && <div className="alert alert-danger">{error}</div>}
+    </div>
+  );
+
+  const renderRiskTab = () => (
+    <div className="risk-tab">
+      <div className="tab-header">
+        <h3>Risk & Position</h3>
+      </div>
+
+      {!unifiedData ? (
+        <div className="placeholder">
+          <p className="text-muted">Complete Trade Setup tab and run analysis to see risk validation</p>
+        </div>
+      ) : (
+        <>
+          <div className="gates-section">
+            <h4>Decision Gates</h4>
+            <div className="gates-list">
+              {unifiedData.gates.map((gate, i) => (
+                <div key={i} className={`gate-item ${gate.passed ? 'passed' : 'failed'}`}>
+                  <div className="gate-icon">
+                    {gate.passed ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                  </div>
+                  <div className="gate-content">
+                    <div className="gate-name">{gate.gate_name}</div>
+                    {gate.issue && <div className="gate-issue">{gate.issue}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {unifiedData.calculator && (
+            <div className="position-section">
+              <h4>Position Sizing</h4>
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <div className="metric-label">Shares</div>
+                  <div className="metric-value">{Math.round(unifiedData.calculator.position_size_shares)}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-label">Capital Required</div>
+                  <div className="metric-value">${Math.round(unifiedData.calculator.capital_required).toLocaleString()}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-label">Risk per Share</div>
+                  <div className="metric-value">${(unifiedData.calculator.risk_per_share).toFixed(2)}</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-label">Max Loss</div>
+                  <div className="metric-value warning">${Math.round(unifiedData.calculator.max_loss).toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {unifiedData.calculator?.warnings && unifiedData.calculator.warnings.length > 0 && (
+            <div className="warnings-section">
+              <h4>Warnings</h4>
+              {unifiedData.calculator.warnings.map((warning, i) => (
+                <div key={i} className="alert alert-warning">
+                  <AlertCircle size={16} />
+                  {warning}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  const renderDecisionTab = () => (
+    <div className="decision-tab">
+      <div className="tab-header">
+        <h3>Decision Center</h3>
+      </div>
+
+      {!unifiedData ? (
+        <div className="placeholder">
+          <p className="text-muted">Complete analysis to review final decision</p>
+        </div>
+      ) : (
+        <>
+          <div className="gates-status">
+            {!unifiedData.gates_passed && (
+              <div className="alert alert-danger">
+                <XCircle size={20} />
+                <div>
+                  <div className="alert-title">Decision Gates Failed</div>
+                  <div className="alert-detail">This trade does not pass required validation gates. Review the Risk & Position tab.</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {unifiedData.thesis && (
+            <>
+              <div className="thesis-section">
+                <h4>Thesis Summary</h4>
+                <div className="thesis-content">
+                  <div className="thesis-item">
+                    <div className="thesis-label">Bull Case</div>
+                    <div className="thesis-text">{unifiedData.thesis.bull_case}</div>
+                  </div>
+                  <div className="thesis-item">
+                    <div className="thesis-label">Bear Case</div>
+                    <div className="thesis-text">{unifiedData.thesis.bear_case}</div>
+                  </div>
+                  <div className="thesis-item">
+                    <div className="thesis-label">Invalidation</div>
+                    <div className="thesis-text">{unifiedData.thesis.invalidation}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pillars-section">
+                <h4>Pillar Analysis</h4>
+                <div className="pillars-grid">
+                  {unifiedData.thesis.pillar_scores && Object.entries(unifiedData.thesis.pillar_scores).map(([pillar, score]) => (
+                    <div key={pillar} className="pillar-bar">
+                      <div className="pillar-label">{pillar}</div>
+                      <div className="pillar-score">{Math.round(score)}/100</div>
+                      <div className="pillar-fill" style={{ width: `${score}%` }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="confidence-section">
+                <h4>Investment Confidence</h4>
+                <div className="confidence-display">
+                  <div className="confidence-meter-container">
+                    <div className="confidence-value">{Math.round(unifiedData.confidence)}%</div>
+                    <div
+                      className="confidence-meter"
+                      style={{
+                        background: unifiedData.confidence >= 70 ? '#10b981' : unifiedData.confidence >= 50 ? '#f59e0b' : '#ef4444',
+                      }}
+                    />
+                  </div>
+                  <div className="confidence-detail">
+                    Evidence Coverage: {Math.round(unifiedData.thesis.evidence_coverage)}% | Gates Passed: {unifiedData.gates_passed ? 'Yes' : 'No'}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="action-buttons">
+            <button
+              className="button button-primary"
+              onClick={handleSaveTradePlan}
+              disabled={!unifiedData.ready_to_trade}
+            >
+              <CheckCircle2 size={16} />
+              Mark Ready to Trade
+            </button>
+            <button className="button button-secondary" onClick={handleExportPDF}>
+              Export to PDF
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // ════════════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ════════════════════════════════════════════════════════════════════════════════
 
   return (
     <div className="unified-research-trade-flow">
       <div className="flow-header">
-        <h1>Research-to-Trade Decision Tool</h1>
-        <p className="flow-subtitle">Unified analysis: Research + Technical + Position Sizing + Confidence Scoring</p>
+        <h1>Trade Analysis</h1>
+        <p className="flow-subtitle">Research-driven decision support for position entry</p>
       </div>
 
-      {/* Tab navigation */}
       <div className="tabs-container">
         <button
-          className={`tab-button ${activeTab === 'research' ? 'active' : ''}`}
-          onClick={() => setActiveTab('research')}
+          className={`tab-button ${activeTab === 'intelligence' ? 'active' : ''}`}
+          onClick={() => setActiveTab('intelligence')}
         >
-          📊 Research
+          Company Intelligence
         </button>
         <button
           className={`tab-button ${activeTab === 'setup' ? 'active' : ''}`}
           onClick={() => setActiveTab('setup')}
         >
-          ⚙️ Setup
+          Trade Setup
         </button>
         <button
-          className={`tab-button ${activeTab === 'calculator' ? 'active' : ''}`}
-          onClick={() => setActiveTab('calculator')}
+          className={`tab-button ${activeTab === 'risk' ? 'active' : ''}`}
+          onClick={() => setActiveTab('risk')}
         >
-          🧮 Calculator
+          Risk & Position
         </button>
         <button
-          className={`tab-button ${activeTab === 'scorecard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('scorecard')}
+          className={`tab-button ${activeTab === 'decision' ? 'active' : ''}`}
+          onClick={() => setActiveTab('decision')}
         >
-          🎯 Scorecard
+          Decision Center
         </button>
       </div>
 
-      {/* Tab content */}
       <div className="tabs-content">
-        {activeTab === 'research' && <TabResearch />}
-        {activeTab === 'setup' && <TabTechnicalSetup />}
-        {activeTab === 'calculator' && <TabPositionCalculator />}
-        {activeTab === 'scorecard' && <TabDecisionScorecard />}
-      </div>
-
-      {/* Confirmation modal */}
-      {showConfirmation && (
-        <div className="modal-overlay" onClick={() => setShowConfirmation(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Mark Trade Plan as Ready?</h3>
-            <p className="modal-text">
-              You're about to mark this trade plan as ready for execution. Make sure all analysis is complete.
-            </p>
-            <div className="modal-buttons">
-              <button className="button button-secondary" onClick={() => setShowConfirmation(false)}>
-                Cancel
-              </button>
-              <button className="button button-primary" onClick={() => {
-                alert('Status updated to READY');
-                setShowConfirmation(false);
-              }}>
-                Mark Ready
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// ════════════════════════════════════════════════════════════════════════════════
-// HELPER COMPONENTS
-// ════════════════════════════════════════════════════════════════════════════════
-
-interface ScoreBarProps {
-  label: string;
-  score: number;
-  weight: number;
-}
-
-function ScoreBar({ label, score, weight }: ScoreBarProps) {
-  const points = Math.round((score * weight) / 100);
-  return (
-    <div className="score-bar-container">
-      <div className="score-bar-label">{label}</div>
-      <div className="score-bar-wrapper">
-        <div
-          className="score-bar-fill"
-          style={{
-            width: `${score}%`,
-            backgroundColor: score >= 75 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444',
-          }}
-        />
-      </div>
-      <div className="score-bar-value">
-        {score.toFixed(0)}/100 ({weight}% weight, {points} pts)
+        {activeTab === 'intelligence' && renderIntelligenceTab()}
+        {activeTab === 'setup' && renderSetupTab()}
+        {activeTab === 'risk' && renderRiskTab()}
+        {activeTab === 'decision' && renderDecisionTab()}
       </div>
     </div>
   );

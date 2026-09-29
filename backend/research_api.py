@@ -8,6 +8,10 @@ from research_system.research_trade_unified import (
     ResearchTradeUnifiedFlow,
     create_unified_response
 )
+from research_system.business_model_analysis import (
+    get_business_model_analysis,
+    get_all_business_models
+)
 
 app = Flask(__name__)
 
@@ -196,6 +200,31 @@ def unified_research_trade_flow():
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/research/<ticker>/business-model', methods=['GET'])
+def get_business_model(ticker):
+    """Get business model analysis for a company"""
+    analysis = get_business_model_analysis(ticker)
+
+    if not analysis:
+        return jsonify({'success': False, 'error': 'Business model data not found'}), 404
+
+    return jsonify({
+        'success': True,
+        **analysis
+    })
+
+
+@app.route('/api/research/business-models/all', methods=['GET'])
+def get_all_models():
+    """Get business models for all companies"""
+    models = get_all_business_models()
+    return jsonify({
+        'success': True,
+        'count': len(models),
+        'data': {ticker: data for ticker, data in models.items()}
+    })
 
 if __name__ == '__main__':
     print("=" * 80)

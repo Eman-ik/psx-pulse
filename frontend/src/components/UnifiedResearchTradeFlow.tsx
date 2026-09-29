@@ -17,6 +17,8 @@ import React, { useState } from 'react';
 import { AlertCircle, CheckCircle2, XCircle, TrendingUp, Lock } from 'lucide-react';
 import './UnifiedResearchTradeFlow.css';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+
 // ════════════════════════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
 // ════════════════════════════════════════════════════════════════════════════════
@@ -127,7 +129,7 @@ export function UnifiedResearchTradeFlow() {
     setError('');
 
     try {
-      const response = await fetch('/api/research-trade/unified-flow', {
+      const response = await fetch(`${API_BASE_URL}/research-trade/unified-flow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

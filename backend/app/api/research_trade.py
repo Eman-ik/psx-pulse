@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field
 # Add research_system to path so we can import from it
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from research_system.research_trade_unified import ResearchTradeUnifiedFlow, TradeHorizon
+from research_system.research_trade_unified import ResearchTradeUnifiedFlow
+from research_system.services import TradeHorizon
 
 router = APIRouter(prefix="/research-trade", tags=["research-trade"])
 

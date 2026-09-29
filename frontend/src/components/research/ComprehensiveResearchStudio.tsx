@@ -2,25 +2,57 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, BarChart3, Bot, Building2, Download, FileText, FolderOpen, Landmark, Loader2, MessageSquareText, Search, ShieldCheck, TrendingUp, Users, Briefcase } from "lucide-react";
+import { Activity, BarChart3, Bot, Building2, Download, FileText, FolderOpen, Landmark, Loader2, MessageSquareText, Search, ShieldCheck, TrendingUp, Users, Briefcase, Factory, LineChart, TrendingDown, DollarSign, Zap, AlertTriangle, Gift, Target } from "lucide-react";
 import { BusinessModelSection } from "./BusinessModelSection";
+import { FinancialGrowthSection } from "./FinancialGrowthSection";
+import { ReturnsOnCapitalSection } from "./ReturnsOnCapitalSection";
+import { BalanceSheetStrengthSection } from "./BalanceSheetStrengthSection";
+import { CashFlowHealthSection } from "./CashFlowHealthSection";
+import { EarningsQualitySection } from "./EarningsQualitySection";
+import { WorkingCapitalSection } from "./WorkingCapitalSection";
+import { DividendAnalysisSection } from "./DividendAnalysisSection";
+import { ValuationSection } from "./ValuationSection";
+import { CapitalAllocationSection } from "./CapitalAllocationSection";
+import { RiskAssessmentSection } from "./RiskAssessmentSection";
+import { CatalystAnalysisSection } from "./CatalystAnalysisSection";
+import { IndustryIntelligence, IndustryIntelligencePanel } from "./IndustryIntelligencePanel";
+import PeerComparisonSection from "./PeerComparisonSection";
+import HistoricalValuationSection from "./HistoricalValuationSection";
+import ManagementGovernanceSection from "./ManagementGovernanceSection";
+import FundamentalScorecardSection from "./FundamentalScorecardSection";
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 type CoverageTier = "full" | "unverified" | "price_only";
-type Tab = "overview" | "business-model" | "financials" | "kpis" | "valuation" | "peers" | "announcements" | "filings" | "ai" | "report";
+type Tab = "overview" | "business-model" | "industry" | "financials" | "kpis" | "valuation" | "peers" | "financial-growth" | "returns-on-capital" | "balance-sheet" | "cash-flow" | "earnings-quality" | "working-capital" | "dividend" | "valuation-full" | "capital-allocation" | "risks" | "catalysts" | "peer-comparison" | "historical-valuation" | "governance" | "fundamental-scorecard" | "announcements" | "filings" | "ai" | "report";
 interface UniverseEntry { symbol:string; name:string; sector:"FERTILIZER"|"CEMENT"; coverage_tier:CoverageTier; index_weight:number|null; issuer_id:number; }
 interface Universe { as_of:string; count:number; tier_counts:Record<string,number>; sector_counts:Record<string,number>; entries:UniverseEntry[]; }
 interface Point { period_end:string; value:number; unit?:string; period_type?:string; }
 interface Ratio { name:string; category:string; unit:string; formula:string; values:Point[]; }
 interface Peer { id:number; symbol:string; name:string; sector:string; market_cap:number|null; eps:number|null; roe:number|null; debt_to_equity:number|null; net_profit_margin:number|null; coverage_status:string; }
-interface Workspace { ticker:string; generated_at:string; coverage_tier:CoverageTier; evidence:{source_count:number;announcement_count:number;financial_series_count:number;ratio_series_count:number;fundamentals_renderable:boolean}; overview:{issuer:{name:string;short_name:string|null;sector_name:string;business_description:string|null;website:string|null;auditor:string|null;fiscal_year_end_month:number|null;establishment_year:number|null};data_delay_notice:string;symbol:string;security_id:number|null;free_float_pct:number|null;financials:Record<string,Point[]>;ratios:Record<string,Ratio>;payouts:{action_type:string;effective_date:string;ratio_or_amount:number|null}[];announcements:{id:number;title:string;category:string;published_at:string;summary:string|null;source_url:string|null}[];sources:{document_type:string;source_tier:string;url:string|null;fetched_at:string}[];operational_metrics:Record<string,Point[]>;thesis:{as_of_date:string;bull_case:string;base_case:string;bear_case:string;key_catalysts:string[];key_risks:string[]}|null};peers:Peer[]; }
+interface Workspace { ticker:string; generated_at:string; coverage_tier:CoverageTier; evidence:{source_count:number;announcement_count:number;financial_series_count:number;ratio_series_count:number;fundamentals_renderable:boolean}; overview:{issuer:{name:string;short_name:string|null;sector_name:string;business_description:string|null;website:string|null;auditor:string|null;fiscal_year_end_month:number|null;establishment_year:number|null};data_delay_notice:string;symbol:string;security_id:number|null;free_float_pct:number|null;financials:Record<string,Point[]>;ratios:Record<string,Ratio>;payouts:{action_type:string;effective_date:string;ratio_or_amount:number|null}[];announcements:{id:number;title:string;category:string;published_at:string;summary:string|null;source_url:string|null}[];sources:{document_type:string;source_tier:string;url:string|null;fetched_at:string}[];operational_metrics:Record<string,Point[]>;thesis:{as_of_date:string;bull_case:string;base_case:string;bear_case:string;key_catalysts:string[];key_risks:string[]}|null};peers:Peer[]; industry:IndustryIntelligence; }
 interface ResearchReport { not_covered:boolean; unavailable:boolean; coverage_note?:string; published_at?:string;sections_total?:number;sections_with_real_content?:number;sections?:{title:string;content:string;has_real_content:boolean;missing_evidence:string[]}[]; }
 
 const TABS:{id:Tab;label:string;icon:typeof BarChart3;requiresFull?:boolean}[]=[
   {id:"overview",label:"Overview",icon:Building2},{id:"business-model",label:"Business Model",icon:Briefcase},
+  {id:"industry",label:"Industry",icon:Factory},
   {id:"financials",label:"Financials",icon:FileText,requiresFull:true},
   {id:"kpis",label:"KPIs",icon:Activity,requiresFull:true},{id:"valuation",label:"Valuation",icon:Landmark,requiresFull:true},
-  {id:"peers",label:"Peers",icon:Users,requiresFull:true},{id:"announcements",label:"Announcements",icon:MessageSquareText},
+  {id:"peers",label:"Peers",icon:Users,requiresFull:true},{id:"financial-growth",label:"Growth",icon:LineChart,requiresFull:true},
+  {id:"returns-on-capital",label:"Returns",icon:TrendingUp,requiresFull:true},
+  {id:"balance-sheet",label:"Balance",icon:DollarSign,requiresFull:true},
+  {id:"cash-flow",label:"Cash Flow",icon:Zap,requiresFull:true},
+  {id:"earnings-quality",label:"Earnings",icon:TrendingDown,requiresFull:true},
+  {id:"working-capital",label:"WC",icon:Activity,requiresFull:true},
+  {id:"dividend",label:"Dividend",icon:Gift,requiresFull:true},
+  {id:"valuation-full",label:"Valuation+",icon:Target,requiresFull:true},
+  {id:"capital-allocation",label:"Capital",icon:TrendingUp,requiresFull:true},
+  {id:"risks",label:"Risks",icon:AlertTriangle,requiresFull:true},
+  {id:"catalysts",label:"Catalysts",icon:Zap,requiresFull:true},
+  {id:"peer-comparison",label:"Peers",icon:Users,requiresFull:true},
+  {id:"historical-valuation",label:"History",icon:LineChart,requiresFull:true},
+  {id:"governance",label:"Governance",icon:ShieldCheck,requiresFull:true},
+  {id:"fundamental-scorecard",label:"Scorecard",icon:BarChart3,requiresFull:true},
+  {id:"announcements",label:"Announcements",icon:MessageSquareText},
   {id:"filings",label:"Filings",icon:FolderOpen},{id:"ai",label:"AI Research",icon:Bot,requiresFull:true},{id:"report",label:"Report",icon:Download},
 ];
 const latest=(series?:Point[])=>series?.length?series[series.length-1]:null;
@@ -65,10 +97,26 @@ export function ComprehensiveResearchStudio(){
       <nav className="flex gap-1 overflow-x-auto border-b border-border">{visibleTabs.map(item=>{const Icon=item.icon;return <button key={item.id} onClick={()=>setTab(item.id)} className={`flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold ${tab===item.id?"border-accent text-accent":"border-transparent text-muted"}`}><Icon className="h-4 w-4"/>{item.label}</button>})}</nav>
       {tab==="overview"&&<div className="grid gap-5 lg:grid-cols-3"><section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2"><h3 className="font-bold">Company intelligence</h3><div className="mt-4 grid gap-4 sm:grid-cols-2"><Card label="Established" value={workspace.overview.issuer.establishment_year?.toString()??"—"}/><Card label="Fiscal year end" value={workspace.overview.issuer.fiscal_year_end_month?`Month ${workspace.overview.issuer.fiscal_year_end_month}`:"—"}/><Card label="Auditor" value={workspace.overview.issuer.auditor??"—"}/><Card label="Website" value={workspace.overview.issuer.website??"—"}/></div></section><section className="rounded-xl border border-border bg-surface p-5"><h3 className="font-bold">Research thesis</h3>{workspace.overview.thesis&&full?<div className="mt-4 space-y-3 text-sm"><p><b className="text-positive">Bull:</b> {workspace.overview.thesis.bull_case}</p><p><b className="text-accent">Base:</b> {workspace.overview.thesis.base_case}</p><p><b className="text-negative">Bear:</b> {workspace.overview.thesis.bear_case}</p></div>:<p className="mt-4 text-sm text-muted">No source-verified thesis is available.</p>}</section></div>}
       {tab==="business-model"&&<section className="rounded-xl border border-border bg-surface p-5"><BusinessModelSection ticker={workspace.ticker}/></section>}
+      {tab==="industry"&&<IndustryIntelligencePanel industry={workspace.industry}/>} 
       {tab==="financials"&&<section className="overflow-hidden rounded-xl border border-border bg-surface"><div className="border-b border-border p-5"><h3 className="font-bold">Financial statement explorer</h3><p className="text-xs text-muted">Reported periods from source-linked filings.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-surface-alt text-muted"><tr><th className="p-3">Line item</th><th>Latest period</th><th>Value</th><th>Unit</th><th>Period type</th></tr></thead><tbody>{financialRows.map(([key,series])=>{const p=latest(series);return <tr key={key} className="border-t border-border"><td className="p-3 font-medium">{key.replaceAll("_"," ")}</td><td>{p?.period_end??"—"}</td><td className="font-mono">{compact(p?.value)}</td><td>{p?.unit??"—"}</td><td>{p?.period_type??"—"}</td></tr>})}</tbody></table></div></section>}
       {tab==="kpis"&&<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{ratioRows.filter(([,r])=>!r.category.toLowerCase().includes("valuation")).map(([key,r])=><Card key={key} label={`${r.category} · ${r.name}`} value={ratioValue(latest(r.values)?.value,r.unit)} note={r.formula}/>)}</div>}
       {tab==="valuation"&&<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{ratioRows.filter(([key,r])=>r.category.toLowerCase().includes("valuation")||["pe_ratio","pb_ratio","dividend_yield","ev_ebitda"].includes(key)).map(([key,r])=><Card key={key} label={r.name} value={ratioValue(latest(r.values)?.value,r.unit)} note={r.formula}/>)}</div>}
       {tab==="peers"&&<section className="overflow-hidden rounded-xl border border-border bg-surface"><div className="p-5"><h3 className="font-bold">{workspace.overview.issuer.sector_name} peer comparison</h3><p className="text-xs text-muted">Only source-verified values are used for analytical comparison.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-surface-alt"><tr><th className="p-3">Ticker</th><th>Company</th><th>Coverage</th><th>Market cap</th><th>EPS</th><th>ROE</th><th>D/E</th><th>Net margin</th></tr></thead><tbody>{workspace.peers.map(p=><tr key={p.id} className="border-t border-border"><td className="p-3 font-bold text-accent">{p.symbol}</td><td>{p.name}</td><td>{p.coverage_status}</td><td>{compact(p.market_cap)}</td><td>{compact(p.eps)}</td><td>{pct(p.roe)}</td><td>{ratioValue(p.debt_to_equity,"x")}</td><td>{pct(p.net_profit_margin)}</td></tr>)}</tbody></table></div></section>}
+      {tab==="financial-growth"&&<section className="rounded-xl border border-border bg-surface p-5"><FinancialGrowthSection /></section>}
+      {tab==="returns-on-capital"&&<section className="rounded-xl border border-border bg-surface p-5"><ReturnsOnCapitalSection /></section>}
+      {tab==="balance-sheet"&&<section className="rounded-xl border border-border bg-surface p-5"><BalanceSheetStrengthSection /></section>}
+      {tab==="cash-flow"&&<section className="rounded-xl border border-border bg-surface p-5"><CashFlowHealthSection /></section>}
+      {tab==="earnings-quality"&&<section className="rounded-xl border border-border bg-surface p-5"><EarningsQualitySection /></section>}
+      {tab==="working-capital"&&<section className="rounded-xl border border-border bg-surface p-5"><WorkingCapitalSection /></section>}
+      {tab==="dividend"&&<section className="rounded-xl border border-border bg-surface p-5"><DividendAnalysisSection /></section>}
+      {tab==="valuation-full"&&<section className="rounded-xl border border-border bg-surface p-5"><ValuationSection /></section>}
+      {tab==="capital-allocation"&&<section className="rounded-xl border border-border bg-surface p-5"><CapitalAllocationSection /></section>}
+      {tab==="risks"&&<section className="rounded-xl border border-border bg-surface p-5"><RiskAssessmentSection /></section>}
+      {tab==="catalysts"&&<section className="rounded-xl border border-border bg-surface p-5"><CatalystAnalysisSection /></section>}
+      {tab==="peer-comparison"&&<section className="rounded-xl border border-border bg-surface p-5"><PeerComparisonSection /></section>}
+      {tab==="historical-valuation"&&<section className="rounded-xl border border-border bg-surface p-5"><HistoricalValuationSection /></section>}
+      {tab==="governance"&&<section className="rounded-xl border border-border bg-surface p-5"><ManagementGovernanceSection /></section>}
+      {tab==="fundamental-scorecard"&&<section className="rounded-xl border border-border bg-surface p-5"><FundamentalScorecardSection /></section>}
       {tab==="announcements"&&<div className="space-y-3">{workspace.overview.announcements.map(a=><article key={a.id} className="rounded-xl border border-border bg-surface p-4"><div className="flex justify-between gap-4"><div><p className="text-xs font-bold uppercase text-accent">{a.category}</p><h3 className="mt-1 font-semibold">{a.title}</h3></div><time className="text-xs text-muted">{a.published_at.slice(0,10)}</time></div>{a.summary&&<p className="mt-2 text-sm text-muted">{a.summary}</p>}{a.source_url&&<a href={a.source_url} target="_blank" className="mt-2 inline-block text-xs text-accent">Open source ↗</a>}</article>)}{!workspace.overview.announcements.length&&<p className="rounded-xl border border-border bg-surface p-8 text-center text-muted">No announcements are stored for this issuer.</p>}</div>}
       {tab==="filings"&&<div className="grid gap-3 md:grid-cols-2">{workspace.overview.sources.map((s,i)=><article key={`${s.document_type}-${i}`} className="rounded-xl border border-border bg-surface p-4"><p className="font-semibold">{s.document_type.replaceAll("_"," ")}</p><p className="mt-1 text-xs text-muted">Tier {s.source_tier} · fetched {s.fetched_at.slice(0,10)}</p>{s.url?<a href={s.url} target="_blank" className="mt-3 inline-block text-xs text-accent">View filing/source ↗</a>:<p className="mt-3 text-xs text-muted">Local source record</p>}</article>)}</div>}
       {tab==="ai"&&<section className="rounded-xl border border-border bg-surface p-5"><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-positive"/><h3 className="font-bold">Citation-grounded research report</h3></div>{!report?<Loader2 className="mt-8 h-6 w-6 animate-spin text-accent"/>:report.unavailable||report.not_covered?<p className="mt-4 text-sm text-muted">{report.coverage_note??"The citation-grounded research pipeline is currently unavailable for this ticker."}</p>:<div className="mt-5 space-y-4"><p className="text-xs text-muted">Evidence coverage: {report.sections_with_real_content}/{report.sections_total} sections · published {report.published_at?.slice(0,10)}</p>{report.sections?.map((s,i)=><article key={i} className="rounded-lg border border-border p-4"><h4 className="font-semibold">{s.title}</h4><p className="mt-2 whitespace-pre-wrap text-sm text-muted">{s.content}</p>{!s.has_real_content&&<p className="mt-2 text-xs text-amber-300">Missing evidence: {s.missing_evidence.join(", ")}</p>}</article>)}</div>}</section>}

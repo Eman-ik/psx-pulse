@@ -22,6 +22,7 @@ from app.api.comparison import companies_comparison
 from app.api.deps import get_db
 from app.api.sectors import cement_sector, fertilizer_sector
 from app.db.models import Security
+from app.etl.industry_intelligence import build_industry_intelligence
 from app.universe import SNAPSHOT_PATH, coverage_tier
 
 router = APIRouter(prefix="/research-workspace", tags=["research-workspace"])
@@ -59,6 +60,15 @@ def research_universe(db: Session = Depends(get_db)) -> dict:
     }
 
 
+@router.get("/industry/{sector_name}")
+def research_industry(sector_name: str, db: Session = Depends(get_db)) -> dict:
+    """Stage 2 industry structure and economics with visible evidence gaps."""
+    try:
+        return build_industry_intelligence(db, sector_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 def _workspace_company(ticker: str, db: Session) -> dict:
     symbol = ticker.strip().upper()
     security = db.execute(
@@ -79,6 +89,7 @@ def _workspace_company(ticker: str, db: Session) -> dict:
         "coverage_tier": coverage_tier(symbol),
         "overview": overview,
         "peers": peers,
+        "industry": build_industry_intelligence(db, sector_name),
         "evidence": {
             "source_count": len(overview.get("sources", [])),
             "announcement_count": len(overview.get("announcements", [])),
@@ -174,20 +185,38 @@ def build_institutional_report(payload: dict) -> bytes:
         story += [Paragraph("3. Profitability, leverage and valuation", styles["Section"]), Table(ratio_rows, colWidths=[80*mm, 35*mm, 35*mm], repeatRows=1, style=[("BACKGROUND", (0,0), (-1,0), colors.HexColor("#0F2942")), ("TEXTCOLOR", (0,0), (-1,0), colors.white), ("GRID", (0,0), (-1,-1), .3, colors.HexColor("#CBD5E1")), ("FONTSIZE", (0,0), (-1,-1), 8.5), ("PADDING", (0,0), (-1,-1), 5)])]
 
     thesis = overview.get("thesis")
-    story += [PageBreak(), Paragraph("4. Investment case", styles["Section"])]
+    industry = payload.get("industry", {})
+    industry_structure = industry.get("structure", {})
+    industry_economics = industry.get("economics", {})
+    story += [PageBreak(), Paragraph("4. Industry structure and economics", styles["Section"])]
+    story.append(Paragraph(
+        f"Listed competitors: {industry_structure.get('listed_competitor_count', 'Not available')} | "
+        f"Verified fundamental coverage: {industry_economics.get('verified_company_count', 0)}/"
+        f"{industry_economics.get('listed_company_count', 0)} companies.",
+        styles["BodyInstitutional"],
+    ))
+    industry_rows = [["Industry metric", "Median", "Coverage"]]
+    for metric in industry_economics.get("sector_medians", []):
+        value = metric.get("value")
+        rendered = "Not available" if value is None else f"{value:,.2f}{metric.get('unit', '')}"
+        industry_rows.append([metric.get("label", metric.get("key", "Metric")), rendered, f"{metric.get('companies_covered', 0)} companies"])
+    story.append(Table(industry_rows, colWidths=[80*mm, 35*mm, 35*mm], repeatRows=1, style=[("BACKGROUND", (0,0), (-1,0), colors.HexColor("#0F5C5E")), ("TEXTCOLOR", (0,0), (-1,0), colors.white), ("GRID", (0,0), (-1,-1), .3, colors.HexColor("#CBD5E1")), ("FONTSIZE", (0,0), (-1,-1), 8.5), ("PADDING", (0,0), (-1,-1), 5)]))
+    story += [Paragraph("Industry conclusion", styles["Section"]), Paragraph(industry.get("attractiveness", {}).get("conclusion", "Industry evidence is unavailable."), styles["BodyInstitutional"])]
+
+    story += [Paragraph("5. Investment case", styles["Section"])]
     if thesis and full:
         for heading, text in (("Bull case", thesis["bull_case"]), ("Base case", thesis["base_case"]), ("Bear case", thesis["bear_case"])):
             story += [Paragraph(f"<b>{heading}</b>", styles["BodyInstitutional"]), Paragraph(text, styles["BodyInstitutional"]), Spacer(1, 3*mm)]
     else:
         story.append(Paragraph("No source-verified investment thesis is available for institutional delivery.", styles["BodyInstitutional"]))
 
-    story += [Paragraph("5. Recent announcements", styles["Section"])]
+    story += [Paragraph("6. Recent announcements", styles["Section"])]
     for announcement in overview.get("announcements", [])[:8]:
         story.append(Paragraph(f"<b>{announcement['published_at'][:10]}</b> — {announcement['title']}", styles["BodyInstitutional"]))
     if not overview.get("announcements"):
         story.append(Paragraph("No announcements are stored for this issuer.", styles["BodyInstitutional"]))
 
-    story += [PageBreak(), Paragraph("6. Sources and lineage", styles["Section"])]
+    story += [PageBreak(), Paragraph("7. Sources and lineage", styles["Section"])]
     for source in overview.get("sources", []):
         label = f"{source['document_type']} | tier {source['source_tier']} | fetched {source['fetched_at']}"
         if source.get("url"):

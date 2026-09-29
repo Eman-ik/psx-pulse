@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -29,6 +29,61 @@ class OperationalMetric(Base):
     value: Mapped[float] = mapped_column(Numeric(18, 4))
     unit: Mapped[str] = mapped_column(String(20))  # KT | percent | million_MT
     source_document_id: Mapped[int | None] = mapped_column(ForeignKey("source_document.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndustryObservation(Base):
+    """A sourced numeric observation describing an industry rather than one issuer.
+
+    Examples include installed capacity, production, dispatches, imports, exports,
+    realized prices and input costs.  The source document is mandatory so Stage 2 can
+    never turn a spreadsheet entry into an unattributed industry fact.
+    """
+
+    __tablename__ = "industry_observation"
+    __table_args__ = (
+        UniqueConstraint(
+            "sector_id", "metric_key", "company_issuer_id", "product", "period_end",
+            name="uq_industry_observation_dimension_period",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sector_id: Mapped[int] = mapped_column(ForeignKey("sector.id"), index=True)
+    company_issuer_id: Mapped[int | None] = mapped_column(ForeignKey("issuer.id"), nullable=True, index=True)
+    metric_key: Mapped[str] = mapped_column(String(60), index=True)
+    product: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    period_start: Mapped[date] = mapped_column(Date)
+    period_end: Mapped[date] = mapped_column(Date, index=True)
+    frequency: Mapped[str] = mapped_column(String(20))
+    value: Mapped[float] = mapped_column(Numeric(20, 4))
+    unit: Mapped[str] = mapped_column(String(30))
+    source_document_id: Mapped[int] = mapped_column(ForeignKey("source_document.id"), index=True)
+    source_page: Mapped[int | None] = mapped_column(nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndustryAssessment(Base):
+    """Source-grounded qualitative assessment for non-numeric industry dimensions."""
+
+    __tablename__ = "industry_assessment"
+    __table_args__ = (
+        UniqueConstraint("sector_id", "dimension", "as_of_date", name="uq_industry_assessment_dimension_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sector_id: Mapped[int] = mapped_column(ForeignKey("sector.id"), index=True)
+    dimension: Mapped[str] = mapped_column(String(50), index=True)
+    rating: Mapped[str] = mapped_column(String(30))
+    assessment: Mapped[str] = mapped_column(Text)
+    as_of_date: Mapped[date] = mapped_column(Date, index=True)
+    source_document_id: Mapped[int] = mapped_column(ForeignKey("source_document.id"), index=True)
+    source_page: Mapped[int | None] = mapped_column(nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    analyst: Mapped[str] = mapped_column(String(120))
+    review_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

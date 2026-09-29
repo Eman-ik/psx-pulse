@@ -5,7 +5,7 @@ from app.db.models.market import CorporateAction, IndexOHLCV, MarketIndex, Price
 from app.db.models.announcements import Announcement, EntityLink
 from app.db.models.macro import MacroObservation, MacroSeries, SectorRiskSnapshot
 from app.db.models.scoring import MlSignalScore, SignalScore
-from app.db.models.research import CapmAssumption, OperationalMetric, Thesis
+from app.db.models.research import CapmAssumption, IndustryAssessment, IndustryObservation, OperationalMetric, Thesis
 from app.db.models.analyst import AnalystPacket, AnalystRun
 
 __all__ = [
@@ -34,6 +34,8 @@ __all__ = [
     "SignalScore",
     "MlSignalScore",
     "OperationalMetric",
+    "IndustryObservation",
+    "IndustryAssessment",
     "CapmAssumption",
     "Thesis",
     "AnalystRun",

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import admin, analyst, comparison, companies, equity_research, financials, live, macro, market, ml_signals, news, quant_forecast, screener, sectors, signals
+from app.api import admin, analyst, comparison, companies, equity_research, financials, live, macro, market, ml_signals, news, quant_forecast, research_trade, screener, sectors, signals
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -32,6 +32,7 @@ app.include_router(ml_signals.router)
 app.include_router(admin.router)
 app.include_router(equity_research.router)
 app.include_router(quant_forecast.router)
+app.include_router(research_trade.router)
 
 
 @app.get("/", include_in_schema=False)

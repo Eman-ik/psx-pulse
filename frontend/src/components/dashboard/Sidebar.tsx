@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Building2,
   SlidersHorizontal,
-  Newspaper,
   GraduationCap,
   Bell,
   Settings,
@@ -15,7 +14,6 @@ import {
   BarChart2,
   Layers,
   FileSearch,
-  BrainCircuit,
   Briefcase,
 } from "lucide-react";
 
@@ -25,9 +23,7 @@ const mainNav = [
   { label: "Screener", icon: SlidersHorizontal, href: "/screener" },
   { label: "Ranking", icon: BarChart2, href: "/ranking" },
   { label: "Sectors", icon: Layers, href: "/sector" },
-  { label: "News & Announcements", icon: Newspaper, href: "/news" },
   { label: "Research Studio", icon: FileSearch, href: "/research" },
-  { label: "Model Evidence", icon: BrainCircuit, href: "/model-evidence" },
   { label: "Portfolio", icon: Briefcase, href: "/portfolio" },
   { label: "Academy", icon: GraduationCap, href: "#", disabled: true },
   { label: "Watchlists & Alerts", icon: Bell, href: "#", disabled: true },

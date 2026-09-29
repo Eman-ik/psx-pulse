@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # Data freshness / source policy
     data_delay_disclaimer: str = "Data is end-of-day / delayed public data, not a licensed real-time feed."
 
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # SBP EasyData API (https://easydata.sbp.org.pk) — free account + generated key required.
     # Macro ingestion (app/ingestion/sbp_macro.py) no-ops with a warning when unset.

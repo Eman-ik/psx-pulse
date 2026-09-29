@@ -1,33 +1,41 @@
-/** Shared formatters for the comparison-style tables (Companies, Screener, Competitors tab) —
- * previously copy-pasted three times with slightly different signatures.
- */
+// Simple formatting utilities
+export const formatRupees = (value: number | null | undefined, scale: 'default' | 'millions' | 'billions' = 'default'): string => {
+  if (value === null || value === undefined) return '—';
 
-export function formatPrice(v: number | null): string {
-  return v != null ? `PKR ${v.toFixed(2)}` : "—";
+  const scaled = scale === 'millions' ? value / 1e6 : scale === 'billions' ? value / 1e9 : value;
+  const decimals = scale === 'default' ? 2 : scale === 'billions' ? 1 : 0;
+  const suffix = scale === 'millions' ? 'M' : scale === 'billions' ? 'B' : '';
+
+  return `Rs. ${scaled.toFixed(decimals)}${suffix}`;
+};
+
+export const formatPercent = (value: number | null | undefined, decimals = 1): string => {
+  if (value === null || value === undefined) return '—';
+  return `${value > 0 ? '+' : ''}${value.toFixed(decimals)}%`;
+};
+
+export const formatRatio = (value: number | null | undefined, decimals = 2): string => {
+  if (value === null || value === undefined) return '—';
+  return `${value.toFixed(decimals)}x`;
+};
+
+export function formatPrice(value: number | null): string {
+  return value != null ? `PKR ${value.toFixed(2)}` : "—";
 }
 
-export function formatPct(v: number | null): string {
-  return v != null ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}%` : "—";
+export function formatPct(value: number | null): string {
+  return value != null ? `${value >= 0 ? "+" : ""}${value.toFixed(2)}%` : "—";
 }
 
-export function formatMarketCap(v: number | null): string {
-  return v != null ? `PKR ${(v / 1_000_000).toFixed(1)} bn` : "—";
+export function formatMarketCap(value: number | null): string {
+  return value != null ? `PKR ${(value / 1_000_000).toFixed(1)} bn` : "—";
 }
 
-export function formatMultiple(v: number | null, digits = 2): string {
-  return v != null ? `${v.toFixed(digits)}x` : "—";
+export function formatMultiple(value: number | null, digits = 2): string {
+  return value != null ? `${value.toFixed(digits)}x` : "—";
 }
 
-export function formatPercent(v: number | null, digits = 1): string {
-  return v != null ? `${v.toFixed(digits)}%` : "—";
-}
-
-/** pe_ratio/dividend_yield come straight from psxdata's live quote, where exactly 0 usually
- * means "not available" rather than a genuine zero — treat it the same as null. Only applies
- * to those two live-quote-sourced fields, not to our own calculated ratios (ROE, D/E, etc.),
- * where 0 is a plausible real value.
- */
-export function formatLiveRatio(v: number | null, digits = 2, unit: "x" | "%" = "%"): string {
-  if (v == null || v === 0) return "—";
-  return unit === "x" ? formatMultiple(v, digits) : formatPercent(v, digits);
+export function formatLiveRatio(value: number | null, digits = 2, unit: "x" | "%" = "%"): string {
+  if (value == null || value === 0) return "—";
+  return unit === "x" ? formatMultiple(value, digits) : formatPercent(value, digits);
 }

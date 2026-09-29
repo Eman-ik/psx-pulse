@@ -1,248 +1,254 @@
 "use client";
-
-import React, { useState, useRef, useEffect } from "react";
-import { Search, Loader2, AlertCircle, ChevronRight, TrendingUp } from "lucide-react";
+import React, { useState } from "react";
+import { Search, Loader2, AlertCircle, TrendingUp, BarChart3, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { EquityResearchReportResponse } from "@/lib/api";
-import { EquityResearchSections } from "./EquityResearchSections";
+import { formatRupees, formatPercent, formatRatio } from "@/lib/format";
 
-// ─── Terminal step log ─────────────────────────────────────────────────────────
-
-const STEPS = [
-  "Resolving ticker against Equity-research's coverage…",
-  "Fetching the latest published report…",
-  "Loading report sections…",
-];
-
-function TerminalLog({ activeStep }: { activeStep: number }) {
-  return (
-    <div className="bg-[#05070d] border border-border rounded-xl p-5 font-mono text-xs space-y-1.5 max-w-2xl mx-auto">
-      <p className="text-muted text-[10px] uppercase tracking-wider mb-3">
-        PSX QuantResearch · Institutional Equity Workflow
-      </p>
-      {STEPS.map((step, i) => {
-        const done = i < activeStep;
-        const current = i === activeStep;
-        return (
-          <div key={i} className={`flex items-center gap-2.5 transition-opacity duration-300 ${i > activeStep ? "opacity-20" : "opacity-100"}`}>
-            <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold ${
-              done ? "bg-positive/20 text-positive" :
-              current ? "bg-accent/20 text-accent" :
-              "bg-muted/10 text-muted"
-            }`}>
-              {done ? "✓" : i + 1}
-            </span>
-            <span className={`${done ? "text-muted line-through" : current ? "text-accent" : "text-muted/40"}`}>
-              {step}
-            </span>
-            {current && <Loader2 className="w-3 h-3 text-accent animate-spin ml-auto" />}
-          </div>
-        );
-      })}
-    </div>
-  );
+interface ResearchData {
+  company: {
+    ticker: string;
+    legal_name: string;
+    sector: string;
+    market_cap: number;
+    stock_price: number;
+    shares_outstanding: number;
+    free_float: number;
+  };
+  financials: {
+    revenue: number;
+    pat: number;
+    eps: number;
+  };
+  metrics: {
+    eps: number;
+    roe: number;
+    pe_ratio: number;
+    net_margin: number;
+    debt_to_equity: number;
+    dividend_yield: number;
+  };
+  valuation: {
+    pe_ratio: number;
+    dividend_yield: number;
+    market_cap: number;
+    stock_price: number;
+  };
 }
 
-// ─── Ticker pill ───────────────────────────────────────────────────────────────
-
-const QUICK_TICKERS = ["FFC", "EFERT", "FATIMA", "AGL", "AHCL"];
-
-// ─── Main component ────────────────────────────────────────────────────────────
+type TabType = "overview" | "financials" | "metrics" | "valuation";
 
 export function ResearchStudio() {
   const router = useRouter();
-  const [input, setInput] = useState("");
+  const [ticker, setTicker] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeStep, setActiveStep] = useState(0);
-  const [report, setReport] = useState<EquityResearchReportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const reportRef = useRef<HTMLDivElement | null>(null);
+  const [data, setData] = useState<ResearchData | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
 
-  // Advance the terminal step log pseudo-randomly while loading
-  const startStepTimer = () => {
-    setActiveStep(0);
-    let step = 0;
-    // Steps 0-7 advance every ~8s, steps 8-9 advance slower
-    stepTimerRef.current = setInterval(() => {
-      step++;
-      if (step < STEPS.length - 1) {
-        setActiveStep(step);
-      }
-    }, 8000);
-  };
-
-  const stopStepTimer = () => {
-    if (stepTimerRef.current) {
-      clearInterval(stepTimerRef.current);
-      stepTimerRef.current = null;
-    }
-  };
-
-  const runResearch = async (ticker: string) => {
-    const t = ticker.trim().toUpperCase();
-    if (!t) return;
-
+  const loadData = async (t: string) => {
+    if (!t.trim()) return;
     setLoading(true);
-    setReport(null);
     setError(null);
-    startStepTimer();
+    setData(null);
+    setActiveTab("overview");
 
     try {
-      const res = await fetch("/api/research/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker: t }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? `Server error ${res.status}`);
-        return;
-      }
-      if (!data.result) {
-        setError("No report returned from server.");
-        return;
-      }
-
-      setActiveStep(STEPS.length); // mark all done
-      setReport(data.result as EquityResearchReportResponse);
-      // Scroll to report after short delay so render completes
-      setTimeout(() => {
-        reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 200);
+      const res = await fetch(`http://localhost:5000/api/research/${t.toUpperCase()}/data`);
+      if (!res.ok) throw new Error("Company not found");
+      const result = await res.json();
+      setData(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Network error");
+      setError(e instanceof Error ? e.message : "Error loading data");
     } finally {
-      stopStepTimer();
       setLoading(false);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    runResearch(input);
+    loadData(ticker);
   };
 
-  // Cleanup timer on unmount
-  useEffect(() => () => stopStepTimer(), []);
+  const TABS = [
+    { id: "overview" as TabType, label: "Overview" },
+    { id: "financials" as TabType, label: "Financials" },
+    { id: "metrics" as TabType, label: "Metrics" },
+    { id: "valuation" as TabType, label: "Valuation" },
+  ];
 
   return (
-    <div className="space-y-8 pb-16">
-      {/* ── Hero + Search ─────────────────────────────────────────────── */}
-      <div className="text-center space-y-2 pt-2">
-        <span className="inline-block text-[10px] font-mono font-bold uppercase tracking-widest text-accent border border-accent/30 rounded px-3 py-1 bg-accent/5">
-          PSX QuantResearch · Institutional Equity AI
-        </span>
-        <h1 className="text-3xl font-bold text-foreground">Research Studio</h1>
-        <p className="text-muted text-sm max-w-xl mx-auto font-sans">
-          Type a PSX ticker. Returns the real, citation-grounded report from
-          Equity-research&apos;s deterministic pipeline — currently covering FFC, EFERT,
-          and FATIMA, with per-section coverage shown honestly.
-        </p>
-      </div>
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-bold text-foreground">Research Studio</h1>
+          <p className="text-muted">Complete financial data for PSX companies</p>
+        </div>
 
-      {/* Search bar */}
-      <form onSubmit={handleSubmit} className="max-w-xl mx-auto">
-        <div className="relative flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input
               type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="e.g. FFC, EFERT, Fatima Fertilizer…"
+              value={ticker}
+              onChange={(e) => setTicker(e.target.value)}
+              placeholder="Enter ticker (FFC, EFERT, FATIMA...)"
               disabled={loading}
-              className="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-3 text-sm text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 disabled:opacity-50 transition-colors font-mono"
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
             />
           </div>
           <button
             type="submit"
-            disabled={loading || !input.trim()}
-            className="flex items-center gap-1.5 px-5 py-3 bg-accent hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white text-sm font-semibold transition-colors shrink-0"
+            disabled={loading || !ticker.trim()}
+            className="px-6 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg disabled:opacity-50 font-semibold flex items-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
-            Analyze
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
           </button>
-        </div>
+        </form>
 
-        {/* Quick-pick tickers */}
-        <div className="flex items-center gap-2 mt-3 flex-wrap justify-center">
-          <span className="text-[10px] text-muted uppercase tracking-wider font-mono">Quick:</span>
-          {QUICK_TICKERS.map(t => (
+        <div className="flex gap-2 flex-wrap justify-center">
+          {["FFC", "EFERT", "FATIMA", "IFIC", "LUCK", "DGKC", "CHCC", "PCCL"].map((t) => (
             <button
               key={t}
-              type="button"
+              onClick={() => { setTicker(t); loadData(t); }}
               disabled={loading}
-              onClick={() => { setInput(t); runResearch(t); }}
-              className="px-2.5 py-1 border border-border rounded text-[11px] font-mono text-muted hover:text-foreground hover:border-accent/40 transition-colors disabled:opacity-40"
+              className="px-3 py-1 text-sm border border-border rounded hover:border-accent text-muted hover:text-foreground disabled:opacity-50"
             >
               {t}
             </button>
           ))}
         </div>
-      </form>
 
-      {/* ── Loading state ───────────────────────────────────────────────── */}
-      {loading && (
-        <div className="space-y-4">
-          <p className="text-center text-xs font-mono text-muted">
-            Fetching the real, published Equity-research report…
-          </p>
-          <TerminalLog activeStep={activeStep} />
-        </div>
-      )}
-
-      {/* ── Error state ─────────────────────────────────────────────────── */}
-      {error && !loading && (
-        <div className="max-w-2xl mx-auto bg-negative/5 border border-negative/20 rounded-xl p-5 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-negative shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="text-sm font-bold text-negative">Analysis Failed</p>
-            <p className="text-xs text-muted font-sans">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Report ──────────────────────────────────────────────────────── */}
-      {report && !loading && (
-        <div ref={reportRef} className="space-y-6">
-          <EquityResearchSections r={report} />
-
-          {/* ── Plan Trade Button ───────────────────────────────────────── */}
-          <div className="max-w-2xl mx-auto bg-gradient-to-r from-accent/10 to-accent/5 border border-accent/20 rounded-xl p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-bold text-foreground">Ready to trade based on this research?</p>
-              <p className="text-xs text-muted">Use our position sizing calculator and decision gates to plan your entry, stop, and targets.</p>
+        {error && (
+          <div className="bg-negative/10 border border-negative/30 rounded-lg p-4 flex gap-3">
+            <AlertCircle className="w-5 h-5 text-negative shrink-0" />
+            <div>
+              <p className="font-semibold text-negative">Error</p>
+              <p className="text-sm text-muted">{error}</p>
             </div>
-            <button
-              onClick={() => router.push(`/trade-planning?ticker=${input.toUpperCase()}`)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent/80 rounded-lg text-white text-sm font-semibold transition-colors shrink-0 whitespace-nowrap"
-            >
-              <TrendingUp className="w-4 h-4" />
-              Plan Trade
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── Empty hero (no report yet) ──────────────────────────────────── */}
-      {!loading && !report && !error && (
-        <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-          {[
-            { icon: "🔗", title: "Citation-Grounded", desc: "Every claim traces to real evidence — no invented facts, no ungrounded narrative." },
-            { icon: "✅", title: "Honest Coverage", desc: "Each section is marked real or not-yet-available. Gaps are shown, never papered over." },
-            { icon: "🧪", title: "Independently Verified", desc: "Reports pass a separate verification pass before publication." },
-          ].map(card => (
-            <div key={card.title} className="bg-surface border border-border rounded-xl p-4 space-y-2 text-center">
-              <span className="text-2xl">{card.icon}</span>
-              <p className="text-xs font-bold text-foreground font-mono">{card.title}</p>
-              <p className="text-[11px] text-muted font-sans leading-snug">{card.desc}</p>
+        {loading && (
+          <div className="text-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-accent" />
+            <p className="text-muted mt-2">Loading data...</p>
+          </div>
+        )}
+
+        {data && !loading && (
+          <div className="space-y-6">
+            <div className="bg-surface border border-border rounded-lg p-6">
+              <div className="flex items-start justify-between flex-wrap gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground">{data.company.legal_name}</h2>
+                  <p className="text-sm text-muted mt-1">Ticker: {data.company.ticker} • {data.company.sector}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-bold text-foreground">{formatRupees(data.company.stock_price)}</p>
+                  <p className="text-xs text-muted">Current Price</p>
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+
+            <div className="border-b border-border flex gap-1 overflow-x-auto">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    activeTab === tab.id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === "overview" && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: "Stock Price", value: formatRupees(data.company.stock_price) },
+                  { label: "Market Cap", value: formatRupees(data.company.market_cap, "billions") },
+                  { label: "Shares Outstanding", value: formatRupees(data.company.shares_outstanding, "millions") },
+                  { label: "Free Float", value: formatPercent(data.company.free_float) },
+                ].map((m) => (
+                  <div key={m.label} className="bg-surface border border-border rounded-lg p-4">
+                    <p className="text-xs text-muted uppercase mb-2">{m.label}</p>
+                    <p className="text-lg font-bold text-foreground">{m.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTab === "financials" && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  { label: "Revenue", value: formatRupees(data.financials.revenue, "billions"), sub: "Annual Revenue" },
+                  { label: "PAT", value: formatRupees(data.financials.pat, "billions"), sub: "Profit After Tax" },
+                  { label: "EPS", value: formatRupees(data.financials.eps), sub: "Earnings Per Share" },
+                ].map((m) => (
+                  <div key={m.label} className="bg-surface border border-border rounded-lg p-6">
+                    <p className="text-xs text-muted uppercase mb-2">{m.label}</p>
+                    <p className="text-2xl font-bold text-foreground">{m.value}</p>
+                    <p className="text-xs text-muted mt-2">{m.sub}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTab === "metrics" && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { label: "ROE", value: formatPercent(data.metrics.roe), desc: "Return on Equity" },
+                  { label: "Net Margin", value: formatPercent(data.metrics.net_margin), desc: "Net Profit Margin" },
+                  { label: "D/E Ratio", value: formatRatio(data.metrics.debt_to_equity), desc: "Debt to Equity" },
+                  { label: "P/E Ratio", value: formatRatio(data.metrics.pe_ratio), desc: "Price to Earnings" },
+                  { label: "Div Yield", value: formatPercent(data.metrics.dividend_yield), desc: "Dividend Yield" },
+                  { label: "EPS", value: formatRupees(data.metrics.eps), desc: "Earnings Per Share" },
+                ].map((m) => (
+                  <div key={m.label} className="bg-surface border border-border rounded-lg p-4">
+                    <p className="text-xs text-muted uppercase mb-1">{m.label}</p>
+                    <p className="text-xl font-bold text-foreground">{m.value}</p>
+                    <p className="text-[11px] text-muted/70 mt-1">{m.desc}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTab === "valuation" && (
+              <div className="bg-surface border border-border rounded-lg p-6">
+                <h3 className="font-semibold text-foreground mb-4">Valuation Metrics</h3>
+                <div className="space-y-3">
+                  {[
+                    { label: "P/E Ratio", value: formatRatio(data.valuation.pe_ratio) },
+                    { label: "Dividend Yield", value: formatPercent(data.valuation.dividend_yield) },
+                    { label: "Market Cap", value: formatRupees(data.valuation.market_cap, "billions") },
+                    { label: "Stock Price", value: formatRupees(data.valuation.stock_price) },
+                  ].map((m) => (
+                    <div key={m.label} className="flex items-center justify-between pb-3 border-b border-border/30 last:border-0">
+                      <span className="text-muted">{m.label}</span>
+                      <span className="font-bold text-foreground">{m.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-accent/10 border border-accent/30 rounded-lg p-6 flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p className="font-semibold text-foreground">Ready to trade?</p>
+                <p className="text-sm text-muted">Use our position sizing calculator</p>
+              </div>
+              <button
+                onClick={() => router.push(`/trade-planning?ticker=${data.company.ticker}`)}
+                className="px-6 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg font-semibold flex items-center gap-2 whitespace-nowrap"
+              >
+                <TrendingUp className="w-4 h-4" /> Plan Trade
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

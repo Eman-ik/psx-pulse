@@ -6,6 +6,8 @@ all of which are unique columns, so repeated runs never duplicate rows.
 
 import logging
 import re
+import json
+from pathlib import Path
 
 import psxdata
 from sqlalchemy.orm import Session
@@ -16,6 +18,28 @@ from app.ingestion.psx_live import CEMENT_SECTOR_COMPANIES, FERTILIZER_SECTOR_CO
 logger = logging.getLogger(__name__)
 
 SECTOR_NAME = "Fertilizer"
+_UNIVERSE_SNAPSHOT = Path(__file__).resolve().parents[2] / "data" / "universe_snapshot.json"
+
+
+def _snapshot_companies(sector: str, fallback: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Use the reviewed 23-company universe snapshot for identity seeding.
+
+    The live-quote lists are intentionally narrower because the quote source does not serve
+    every active security reliably; they must not define which companies Research Studio can
+    search. The fallback keeps first-run tooling usable if the snapshot is missing.
+    """
+    if not _UNIVERSE_SNAPSHOT.exists():
+        return fallback
+    payload = json.loads(_UNIVERSE_SNAPSHOT.read_text(encoding="utf-8"))
+    snapshot_rows = [
+        {"symbol": row["symbol"], "name": row["name"]}
+        for row in payload["entries"]
+        if row["sector"].upper() == sector.upper()
+    ]
+    by_symbol = {row["symbol"]: row for row in snapshot_rows}
+    ordered = [by_symbol[row["symbol"]] for row in fallback if row["symbol"] in by_symbol]
+    seen = {row["symbol"] for row in ordered}
+    return ordered + [row for row in snapshot_rows if row["symbol"] not in seen]
 
 # Sector classifications that are fund-like entities (mutual funds/modarabas/REITs/govt paper),
 # not operating companies -- standard equity metrics (P/E, ROE, DCF) don't fit them. Excluded
@@ -67,7 +91,7 @@ def seed_fertilizer_sector(db: Session) -> list[Security]:
     """Ensures the Fertilizer sector and its 7 pilot issuers/securities exist. Returns the securities."""
     sector = _get_or_create_sector(db, SECTOR_NAME)
     securities = []
-    for company in FERTILIZER_SECTOR_COMPANIES:
+    for company in _snapshot_companies("FERTILIZER", FERTILIZER_SECTOR_COMPANIES):
         issuer = _get_or_create_issuer(db, company["name"], sector)
         security = _get_or_create_security(db, company["symbol"], issuer)
         securities.append(security)
@@ -79,7 +103,7 @@ def seed_cement_sector(db: Session) -> list[Security]:
     """Ensures the Cement sector and its pilot issuers/securities exist. Returns the securities."""
     sector = _get_or_create_sector(db, "Cement")
     securities = []
-    for company in CEMENT_SECTOR_COMPANIES:
+    for company in _snapshot_companies("CEMENT", CEMENT_SECTOR_COMPANIES):
         issuer = _get_or_create_issuer(db, company["name"], sector)
         security = _get_or_create_security(db, company["symbol"], issuer)
         securities.append(security)

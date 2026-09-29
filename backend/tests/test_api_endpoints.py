@@ -123,6 +123,42 @@ def test_sector_endpoints_return_only_that_sectors_companies():
     assert "LUCK" in cement_symbols
 
 
+@pytest.mark.requires_seeded_data
+def test_research_workspace_covers_complete_fertilizer_and_cement_universe():
+    response = client.get("/research-workspace/universe")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["count"] == 23
+    assert data["sector_counts"] == {"FERTILIZER": 5, "CEMENT": 18}
+    assert len(data["entries"]) == 23
+    assert {entry["coverage_tier"] for entry in data["entries"]} == {
+        "full", "unverified", "price_only"
+    }
+
+
+@pytest.mark.requires_seeded_data
+def test_research_workspace_every_ticker_resolves_and_respects_evidence_tier():
+    universe = client.get("/research-workspace/universe").json()
+    for entry in universe["entries"]:
+        response = client.get(f"/research-workspace/{entry['symbol']}")
+        assert response.status_code == 200, entry["symbol"]
+        data = response.json()
+        assert data["ticker"] == entry["symbol"]
+        assert data["coverage_tier"] == entry["coverage_tier"]
+        assert data["overview"]["issuer"]["sector_name"].upper() == entry["sector"]
+        if entry["coverage_tier"] == "full":
+            assert data["evidence"]["fundamentals_renderable"] is True
+        else:
+            assert data["evidence"]["fundamentals_renderable"] is False
+            assert data["overview"]["ratios"] == {}
+
+
+@pytest.mark.requires_seeded_data
+def test_research_workspace_rejects_unknown_ticker():
+    response = client.get("/research-workspace/NOTREAL")
+    assert response.status_code == 404
+
+
 def test_signals_endpoint_blocked_while_compliance_gate_closed():
     # Duplicate of test_health_and_gates.py's coverage, kept here too since it's the
     # signal-gate invariant this whole suite is meant to guard -- an unvalidated

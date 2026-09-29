@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Building2,
   SlidersHorizontal,
   GraduationCap,
   Bell,
@@ -12,17 +11,14 @@ import {
   HelpCircle,
   LogOut,
   BarChart2,
-  Layers,
   FileSearch,
   Briefcase,
 } from "lucide-react";
 
 const mainNav = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },
-  { label: "Companies", icon: Building2, href: "/companies" },
   { label: "Screener", icon: SlidersHorizontal, href: "/screener" },
   { label: "Ranking", icon: BarChart2, href: "/ranking" },
-  { label: "Sectors", icon: Layers, href: "/sector" },
   { label: "Research Studio", icon: FileSearch, href: "/research" },
   { label: "Portfolio", icon: Briefcase, href: "/portfolio" },
   { label: "Academy", icon: GraduationCap, href: "#", disabled: true },

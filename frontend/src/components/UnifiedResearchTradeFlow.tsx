@@ -15,6 +15,7 @@
 
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle2, XCircle, TrendingUp, Lock } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import './UnifiedResearchTradeFlow.css';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
@@ -65,6 +66,15 @@ interface RiskMetrics {
   allocation_pct: number;
 }
 
+interface CalculatorResult {
+  position_size_shares: number;
+  capital_required: number;
+  risk_per_share: number;
+  max_loss: number;
+  allocation_pct: number;
+  warnings: string[];
+}
+
 interface UnifiedFlowResponse {
   ticker: string;
   evidence_score: EvidenceCoverageScore;
@@ -76,7 +86,7 @@ interface UnifiedFlowResponse {
   market: any;
   events: any;
   thesis: ThesisResult;
-  calculator: any;
+  calculator: CalculatorResult;
   ready_to_trade: boolean;
   confidence: number;
   timestamp: string;
@@ -87,8 +97,9 @@ interface UnifiedFlowResponse {
 // ════════════════════════════════════════════════════════════════════════════════
 
 export function UnifiedResearchTradeFlow() {
+  const searchParams = useSearchParams();
   // Input state
-  const [ticker, setTicker] = useState('');
+  const [ticker, setTicker] = useState(searchParams.get('ticker')?.toUpperCase() ?? '');
   const [entry, setEntry] = useState('');
   const [stop, setStop] = useState('');
   const [target1, setTarget1] = useState('');

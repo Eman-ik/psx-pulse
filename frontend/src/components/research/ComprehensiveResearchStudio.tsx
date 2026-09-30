@@ -2,19 +2,9 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, BarChart3, Bot, Building2, Download, FileText, FolderOpen, Landmark, Loader2, MessageSquareText, Search, ShieldCheck, TrendingUp, Users, Briefcase, Factory, LineChart, TrendingDown, DollarSign, Zap, AlertTriangle, Gift, Target } from "lucide-react";
+import { Activity, BarChart3, Bot, Building2, Download, FileText, FolderOpen, Landmark, Loader2, MessageSquareText, Search, ShieldCheck, Users, Briefcase, Factory, LineChart, TrendingUp } from "lucide-react";
 import { BusinessModelSection } from "./BusinessModelSection";
-import { FinancialGrowthSection } from "./FinancialGrowthSection";
-import { ReturnsOnCapitalSection } from "./ReturnsOnCapitalSection";
-import { BalanceSheetStrengthSection } from "./BalanceSheetStrengthSection";
-import { CashFlowHealthSection } from "./CashFlowHealthSection";
-import { EarningsQualitySection } from "./EarningsQualitySection";
-import { WorkingCapitalSection } from "./WorkingCapitalSection";
-import { DividendAnalysisSection } from "./DividendAnalysisSection";
-import { ValuationSection } from "./ValuationSection";
-import { CapitalAllocationSection } from "./CapitalAllocationSection";
-import { RiskAssessmentSection } from "./RiskAssessmentSection";
-import { CatalystAnalysisSection } from "./CatalystAnalysisSection";
+import { FinancialAnalysisConsolidated } from "./FinancialAnalysisConsolidated";
 import { IndustryIntelligence, IndustryIntelligencePanel } from "./IndustryIntelligencePanel";
 import PeerComparisonSection from "./PeerComparisonSection";
 import HistoricalValuationSection from "./HistoricalValuationSection";
@@ -24,7 +14,7 @@ import FundamentalScorecardSection from "./FundamentalScorecardSection";
 const WORKSPACE_API = "http://localhost:8000";
 const ANALYSIS_API = "http://localhost:5000/api";
 type CoverageTier = "full" | "unverified" | "price_only";
-type Tab = "overview" | "business-model" | "industry" | "financials" | "kpis" | "valuation" | "peers" | "financial-growth" | "returns-on-capital" | "balance-sheet" | "cash-flow" | "earnings-quality" | "working-capital" | "dividend" | "valuation-full" | "capital-allocation" | "risks" | "catalysts" | "peer-comparison" | "historical-valuation" | "governance" | "fundamental-scorecard" | "announcements" | "filings" | "ai" | "report";
+type Tab = "overview" | "business-model" | "industry" | "financials" | "kpis" | "valuation" | "peers" | "analysis" | "peer-comparison" | "historical-valuation" | "governance" | "fundamental-scorecard" | "announcements" | "filings" | "ai" | "report";
 interface UniverseEntry { symbol:string; name:string; sector:"FERTILIZER"|"CEMENT"; coverage_tier:CoverageTier; index_weight:number|null; issuer_id:number; }
 interface Universe { as_of:string; count:number; tier_counts:Record<string,number>; sector_counts:Record<string,number>; entries:UniverseEntry[]; }
 interface Point { period_end:string; value:number; unit?:string; period_type?:string; }
@@ -38,18 +28,8 @@ const TABS:{id:Tab;label:string;icon:typeof BarChart3;requiresFull?:boolean}[]=[
   {id:"industry",label:"Industry",icon:Factory},
   {id:"financials",label:"Financials",icon:FileText,requiresFull:true},
   {id:"kpis",label:"KPIs",icon:Activity,requiresFull:true},{id:"valuation",label:"Valuation",icon:Landmark,requiresFull:true},
-  {id:"peers",label:"Peers",icon:Users,requiresFull:true},{id:"financial-growth",label:"Growth",icon:LineChart,requiresFull:true},
-  {id:"returns-on-capital",label:"Returns",icon:TrendingUp,requiresFull:true},
-  {id:"balance-sheet",label:"Balance",icon:DollarSign,requiresFull:true},
-  {id:"cash-flow",label:"Cash Flow",icon:Zap,requiresFull:true},
-  {id:"earnings-quality",label:"Earnings",icon:TrendingDown,requiresFull:true},
-  {id:"working-capital",label:"WC",icon:Activity,requiresFull:true},
-  {id:"dividend",label:"Dividend",icon:Gift,requiresFull:true},
-  {id:"valuation-full",label:"Valuation+",icon:Target,requiresFull:true},
-  {id:"capital-allocation",label:"Capital",icon:TrendingUp,requiresFull:true},
-  {id:"risks",label:"Risks",icon:AlertTriangle,requiresFull:true},
-  {id:"catalysts",label:"Catalysts",icon:Zap,requiresFull:true},
-  {id:"peer-comparison",label:"Peers",icon:Users,requiresFull:true},
+  {id:"peers",label:"Peers",icon:Users,requiresFull:true},{id:"analysis",label:"Analysis",icon:BarChart3,requiresFull:true},
+  {id:"peer-comparison",label:"Comparables",icon:Users,requiresFull:true},
   {id:"historical-valuation",label:"History",icon:LineChart,requiresFull:true},
   {id:"governance",label:"Governance",icon:ShieldCheck,requiresFull:true},
   {id:"fundamental-scorecard",label:"Scorecard",icon:BarChart3,requiresFull:true},
@@ -112,17 +92,7 @@ export function ComprehensiveResearchStudio(){
       {tab==="kpis"&&<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{ratioRows.filter(([,r])=>!r.category.toLowerCase().includes("valuation")).map(([key,r])=><Card key={key} label={`${r.category} · ${r.name}`} value={ratioValue(latest(r.values)?.value,r.unit)} note={r.formula}/>)}</div>}
       {tab==="valuation"&&<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{ratioRows.filter(([key,r])=>r.category.toLowerCase().includes("valuation")||["pe_ratio","pb_ratio","dividend_yield","ev_ebitda"].includes(key)).map(([key,r])=><Card key={key} label={r.name} value={ratioValue(latest(r.values)?.value,r.unit)} note={r.formula}/>)}</div>}
       {tab==="peers"&&<section className="overflow-hidden rounded-xl border border-border bg-surface"><div className="p-5"><h3 className="font-bold">{workspace.overview.issuer.sector_name} peer comparison</h3><p className="text-xs text-muted">Only source-verified values are used for analytical comparison.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-surface-alt"><tr><th className="p-3">Ticker</th><th>Company</th><th>Coverage</th><th>Market cap</th><th>EPS</th><th>ROE</th><th>D/E</th><th>Net margin</th></tr></thead><tbody>{workspace.peers.map(p=><tr key={p.id} className="border-t border-border"><td className="p-3 font-bold text-accent">{p.symbol}</td><td>{p.name}</td><td>{p.coverage_status}</td><td>{compact(p.market_cap)}</td><td>{compact(p.eps)}</td><td>{pct(p.roe)}</td><td>{ratioValue(p.debt_to_equity,"x")}</td><td>{pct(p.net_profit_margin)}</td></tr>)}</tbody></table></div></section>}
-      {tab==="financial-growth"&&<section className="rounded-xl border border-border bg-surface p-5"><FinancialGrowthSection /></section>}
-      {tab==="returns-on-capital"&&<section className="rounded-xl border border-border bg-surface p-5"><ReturnsOnCapitalSection /></section>}
-      {tab==="balance-sheet"&&<section className="rounded-xl border border-border bg-surface p-5"><BalanceSheetStrengthSection /></section>}
-      {tab==="cash-flow"&&<section className="rounded-xl border border-border bg-surface p-5"><CashFlowHealthSection /></section>}
-      {tab==="earnings-quality"&&<section className="rounded-xl border border-border bg-surface p-5"><EarningsQualitySection /></section>}
-      {tab==="working-capital"&&<section className="rounded-xl border border-border bg-surface p-5"><WorkingCapitalSection /></section>}
-      {tab==="dividend"&&<section className="rounded-xl border border-border bg-surface p-5"><DividendAnalysisSection /></section>}
-      {tab==="valuation-full"&&<section className="rounded-xl border border-border bg-surface p-5"><ValuationSection /></section>}
-      {tab==="capital-allocation"&&<section className="rounded-xl border border-border bg-surface p-5"><CapitalAllocationSection /></section>}
-      {tab==="risks"&&<section className="rounded-xl border border-border bg-surface p-5"><RiskAssessmentSection /></section>}
-      {tab==="catalysts"&&<section className="rounded-xl border border-border bg-surface p-5"><CatalystAnalysisSection /></section>}
+      {tab==="analysis"&&<section className="rounded-xl border border-border bg-surface"><div className="p-5"><FinancialAnalysisConsolidated workspace={workspace} /></div></section>}
       {tab==="peer-comparison"&&<section className="rounded-xl border border-border bg-surface p-5"><PeerComparisonSection data={peerData} isLoading={!peerData} /></section>}
       {tab==="historical-valuation"&&<section className="rounded-xl border border-border bg-surface p-5"><HistoricalValuationSection data={histData} isLoading={!histData} /></section>}
       {tab==="governance"&&<section className="rounded-xl border border-border bg-surface p-5"><ManagementGovernanceSection data={govData} isLoading={!govData} /></section>}

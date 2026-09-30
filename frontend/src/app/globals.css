@@ -1,47 +1,130 @@
 @import "tailwindcss";
 
 :root {
-  --background: #05070d;
-  --foreground: #f5f6fa;
+  /* Core Visual Identity: Cool Blue-Gray Palette */
+  --bg-timid: #DAE1EE;        /* Timid Blue — Primary light background (55%) */
+  --surface-movie: #B4C0D5;   /* Movie Magic — Secondary surfaces, glass panels, soft atmospheric backgrounds (20%) */
+  --dark-anchor: #10161A;     /* Black Is Back — Dark contrast sections, typography, navigation emphasis, CTAs (5-10%) */
+  --accent-periwinkle: #8E9CB7; /* Periwinkle Blossom — Interactive elements, highlights, charts (10%) */
+  --accent-dana: #566680;     /* Dana — Strongest blue-gray accent, secondary text, borders, data viz (5-10%) */
+
+  --background: #DAE1EE;
+  --foreground: #10161A;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Segoe UI", Arial, sans-serif;
-  --font-mono: "Cascadia Code", Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", Consolas, monospace;
 
-  /* Dashboard palette */
-  --color-bg: #05070d;
-  --color-sidebar: #0a0d16;
-  --color-surface: #10131c;
-  --color-surface-alt: #161a26;
-  --color-border: rgba(255, 255, 255, 0.07);
-  --color-muted: #8b92a5;
-  --color-accent: #4f7cff;
-  --color-accent-pink: #ff4d9d;
-  --color-accent-yellow: #ffcd4b;
-  --color-positive: #22c55e;
-  --color-negative: #ef4444;
+  /* Cool Blue-Gray Palette Tokens */
+  --color-bg: #DAE1EE;
+  --color-sidebar: rgba(218, 225, 238, 0.82);
+  --color-surface: rgba(255, 255, 255, 0.72);
+  --color-surface-alt: rgba(180, 192, 213, 0.32);
+  --color-border: rgba(86, 102, 128, 0.18);
+  --color-border-light: rgba(255, 255, 255, 0.85);
+  --color-muted: #566680;
+  --color-accent: #10161A;
+  --color-periwinkle: #8E9CB7;
+  --color-dana: #566680;
+  --color-movie: #B4C0D5;
+  --color-positive: #2C6B56;
+  --color-negative: #8A4045;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-}
-
+/* Base resets & typography */
 * {
   box-sizing: border-box;
 }
 
+html {
+  background-color: var(--bg-timid);
+  color: var(--dark-anchor);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--bg-timid);
+  color: var(--dark-anchor);
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Layer 1 & 2: Atmospheric Background, Mist & Water-Caustic Textures */
+.atmospheric-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 65% 55% at 15% 10%, rgba(180, 192, 213, 0.55) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 85% 20%, rgba(142, 156, 183, 0.35) 0%, transparent 65%),
+    radial-gradient(ellipse 70% 50% at 50% 85%, rgba(180, 192, 213, 0.45) 0%, transparent 75%),
+    linear-gradient(180deg, #DAE1EE 0%, #E3E9F4 35%, #D4DDEB 70%, #DAE1EE 100%);
+}
+
+/* Subtle procedural grain texture (frosted glass / sea mist noise) */
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Layer 3: Controlled Glassmorphism System */
+.glass-light {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 16px 36px -12px rgba(16, 22, 26, 0.05), 0 1px 2px rgba(16, 22, 26, 0.03);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-light:hover {
+  border-color: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 45px -12px rgba(86, 102, 128, 0.1), 0 2px 4px rgba(16, 22, 26, 0.04);
+}
+
+.glass-blue {
+  background: rgba(180, 192, 213, 0.38);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 18px 40px -12px rgba(86, 102, 128, 0.08);
+}
+
+/* Layer 5: Dark Contrast Visual Anchor (#10161A) */
+.panel-dark {
+  background: #10161A;
+  border: 1px solid rgba(86, 102, 128, 0.35);
+  color: #DAE1EE;
+  box-shadow: 0 24px 55px -15px rgba(16, 22, 26, 0.3);
+}
+
+.panel-dark-header {
+  border-bottom: 1px solid rgba(86, 102, 128, 0.25);
+}
+
+/* Custom Refined Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: rgba(86, 102, 128, 0.35);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(86, 102, 128, 0.55);
 }
 
 ::-webkit-scrollbar-track {

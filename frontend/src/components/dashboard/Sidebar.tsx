@@ -29,21 +29,26 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden lg:flex w-64 shrink-0 flex-col justify-between border-r border-border bg-sidebar px-5 py-6">
+    <aside className="hidden lg:flex w-64 shrink-0 flex-col justify-between border-r border-white/60 bg-[rgba(218,225,238,0.75)] backdrop-blur-xl px-5 py-6">
       <div>
-        <div className="mb-8 flex items-center gap-2 px-1">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
-            <BarChart2 size={18} />
+        <div className="mb-8 flex items-center gap-2.5 px-1">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#10161A] text-[#DAE1EE] shadow-sm">
+            <BarChart2 size={16} />
           </span>
-          <span className="text-lg font-semibold tracking-tight">
-            PSX<span className="text-accent">Research</span>
-          </span>
+          <div className="flex flex-col">
+            <span className="text-base font-bold tracking-tight text-[#10161A]">
+              PSX<span className="text-[#566680] font-medium ml-1">Research</span>
+            </span>
+            <span className="text-[10px] uppercase font-mono tracking-widest text-[#8E9CB7]">
+              Intelligence Studio
+            </span>
+          </div>
         </div>
 
-        <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
+        <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-wider text-[#566680]">
           Main Menu
         </p>
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-1.5">
           {mainNav.map(({ label, icon: Icon, href, disabled }) => {
             const active = href !== "#" && (href === "/" ? pathname === "/" : pathname.startsWith(href));
             return (
@@ -51,18 +56,18 @@ export default function Sidebar() {
                 key={label}
                 href={href}
                 aria-disabled={disabled}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                   active
-                    ? "bg-accent text-white shadow-lg shadow-accent/20"
+                    ? "bg-[#10161A] text-[#DAE1EE] shadow-md shadow-[#10161A]/15"
                     : disabled
-                      ? "cursor-not-allowed text-muted/50"
-                      : "text-muted hover:bg-surface hover:text-foreground"
+                      ? "cursor-not-allowed text-[#8E9CB7]/60"
+                      : "text-[#566680] hover:bg-white/60 hover:text-[#10161A]"
                 }`}
               >
-                <Icon size={17} />
+                <Icon size={16} className={active ? "text-[#DAE1EE]" : "text-[#566680]"} />
                 <span>{label}</span>
                 {disabled && (
-                  <span className="ml-auto rounded-full bg-surface-alt px-1.5 py-0.5 text-[9px] font-medium text-muted">
+                  <span className="ml-auto rounded-md bg-[#B4C0D5]/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-[#566680]">
                     soon
                   </span>
                 )}
@@ -73,21 +78,28 @@ export default function Sidebar() {
       </div>
 
       <div>
-        <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
-          Account
+        <div className="mb-4 rounded-xl border border-white/70 bg-white/50 p-3 backdrop-blur-md">
+          <p className="text-[11px] font-semibold text-[#10161A]">PSX Pilot Environment</p>
+          <p className="text-[10px] text-[#566680] leading-tight mt-0.5">
+            Fertilizer Sector Fundamental Data &amp; Research Index
+          </p>
+        </div>
+
+        <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-[#566680]">
+          Support &amp; Preferences
         </p>
         <nav className="flex flex-col gap-1">
-          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-surface hover:text-foreground">
-            <HelpCircle size={17} />
-            Help
+          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-[#566680] hover:bg-white/60 hover:text-[#10161A] transition-colors">
+            <HelpCircle size={15} />
+            Documentation
           </Link>
-          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-surface hover:text-foreground">
-            <Settings size={17} />
-            Settings
+          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-[#566680] hover:bg-white/60 hover:text-[#10161A] transition-colors">
+            <Settings size={15} />
+            Preferences
           </Link>
-          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-surface hover:text-foreground">
-            <LogOut size={17} />
-            Log Out
+          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-[#566680] hover:bg-white/60 hover:text-[#10161A] transition-colors">
+            <LogOut size={15} />
+            Sign Out
           </Link>
         </nav>
       </div>

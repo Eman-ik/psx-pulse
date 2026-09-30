@@ -347,14 +347,14 @@ export const SECTORS: SectorConfig[] = [
 export const SECTOR_BY_SLUG = Object.fromEntries(SECTORS.map((s) => [s.slug, s]));
 
 export const COLOR: Record<string, { box: string; icon: string }> = {
-  blue:    { box: "bg-blue-500/10",    icon: "text-blue-400"    },
-  emerald: { box: "bg-emerald-500/10", icon: "text-emerald-400" },
-  orange:  { box: "bg-orange-500/10",  icon: "text-orange-400"  },
-  purple:  { box: "bg-purple-500/10",  icon: "text-purple-400"  },
-  amber:   { box: "bg-amber-500/10",   icon: "text-amber-400"   },
-  rose:    { box: "bg-rose-500/10",    icon: "text-rose-400"    },
-  teal:    { box: "bg-teal-500/10",    icon: "text-teal-400"    },
-  gray:    { box: "bg-slate-500/10",   icon: "text-slate-400"   },
-  cyan:    { box: "bg-cyan-500/10",    icon: "text-cyan-400"    },
-  lime:    { box: "bg-lime-500/10",    icon: "text-lime-400"    },
+  blue:    { box: "bg-[#10161A]",         icon: "text-[#DAE1EE]" },
+  emerald: { box: "bg-[#566680]",         icon: "text-[#DAE1EE]" },
+  orange:  { box: "bg-[#8E9CB7]/35 border border-[#8E9CB7]/40", icon: "text-[#10161A]" },
+  purple:  { box: "bg-[#B4C0D5]/50 border border-white/60",     icon: "text-[#566680]" },
+  amber:   { box: "bg-[#566680]/20 border border-[#566680]/30", icon: "text-[#10161A]" },
+  rose:    { box: "bg-[#10161A]/10 border border-[#10161A]/20", icon: "text-[#566680]" },
+  teal:    { box: "bg-[#8E9CB7]/25 border border-white/80",     icon: "text-[#10161A]" },
+  gray:    { box: "bg-white/80 border border-white",            icon: "text-[#566680]" },
+  cyan:    { box: "bg-[#B4C0D5]/40 border border-[#8E9CB7]/30", icon: "text-[#10161A]" },
+  lime:    { box: "bg-[#566680]/15 border border-[#566680]/20", icon: "text-[#566680]" },
 };

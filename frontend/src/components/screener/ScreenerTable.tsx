@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ArrowUpDown, Info, RotateCcw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Info, RotateCcw, Search, Microscope } from "lucide-react";
 import type { ComparisonRow } from "@/lib/api";
 import { formatLiveRatio, formatMarketCap, formatMultiple, formatPct, formatPercent, formatPrice } from "@/lib/format";
 import { mergeLiveQuote, useLiveQuotes } from "@/lib/useLiveQuotes";
@@ -48,13 +48,16 @@ const EMPTY_FILTERS: Record<SortKey, RangeFilter> = Object.fromEntries(
 ) as Record<SortKey, RangeFilter>;
 
 const SIGNAL_STYLE: Record<string, string> = {
-  strong_buy: "bg-positive/20 text-positive",
-  buy: "bg-positive/15 text-positive",
-  hold: "bg-surface-alt text-muted",
-  sell: "bg-negative/15 text-negative",
-  strong_sell: "bg-negative/20 text-negative",
-  no_signal: "bg-surface-alt text-muted",
+  strong_buy: "bg-[#10161A] text-[#DAE1EE] font-semibold",
+  buy: "bg-[#10161A]/85 text-[#DAE1EE] font-medium",
+  hold: "bg-[#B4C0D5]/40 text-[#566680] font-medium",
+  sell: "bg-[#B4C0D5]/70 text-[#10161A] border border-[#8E9CB7]/50 font-medium",
+  strong_sell: "bg-[#566680] text-[#DAE1EE] font-semibold",
+  no_signal: "bg-white/60 text-[#8E9CB7]",
 };
+
+// Screening pool: 13 companies with financial data (3 verified + 10 unverified)
+const SCREENING_POOL = new Set(["FFC", "EFERT", "FATIMA", "LUCK", "MLCF", "DGKC", "CHCC", "BWCL", "ACPL", "FCCL", "KOHC", "DCL", "GWLC"]);
 
 function AiSignalCell({ row }: { row: ComparisonRow }) {
   if (!row.ai_signal && row.ai_score == null) {
@@ -245,6 +248,7 @@ export default function ScreenerTable({
                 </th>
               ))}
               <th className="px-4 py-3 font-medium">AI Signal</th>
+              <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -286,6 +290,17 @@ export default function ScreenerTable({
                 ))}
                 <td className="px-4 py-3">
                   <AiSignalCell row={row} />
+                </td>
+                <td className="px-4 py-3">
+                  {row.symbol && SCREENING_POOL.has(row.symbol) && (
+                    <Link
+                      href="/screening"
+                      className="inline-flex items-center gap-1 rounded-md bg-accent/10 px-2 py-1 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                    >
+                      <Microscope className="h-3 w-3" />
+                      Deep Analysis
+                    </Link>
+                  )}
                 </td>
               </tr>
             ))}

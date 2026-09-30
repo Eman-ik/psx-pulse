@@ -15,10 +15,10 @@ function SignalPill({ signal }: { signal: string | null }) {
   const label = signal.replace("_", " ");
   const colorClass =
     signal === "strong_buy" || signal === "buy"
-      ? "bg-emerald-500/15 text-emerald-400"
+      ? "bg-[#10161A] text-[#DAE1EE] font-semibold"
       : signal === "strong_sell" || signal === "sell"
-      ? "bg-red-500/15 text-red-400"
-      : "bg-surface-alt text-muted";
+      ? "bg-[#B4C0D5]/70 text-[#10161A] border border-[#8E9CB7]/50 font-semibold"
+      : "bg-white/70 text-[#566680]";
   return (
     <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${colorClass}`}>
       {label}

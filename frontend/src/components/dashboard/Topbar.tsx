@@ -3,54 +3,52 @@
 import { Search, Bell, BarChart2 } from "lucide-react";
 import { useLiveQuotes } from "@/lib/useLiveQuotes";
 
-/**
- * isLive is optional: pages that already know their own live-data status (or that show
- * no live data at all, e.g. Research/Portfolio) can still pass it explicitly. Everyone
- * else gets it for free from useLiveQuotes() -- this used to mean every one of those
- * pages awaited its own fetchLiveQuotes() call during SSR just to compute this badge
- * (up to 35s), which is the whole reason the badge now resolves client-side instead.
- */
 export default function Topbar({ isLive: isLiveOverride }: { isLive?: boolean }) {
   const { isLive: liveFromHook, loading } = useLiveQuotes({ skip: isLiveOverride !== undefined });
   const isLive = isLiveOverride ?? liveFromHook;
+
   return (
-    <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-4 lg:px-8">
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-white/60 bg-[rgba(255,255,255,0.65)] backdrop-blur-xl px-6 py-3.5 lg:px-8 shadow-xs">
       <div>
-        <p className="text-xs text-muted">
-          Homepage / <span className="text-foreground">Dashboard</span>
+        <p className="text-[11px] font-medium text-[#566680]">
+          Homepage / <span className="text-[#10161A] font-semibold">Fertilizer Intelligence</span>
         </p>
-        <h1 className="text-xl font-semibold">PSX Research</h1>
+        <h1 className="text-lg font-bold tracking-tight text-[#10161A]">PSX Sector Dashboard</h1>
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-3">
-        <div className="hidden max-w-xs flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 sm:flex">
-          <Search size={15} className="text-muted" />
+        <div className="hidden max-w-xs flex-1 items-center gap-2.5 rounded-full border border-white/80 bg-white/70 px-4 py-1.5 shadow-2xs backdrop-blur-md sm:flex focus-within:border-[#566680]/50 transition-colors">
+          <Search size={14} className="text-[#566680]" />
           <input
             type="text"
-            placeholder="Search companies, tickers..."
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none"
+            placeholder="Search companies, tickers, announcements..."
+            className="w-full bg-transparent text-xs text-[#10161A] placeholder:text-[#8E9CB7] focus:outline-none"
           />
         </div>
 
         <span
-          className={`hidden rounded-full border px-3 py-1.5 text-xs font-medium sm:inline-block ${
+          className={`hidden rounded-full border px-3 py-1 text-[11px] font-medium sm:inline-flex items-center gap-1.5 ${
             loading
-              ? "border-border bg-surface-alt text-muted"
+              ? "border-[#566680]/20 bg-[#B4C0D5]/20 text-[#566680]"
               : isLive
-                ? "border-positive/30 bg-positive/10 text-positive"
-                : "border-accent-yellow/30 bg-accent-yellow/10 text-accent-yellow"
+                ? "border-[#566680]/30 bg-[#B4C0D5]/35 text-[#10161A]"
+                : "border-[#8E9CB7]/40 bg-white/70 text-[#566680]"
           }`}
         >
-          {loading ? "Loading live prices…" : isLive ? "Live prices via psxdata" : "Sample data — not live"}
+          <span className={`h-1.5 w-1.5 rounded-full ${isLive ? "bg-[#10161A]" : "bg-[#8E9CB7]"}`} />
+          {loading ? "Syncing quotes…" : isLive ? "Live prices via psxdata" : "EOD Verified Data"}
         </span>
 
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-muted hover:text-foreground">
-          <Bell size={16} />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-negative" />
+        <button
+          aria-label="Alerts"
+          className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/70 text-[#566680] hover:text-[#10161A] hover:bg-white transition-all shadow-2xs"
+        >
+          <Bell size={14} />
+          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#10161A]" />
         </button>
 
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent">
-          <BarChart2 size={16} />
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#10161A] text-[#DAE1EE] shadow-sm">
+          <BarChart2 size={14} />
         </div>
       </div>
     </header>

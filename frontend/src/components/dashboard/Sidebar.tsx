@@ -25,6 +25,12 @@ const mainNav = [
   { label: "Watchlists & Alerts", icon: Bell, href: "#", disabled: true },
 ];
 
+const screenerTypes = [
+  { label: "Fundamental Screening", href: "/screening" },
+  { label: "Technical Analysis", href: "/technical" },
+  { label: "Momentum Analysis", href: "/momentum" },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
 
@@ -51,27 +57,52 @@ export default function Sidebar() {
         <nav className="flex flex-col gap-1.5">
           {mainNav.map(({ label, icon: Icon, href, disabled }) => {
             const active = href !== "#" && (href === "/" ? pathname === "/" : pathname.startsWith(href));
+            const isScreenerMain = href === "/screener";
+            const isScreenerSubActive = pathname === "/screening" || pathname === "/technical" || pathname === "/momentum";
+            const showScreenerSub = isScreenerMain || isScreenerSubActive;
+
             return (
-              <Link
-                key={label}
-                href={href}
-                aria-disabled={disabled}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                  active
-                    ? "bg-[#10161A] text-[#DAE1EE] shadow-md shadow-[#10161A]/15"
-                    : disabled
-                      ? "cursor-not-allowed text-[#8E9CB7]/60"
-                      : "text-[#566680] hover:bg-white/60 hover:text-[#10161A]"
-                }`}
-              >
-                <Icon size={16} className={active ? "text-[#DAE1EE]" : "text-[#566680]"} />
-                <span>{label}</span>
-                {disabled && (
-                  <span className="ml-auto rounded-md bg-[#B4C0D5]/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-[#566680]">
-                    soon
-                  </span>
+              <div key={label}>
+                <Link
+                  href={href}
+                  aria-disabled={disabled}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                    (active || (isScreenerMain && isScreenerSubActive))
+                      ? "bg-[#10161A] text-[#DAE1EE] shadow-md shadow-[#10161A]/15"
+                      : disabled
+                        ? "cursor-not-allowed text-[#8E9CB7]/60"
+                        : "text-[#566680] hover:bg-white/60 hover:text-[#10161A]"
+                  }`}
+                >
+                  <Icon size={16} className={(active || (isScreenerMain && isScreenerSubActive)) ? "text-[#DAE1EE]" : "text-[#566680]"} />
+                  <span>{label}</span>
+                  {disabled && (
+                    <span className="ml-auto rounded-md bg-[#B4C0D5]/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-[#566680]">
+                      soon
+                    </span>
+                  )}
+                </Link>
+                {isScreenerMain && (
+                  <div className="mt-1 ml-4 flex flex-col gap-1 border-l border-[#8E9CB7]/30 pl-3">
+                    {screenerTypes.map(({ label: typeLabel, href: typeHref }) => {
+                      const isActive = pathname === typeHref;
+                      return (
+                        <Link
+                          key={typeLabel}
+                          href={typeHref}
+                          className={`text-xs font-medium rounded-lg px-2.5 py-2 transition-all ${
+                            isActive
+                              ? "bg-[#10161A]/60 text-[#DAE1EE]"
+                              : "text-[#566680] hover:bg-white/40 hover:text-[#10161A]"
+                          }`}
+                        >
+                          {typeLabel}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 )}
-              </Link>
+              </div>
             );
           })}
         </nav>

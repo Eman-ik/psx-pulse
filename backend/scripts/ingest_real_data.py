@@ -6,9 +6,15 @@ Populates the database for research studio and screeners
 """
 
 import sys
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 import logging
+
+# Fix encoding for Windows console
+if sys.stdout.encoding and 'utf' not in sys.stdout.encoding.lower():
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 from sqlalchemy import select
 from psxdata import PSXClient
@@ -22,7 +28,7 @@ from app.db.models import (
     FinancialFact, RatioValue
 )
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 class PSXDataIngester:
@@ -50,22 +56,23 @@ class PSXDataIngester:
             # Step 4: Fetch and populate indices
             self.ingest_indices()
 
-            logger.info("✅ Data ingestion complete!")
+            logger.info("Data ingestion complete!")
 
         except Exception as e:
-            logger.error(f"❌ Ingestion failed: {str(e)}")
+            logger.error(f"Ingestion failed: {str(e)}")
             raise
         finally:
             self.db.close()
 
     def ingest_symbols(self):
         """Fetch all PSX symbols and create Security records"""
-        logger.info("📥 Fetching PSX symbols...")
+        logger.info("[FETCH] Getting PSX symbols...")
 
         try:
             symbols_data = self.client.symbols()
             logger.info(f"Found {len(symbols_data)} securities")
 
+            count = 0
             for symbol, details in symbols_data.items():
                 # Check if security already exists
                 existing = self.db.execute(
@@ -73,7 +80,6 @@ class PSXDataIngester:
                 ).scalar_one_or_none()
 
                 if existing:
-                    logger.debug(f"  {symbol} already exists")
                     continue
 
                 # Get or create issuer
@@ -115,10 +121,12 @@ class PSXDataIngester:
                     market_cap=details.get('market_cap')
                 )
                 self.db.add(security)
-                logger.info(f"  ✅ Added {symbol} ({sector_name})")
+                count += 1
+                if count % 10 == 0:
+                    logger.info(f"  Added {count} symbols...")
 
             self.db.commit()
-            logger.info("✅ Symbols ingestion complete")
+            logger.info(f"[OK] Symbols ingestion complete: {count} new securities")
 
         except Exception as e:
             logger.error(f"Error ingesting symbols: {str(e)}")
@@ -127,7 +135,7 @@ class PSXDataIngester:
 
     def ingest_quotes(self):
         """Fetch current quotes and populate PriceOHLCV"""
-        logger.info("📥 Fetching current quotes...")
+        logger.info("[FETCH] Getting current quotes...")
 
         try:
             # Get all active securities
@@ -137,13 +145,13 @@ class PSXDataIngester:
 
             logger.info(f"Fetching quotes for {len(securities)} securities")
 
-            for security in securities:
+            count = 0
+            for i, security in enumerate(securities):
                 try:
                     # Get quote for this symbol
                     quote = self.client.quote(security.symbol)
 
                     if not quote:
-                        logger.warning(f"  ⚠️ No quote for {security.symbol}")
                         continue
 
                     # Check if price record exists for today
@@ -155,7 +163,6 @@ class PSXDataIngester:
                     ).scalar_one_or_none()
 
                     if existing:
-                        logger.debug(f"  {security.symbol} quote already exists for today")
                         continue
 
                     # Create price record
@@ -170,14 +177,16 @@ class PSXDataIngester:
                         is_delayed=False
                     )
                     self.db.add(price)
-                    logger.info(f"  ✅ {security.symbol}: {quote.get('last_price')} PKR")
+                    count += 1
+
+                    if count % 10 == 0 or (i+1) == len(securities):
+                        logger.info(f"  Loaded {count} quotes... ({i+1}/{len(securities)})")
 
                 except Exception as e:
-                    logger.warning(f"  Error fetching quote for {security.symbol}: {str(e)}")
                     continue
 
             self.db.commit()
-            logger.info("✅ Quotes ingestion complete")
+            logger.info(f"[OK] Quotes ingestion complete: {count} prices loaded")
 
         except Exception as e:
             logger.error(f"Error ingesting quotes: {str(e)}")
@@ -186,7 +195,7 @@ class PSXDataIngester:
 
     def ingest_fundamentals(self):
         """Fetch fundamental data and populate FinancialFact"""
-        logger.info("📥 Fetching fundamental data...")
+        logger.info("[FETCH] Getting fundamental data...")
 
         try:
             # Get all active securities
@@ -196,13 +205,13 @@ class PSXDataIngester:
 
             logger.info(f"Fetching fundamentals for {len(securities)} securities")
 
-            for security in securities:
+            count = 0
+            for i, security in enumerate(securities):
                 try:
                     # Get fundamentals for this symbol
                     fundamentals = self.client.fundamentals(security.symbol)
 
                     if not fundamentals:
-                        logger.warning(f"  ⚠️ No fundamentals for {security.symbol}")
                         continue
 
                     # Check if financial data exists for this security
@@ -214,7 +223,6 @@ class PSXDataIngester:
                     ).scalar_one_or_none()
 
                     if existing:
-                        logger.debug(f"  {security.symbol} fundamentals already exist")
                         continue
 
                     # Create financial fact record
@@ -231,14 +239,16 @@ class PSXDataIngester:
                         book_value=float(fundamentals.get('book_value', 0))
                     )
                     self.db.add(financial)
-                    logger.info(f"  ✅ {security.symbol}: EPS {fundamentals.get('eps', 'N/A')}")
+                    count += 1
+
+                    if count % 10 == 0 or (i+1) == len(securities):
+                        logger.info(f"  Loaded {count} fundamentals... ({i+1}/{len(securities)})")
 
                 except Exception as e:
-                    logger.warning(f"  Error fetching fundamentals for {security.symbol}: {str(e)}")
                     continue
 
             self.db.commit()
-            logger.info("✅ Fundamentals ingestion complete")
+            logger.info(f"[OK] Fundamentals ingestion complete: {count} records loaded")
 
         except Exception as e:
             logger.error(f"Error ingesting fundamentals: {str(e)}")
@@ -247,7 +257,7 @@ class PSXDataIngester:
 
     def ingest_indices(self):
         """Fetch index data and populate IndexOHLCV"""
-        logger.info("📥 Fetching index data...")
+        logger.info("[FETCH] Getting index data...")
 
         try:
             # Get or create market indices
@@ -273,7 +283,7 @@ class PSXDataIngester:
                     indices_data = self.client.indices()
 
                     if code not in indices_data:
-                        logger.warning(f"  ⚠️ No data for {code}")
+                        logger.warning(f"No data for {code}")
                         continue
 
                     index_info = indices_data[code]
@@ -287,7 +297,6 @@ class PSXDataIngester:
                     ).scalar_one_or_none()
 
                     if existing:
-                        logger.debug(f"  {code} quote already exists for today")
                         continue
 
                     # Create index price record
@@ -302,14 +311,14 @@ class PSXDataIngester:
                         is_delayed=False
                     )
                     self.db.add(index_price)
-                    logger.info(f"  ✅ {code}: {index_info.get('last_close')} points")
+                    logger.info(f"  [+] {code}: {index_info.get('last_close')} points")
 
                 except Exception as e:
-                    logger.warning(f"  Error fetching {code}: {str(e)}")
+                    logger.warning(f"Error fetching {code}: {str(e)}")
                     continue
 
             self.db.commit()
-            logger.info("✅ Indices ingestion complete")
+            logger.info("[OK] Indices ingestion complete")
 
         except Exception as e:
             logger.error(f"Error ingesting indices: {str(e)}")
@@ -319,32 +328,29 @@ class PSXDataIngester:
 
 def main():
     """Run data ingestion"""
-    print("""
-    ╔════════════════════════════════════════╗
-    ║  PSX Real-Time Data Ingestion Script   ║
-    ║  Populate database with live PSX data  ║
-    ╚════════════════════════════════════════╝
-    """)
+    print("\n" + "="*60)
+    print("PSX REAL-TIME DATA INGESTION SCRIPT")
+    print("Populating database with live PSX data")
+    print("="*60 + "\n")
 
     ingester = PSXDataIngester()
     ingester.ingest_all()
 
-    print("""
-    ✅ Data ingestion successful!
-
-    Research Studio and Screeners now have real PSX data:
-    • Current prices for all listed companies
-    • Fundamental metrics (EPS, P/E, Book Value, etc.)
-    • Index levels (KSE-100, KSE-30, KMI-30)
-    • Market breadth and movers
-
-    Visit: http://localhost:3000
-      - Market Overview: /market
-      - Fundamental Screener: /screening
-      - Technical Screener: /technical
-      - Momentum Screener: /momentum
-      - Research Studio: /research
-    """)
+    print("\n" + "="*60)
+    print("SUCCESS: Data ingestion complete!")
+    print("="*60)
+    print("\nResearch Studio and Screeners now have REAL PSX DATA:")
+    print("  [+] Current prices for all listed companies")
+    print("  [+] Fundamental metrics (EPS, P/E, Book Value, etc.)")
+    print("  [+] Index levels (KSE-100, KSE-30, KMI-30)")
+    print("  [+] Market breadth and movers")
+    print("\nAccess at: http://localhost:3000")
+    print("  - Market Overview: /market")
+    print("  - Fundamental Screener: /screening")
+    print("  - Technical Screener: /technical")
+    print("  - Momentum Screener: /momentum")
+    print("  - Research Studio: /research")
+    print("="*60 + "\n")
 
 
 if __name__ == "__main__":

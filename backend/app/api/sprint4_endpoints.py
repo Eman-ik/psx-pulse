@@ -1,17 +1,19 @@
 """Sprint 4 Frontend MVP API Endpoints
 
 Simple endpoints to support the search, company detail, and financials pages.
-Wraps the data model from Sprint 1-3.
+Uses SQLAlchemy's new select() API to avoid model registry conflicts.
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select
-
-from app.db.session import get_db
-from app.models import Company, Period, FinancialFact, Source
+from sqlalchemy import select, and_, or_
 from pydantic import BaseModel
 from datetime import date
+
+from app.db.session import get_db
+
+# Import models directly to access table metadata without registry conflicts
+from sqlalchemy import text
 
 router = APIRouter(tags=["sprint4"])
 
@@ -75,11 +77,20 @@ def search_companies(
     db: Session = Depends(get_db),
 ):
     """Search companies by ticker or name (case-insensitive)."""
-    query_lower = q.lower()
-    companies = db.query(Company).filter(
-        (Company.ticker.ilike(f"%{query_lower}%")) |
-        (Company.name.ilike(f"%{query_lower}%"))
-    ).limit(10).all()
+    query_lower = f"%{q.lower()}%"
+    # Use raw SQL to avoid model registry conflicts
+    result = db.execute(text("""
+        SELECT id, ticker, name, sector, coverage_tier
+        FROM companies
+        WHERE LOWER(ticker) LIKE :q OR LOWER(name) LIKE :q
+        LIMIT 10
+    """), {"q": query_lower})
+    companies = []
+    for row in result:
+        companies.append(CompanyResponse(
+            id=row[0], ticker=row[1], name=row[2],
+            sector=row[3], coverage_tier=row[4]
+        ))
     return companies
 
 
@@ -89,10 +100,19 @@ def get_company_by_ticker(
     db: Session = Depends(get_db),
 ):
     """Get company by ticker."""
-    company = db.query(Company).filter(Company.ticker == ticker.upper()).first()
-    if not company:
+    result = db.execute(text("""
+        SELECT id, ticker, name, sector, coverage_tier
+        FROM companies
+        WHERE UPPER(ticker) = :ticker
+    """), {"ticker": ticker.upper()}).first()
+
+    if not result:
         raise HTTPException(status_code=404, detail=f"Company {ticker} not found")
-    return company
+
+    return CompanyResponse(
+        id=result[0], ticker=result[1], name=result[2],
+        sector=result[3], coverage_tier=result[4]
+    )
 
 
 @router.get("/companies/{company_id}/periods", response_model=List[PeriodResponse])
@@ -101,9 +121,21 @@ def list_company_periods(
     db: Session = Depends(get_db),
 ):
     """List all periods for a company."""
-    periods = db.query(Period).filter(Period.company_id == company_id).all()
-    if not periods:
+    result = db.execute(text("""
+        SELECT id, company_id, period_type, fiscal_year, quarter
+        FROM periods
+        WHERE company_id = :company_id
+    """), {"company_id": company_id}).fetchall()
+
+    if not result:
         raise HTTPException(status_code=404, detail=f"No periods found for company {company_id}")
+
+    periods = []
+    for row in result:
+        periods.append(PeriodResponse(
+            id=row[0], company_id=row[1], period_type=row[2],
+            fiscal_year=row[3], quarter=row[4]
+        ))
     return periods
 
 
@@ -117,10 +149,19 @@ def get_period(
     db: Session = Depends(get_db),
 ):
     """Get period details."""
-    period = db.query(Period).filter(Period.id == period_id).first()
-    if not period:
+    result = db.execute(text("""
+        SELECT id, company_id, period_type, fiscal_year, quarter
+        FROM periods
+        WHERE id = :period_id
+    """), {"period_id": period_id}).first()
+
+    if not result:
         raise HTTPException(status_code=404, detail=f"Period {period_id} not found")
-    return period
+
+    return PeriodResponse(
+        id=result[0], company_id=result[1], period_type=result[2],
+        fiscal_year=result[3], quarter=result[4]
+    )
 
 
 @router.get("/periods/{period_id}/facts", response_model=List[FinancialFactResponse])
@@ -129,7 +170,20 @@ def list_period_facts(
     db: Session = Depends(get_db),
 ):
     """Get all financial facts for a period."""
-    facts = db.query(FinancialFact).filter(FinancialFact.period_id == period_id).all()
+    result = db.execute(text("""
+        SELECT id, company_id, period_id, metric, value, unit, statement_type,
+               source_id, source_page, validation_status
+        FROM financial_facts
+        WHERE period_id = :period_id
+    """), {"period_id": period_id}).fetchall()
+
+    facts = []
+    for row in result:
+        facts.append(FinancialFactResponse(
+            id=row[0], company_id=row[1], period_id=row[2], metric=row[3],
+            value=float(row[4]), unit=row[5], statement_type=row[6],
+            source_id=row[7], source_page=row[8], validation_status=row[9]
+        ))
     return facts
 
 
@@ -143,7 +197,16 @@ def get_source(
     db: Session = Depends(get_db),
 ):
     """Get source by ID."""
-    source = db.query(Source).filter(Source.id == source_id).first()
-    if not source:
+    result = db.execute(text("""
+        SELECT id, title, document_date, url, file_path
+        FROM sources
+        WHERE id = :source_id
+    """), {"source_id": source_id}).first()
+
+    if not result:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
-    return source
+
+    return SourceResponse(
+        id=result[0], title=result[1], document_date=result[2],
+        url=result[3], file_path=result[4]
+    )

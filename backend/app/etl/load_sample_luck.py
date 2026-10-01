@@ -37,8 +37,8 @@ def load_sample_luck_data(db: Session = None) -> dict:
     luck_data = setup_lucky_cement_data(db)
     company = luck_data["company"]
     periods = luck_data["periods"]
-    print(f"✓ Created company: {company.ticker} - {company.name}")
-    print(f"✓ Created {len(periods['annual'])} annual periods + {len(periods['quarterly'])} quarterly periods")
+    print(f"[OK] Created company: {company.ticker} - {company.name}")
+    print(f"[OK] Created {len(periods['annual'])} annual periods + {len(periods['quarterly'])} quarterly periods")
 
     # Load data for each fiscal year
     sources = {}
@@ -60,7 +60,7 @@ def load_sample_luck_data(db: Session = None) -> dict:
         db.commit()
         db.refresh(source)
         sources[fiscal_year] = source
-        print(f"✓ Created source: {source.title} (ID: {source.id})")
+        print(f"[OK] Created source: {source.title} (ID: {source.id})")
 
         # Get sample facts for this year
         raw_facts = get_sample_data_by_year(fiscal_year)
@@ -76,9 +76,9 @@ def load_sample_luck_data(db: Session = None) -> dict:
         # Report results
         stats = result["stats"]
         print(f"  Pipeline results:")
-        print(f"    ✓ Stored: {stats['stored']}")
-        print(f"    ⚠ Flagged: {stats['flagged']}")
-        print(f"    ✗ Skipped: {stats['skipped']}")
+        print(f"    [OK] Stored: {stats['stored']}")
+        print(f"    [WARN] Flagged: {stats['flagged']}")
+        print(f"    [ERR] Skipped: {stats['skipped']}")
 
         if stats["flagged"] > 0:
             print(f"  Flagged items (require manual review):")
@@ -93,7 +93,7 @@ def load_sample_luck_data(db: Session = None) -> dict:
     # Update company coverage tier
     company.coverage_tier = "full"
     db.commit()
-    print(f"\n✓ Updated company coverage tier to 'full'")
+    print(f"\n[OK] Updated company coverage tier to 'full'")
 
     # Summary
     print("\n" + "=" * 60)
@@ -105,9 +105,9 @@ def load_sample_luck_data(db: Session = None) -> dict:
 
     print(f"Company: {company.ticker} ({company.name})")
     print(f"Total financial facts loaded:")
-    print(f"  ✓ Stored (validated): {total_stored}")
-    print(f"  ⚠ Flagged (review): {total_flagged}")
-    print(f"  ✗ Skipped (errors): {total_skipped}")
+    print(f"  [OK] Stored (validated): {total_stored}")
+    print(f"  [WARN] Flagged (review): {total_flagged}")
+    print(f"  [ERR] Skipped (errors): {total_skipped}")
     print(f"  Total: {total_stored + total_flagged + total_skipped}")
     print("\nNext steps:")
     print("  1. Review flagged items for data quality")

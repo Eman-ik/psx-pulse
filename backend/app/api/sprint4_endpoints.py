@@ -69,11 +69,11 @@ class SourceResponse(BaseModel):
 # Companies Endpoints
 # ============================================================================
 
-@router.get("/companies/search")
+@router.get("/companies/search", response_model=List[CompanyResponse])
 def search_companies(
     q: str = Query(..., min_length=1),
     db: Session = Depends(get_db),
-) -> List[CompanyResponse]:
+):
     """Search companies by ticker or name (case-insensitive)."""
     query_lower = q.lower()
     companies = db.query(Company).filter(
@@ -83,11 +83,11 @@ def search_companies(
     return companies
 
 
-@router.get("/companies/{ticker}")
+@router.get("/companies/{ticker}", response_model=CompanyResponse)
 def get_company_by_ticker(
     ticker: str,
     db: Session = Depends(get_db),
-) -> CompanyResponse:
+):
     """Get company by ticker."""
     company = db.query(Company).filter(Company.ticker == ticker.upper()).first()
     if not company:
@@ -95,11 +95,11 @@ def get_company_by_ticker(
     return company
 
 
-@router.get("/companies/{company_id}/periods")
+@router.get("/companies/{company_id}/periods", response_model=List[PeriodResponse])
 def list_company_periods(
     company_id: int,
     db: Session = Depends(get_db),
-) -> List[PeriodResponse]:
+):
     """List all periods for a company."""
     periods = db.query(Period).filter(Period.company_id == company_id).all()
     if not periods:
@@ -111,11 +111,11 @@ def list_company_periods(
 # Periods Endpoints
 # ============================================================================
 
-@router.get("/periods/{period_id}")
+@router.get("/periods/{period_id}", response_model=PeriodResponse)
 def get_period(
     period_id: int,
     db: Session = Depends(get_db),
-) -> PeriodResponse:
+):
     """Get period details."""
     period = db.query(Period).filter(Period.id == period_id).first()
     if not period:
@@ -123,11 +123,11 @@ def get_period(
     return period
 
 
-@router.get("/periods/{period_id}/facts")
+@router.get("/periods/{period_id}/facts", response_model=List[FinancialFactResponse])
 def list_period_facts(
     period_id: int,
     db: Session = Depends(get_db),
-) -> List[FinancialFactResponse]:
+):
     """Get all financial facts for a period."""
     facts = db.query(FinancialFact).filter(FinancialFact.period_id == period_id).all()
     return facts
@@ -137,11 +137,11 @@ def list_period_facts(
 # Sources Endpoints
 # ============================================================================
 
-@router.get("/sources/{source_id}")
+@router.get("/sources/{source_id}", response_model=SourceResponse)
 def get_source(
     source_id: int,
     db: Session = Depends(get_db),
-) -> SourceResponse:
+):
     """Get source by ID."""
     source = db.query(Source).filter(Source.id == source_id).first()
     if not source:

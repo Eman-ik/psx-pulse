@@ -22,6 +22,7 @@ export default function MarketPage() {
   const [gainers, setGainers] = useState<any[]>([])
   const [losers, setLosers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // Handle WebSocket updates
   useEffect(() => {
@@ -47,14 +48,19 @@ export default function MarketPage() {
     const fetchMarketData = async () => {
       try {
         const response = await fetch('http://localhost:5000/market/overview/snapshot')
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`)
+        }
         const result = await response.json()
         setMarketData(result)
-        setIndices(result.indices)
+        setIndices(result.indices || {})
         setBreadth(result.breadth)
-        setGainers(result.gainers)
-        setLosers(result.losers)
-      } catch (error) {
-        console.error('Failed to load market data:', error)
+        setGainers(result.gainers || [])
+        setLosers(result.losers || [])
+        setFetchError(null)
+      } catch (err) {
+        console.error('Failed to load market data:', err)
+        setFetchError('Unable to load market data. Backend may be offline.')
       } finally {
         setLoading(false)
       }
@@ -71,6 +77,23 @@ export default function MarketPage() {
           <Topbar />
           <main className="flex-1 px-6 py-6 flex items-center justify-center">
             <div className="text-muted">Loading market data...</div>
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex min-h-screen w-full bg-bg">
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar />
+          <main className="flex-1 px-6 py-6 lg:px-8">
+            <div className="rounded-lg border border-negative/30 bg-negative/5 p-4 text-negative">
+              <p className="font-semibold">Error Loading Market Data</p>
+              <p className="text-sm mt-1">{fetchError}</p>
+            </div>
           </main>
         </div>
       </div>
@@ -105,31 +128,42 @@ export default function MarketPage() {
 
           {/* Index Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Object.entries(indices).map(([code, index]: [string, any]) => (
-              <div key={code} className="rounded-lg border border-border bg-surface p-4">
-                <p className="text-xs text-muted font-semibold uppercase">{code}</p>
-                <p className="text-2xl font-bold mt-2">{index.level.toFixed(2)}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  {index.change_pct >= 0 ? (
-                    <TrendingUp className="h-4 w-4 text-positive" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 text-negative" />
-                  )}
-                  <p
-                    className={`text-sm font-semibold ${
-                      index.change_pct >= 0 ? 'text-positive' : 'text-negative'
-                    }`}
-                  >
-                    {index.change_pct >= 0 ? '+' : ''}
-                    {index.change_pct.toFixed(2)}%
-                  </p>
-                  <p className="text-xs text-muted">
-                    ({index.change >= 0 ? '+' : ''}
-                    {index.change.toFixed(2)})
-                  </p>
+            {Object.entries(indices).map(([code, index]: [string, any]) => {
+              if (!index || typeof index.level === 'undefined') {
+                return (
+                  <div key={code} className="rounded-lg border border-border bg-surface p-4">
+                    <p className="text-xs text-muted font-semibold uppercase">{code}</p>
+                    <p className="text-2xl font-bold mt-2 text-muted">—</p>
+                    <p className="text-xs text-muted mt-2">No data available</p>
+                  </div>
+                )
+              }
+              return (
+                <div key={code} className="rounded-lg border border-border bg-surface p-4">
+                  <p className="text-xs text-muted font-semibold uppercase">{code}</p>
+                  <p className="text-2xl font-bold mt-2">{index.level?.toFixed(2) || '—'}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    {index.change_pct >= 0 ? (
+                      <TrendingUp className="h-4 w-4 text-positive" />
+                    ) : (
+                      <TrendingDown className="h-4 w-4 text-negative" />
+                    )}
+                    <p
+                      className={`text-sm font-semibold ${
+                        index.change_pct >= 0 ? 'text-positive' : 'text-negative'
+                      }`}
+                    >
+                      {index.change_pct >= 0 ? '+' : ''}
+                      {index.change_pct?.toFixed(2) || '0.00'}%
+                    </p>
+                    <p className="text-xs text-muted">
+                      ({index.change >= 0 ? '+' : ''}
+                      {index.change?.toFixed(2) || '0.00'})
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Market Breadth */}

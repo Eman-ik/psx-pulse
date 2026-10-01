@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   SlidersHorizontal,
   GraduationCap,
   Bell,
@@ -12,15 +11,11 @@ import {
   LogOut,
   BarChart2,
   FileSearch,
-  Briefcase,
 } from "lucide-react";
 
 const mainNav = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/" },
   { label: "Screener", icon: SlidersHorizontal, href: "/screener" },
-  { label: "Ranking", icon: BarChart2, href: "/ranking" },
   { label: "Research Studio", icon: FileSearch, href: "/research" },
-  { label: "Portfolio", icon: Briefcase, href: "/portfolio" },
   { label: "Academy", icon: GraduationCap, href: "#", disabled: true },
   { label: "Watchlists & Alerts", icon: Bell, href: "#", disabled: true },
 ];

@@ -10,11 +10,12 @@ import PeerComparisonSection from "./PeerComparisonSection";
 import HistoricalValuationSection from "./HistoricalValuationSection";
 import ManagementGovernanceSection from "./ManagementGovernanceSection";
 import FundamentalScorecardSection from "./FundamentalScorecardSection";
+import InvestorQuestionsView from "./InvestorQuestionsView";
 
-const WORKSPACE_API = "http://localhost:8000";
+const WORKSPACE_API = "http://localhost:5000/api";
 const ANALYSIS_API = "http://localhost:5000/api";
 type CoverageTier = "full" | "unverified" | "price_only";
-type Tab = "overview" | "business-model" | "industry" | "financials" | "kpis" | "valuation" | "peers" | "analysis" | "peer-comparison" | "historical-valuation" | "governance" | "fundamental-scorecard" | "announcements" | "filings" | "ai" | "report";
+type Tab = "overview" | "business-model" | "industry" | "financials" | "kpis" | "valuation" | "peers" | "analysis" | "peer-comparison" | "historical-valuation" | "governance" | "fundamental-scorecard" | "announcements" | "filings" | "ai" | "report" | "questions";
 interface UniverseEntry { symbol:string; name:string; sector:"FERTILIZER"|"CEMENT"; coverage_tier:CoverageTier; index_weight:number|null; issuer_id:number; }
 interface Universe { as_of:string; count:number; tier_counts:Record<string,number>; sector_counts:Record<string,number>; entries:UniverseEntry[]; }
 interface Point { period_end:string; value:number; unit?:string; period_type?:string; }
@@ -24,6 +25,7 @@ interface Workspace { ticker:string; generated_at:string; coverage_tier:Coverage
 interface ResearchReport { not_covered:boolean; unavailable:boolean; coverage_note?:string; published_at?:string;sections_total?:number;sections_with_real_content?:number;sections?:{title:string;content:string;has_real_content:boolean;missing_evidence:string[]}[]; }
 
 const TABS:{id:Tab;label:string;icon:typeof BarChart3;requiresFull?:boolean}[]=[
+  {id:"questions",label:"💡 Questions",icon:BarChart3,requiresFull:true},
   {id:"overview",label:"Overview",icon:Building2},{id:"business-model",label:"Business Model",icon:Briefcase},
   {id:"industry",label:"Industry",icon:Factory},
   {id:"financials",label:"Financials",icon:FileText,requiresFull:true},
@@ -86,6 +88,7 @@ export function ComprehensiveResearchStudio(){
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5"><Card label="Evidence sources" value={String(workspace.evidence.source_count)}/><Card label="Financial series" value={String(workspace.evidence.financial_series_count)}/><Card label="Ratio series" value={String(workspace.evidence.ratio_series_count)}/><Card label="Announcements" value={String(workspace.evidence.announcement_count)}/><Card label="Free float" value={pct(workspace.overview.free_float_pct)}/></div>{!full&&<div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-200"><b>Evidence control:</b> {coverageText(workspace.coverage_tier)}. Fundamentals-backed tabs and narrative are withheld until filing verification is complete.</div>}</section>
       <nav className="flex gap-1 overflow-x-auto border-b border-border">{visibleTabs.map(item=>{const Icon=item.icon;return <button key={item.id} onClick={()=>setTab(item.id)} className={`flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold ${tab===item.id?"border-accent text-accent":"border-transparent text-muted"}`}><Icon className="h-4 w-4"/>{item.label}</button>})}</nav>
       {tab==="overview"&&<div className="grid gap-5 lg:grid-cols-3"><section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2"><h3 className="font-bold">Company intelligence</h3><div className="mt-4 grid gap-4 sm:grid-cols-2"><Card label="Established" value={workspace.overview.issuer.establishment_year?.toString()??"—"}/><Card label="Fiscal year end" value={workspace.overview.issuer.fiscal_year_end_month?`Month ${workspace.overview.issuer.fiscal_year_end_month}`:"—"}/><Card label="Auditor" value={workspace.overview.issuer.auditor??"—"}/><Card label="Website" value={workspace.overview.issuer.website??"—"}/></div></section><section className="rounded-xl border border-border bg-surface p-5"><h3 className="font-bold">Research thesis</h3>{workspace.overview.thesis&&full?<div className="mt-4 space-y-3 text-sm"><p><b className="text-positive">Bull:</b> {workspace.overview.thesis.bull_case}</p><p><b className="text-accent">Base:</b> {workspace.overview.thesis.base_case}</p><p><b className="text-negative">Bear:</b> {workspace.overview.thesis.bear_case}</p></div>:<p className="mt-4 text-sm text-muted">No source-verified thesis is available.</p>}</section></div>}
+      {tab==="questions"&&<section className="rounded-xl"><InvestorQuestionsView research={workspace as any} ticker={workspace.ticker}/></section>}
       {tab==="business-model"&&<section className="rounded-xl border border-border bg-surface p-5"><BusinessModelSection ticker={workspace.ticker}/></section>}
       {tab==="industry"&&<IndustryIntelligencePanel industry={workspace.industry}/>} 
       {tab==="financials"&&<section className="overflow-hidden rounded-xl border border-border bg-surface"><div className="border-b border-border p-5"><h3 className="font-bold">Financial statement explorer</h3><p className="text-xs text-muted">Reported periods from source-linked filings.</p></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-surface-alt text-muted"><tr><th className="p-3">Line item</th><th>Latest period</th><th>Value</th><th>Unit</th><th>Period type</th></tr></thead><tbody>{financialRows.map(([key,series])=>{const p=latest(series);return <tr key={key} className="border-t border-border"><td className="p-3 font-medium">{key.replaceAll("_"," ")}</td><td>{p?.period_end??"—"}</td><td className="font-mono">{compact(p?.value)}</td><td>{p?.unit??"—"}</td><td>{p?.period_type??"—"}</td></tr>})}</tbody></table></div></section>}

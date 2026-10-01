@@ -44,23 +44,26 @@ export interface IndustryIntelligence {
 
 const number = (value: number | null, unit: string) => value == null ? "Not available" : `${value.toFixed(2)}${unit}`;
 
-export function IndustryIntelligencePanel({ industry }: { industry: IndustryIntelligence }) {
+export function IndustryIntelligencePanel({ industry }: { industry: IndustryIntelligence | null | undefined }) {
+  if (!industry) return <div className="rounded-xl border border-border bg-surface p-5"><p className="text-sm text-muted">Industry data not available</p></div>;
+
   return <div className="space-y-5">
     <section className="rounded-xl border border-border bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div><p className="text-xs font-bold uppercase tracking-wider text-accent">Stage 2 · Industry</p><h3 className="mt-1 text-xl font-bold">{industry.sector} industry structure</h3><p className="mt-1 text-sm text-muted">Company → Industry → Economy. Missing evidence is shown rather than inferred.</p></div>
-        <div className="rounded-lg border border-border bg-background px-4 py-3 text-center"><p className="text-2xl font-black">{industry.structure.listed_competitor_count}</p><p className="text-[10px] uppercase text-muted">listed competitors</p></div>
+        {industry.structure?.listed_competitor_count != null && <div className="rounded-lg border border-border bg-background px-4 py-3 text-center"><p className="text-2xl font-black">{industry.structure.listed_competitor_count}</p><p className="text-[10px] uppercase text-muted">listed competitors</p></div>}
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">{industry.structure.competitors.map(company=><span key={company.symbol} title={company.name} className={`rounded-full border px-2.5 py-1 text-xs ${company.coverage_tier === "full" ? "border-positive/40 text-positive" : "border-border text-muted"}`}>{company.symbol} · {company.coverage_tier.replace("_", " ")}</span>)}</div>
+      {industry.structure?.competitors && <div className="mt-4 flex flex-wrap gap-2">{industry.structure.competitors.map(company=><span key={company.symbol} title={company.name} className={`rounded-full border px-2.5 py-1 text-xs ${company.coverage_tier === "full" ? "border-positive/40 text-positive" : "border-border text-muted"}`}>{company.symbol} · {company.coverage_tier.replace("_", " ")}</span>)}</div>}
     </section>
 
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    {industry.structure?.dimensions && industry.structure.dimensions.length > 0 && <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {industry.structure.dimensions.map(item=><article key={item.key} className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between gap-2"><h4 className="font-semibold">{item.label}</h4>{item.evidence_status === "missing" ? <HelpCircle className="h-4 w-4 text-amber-300"/> : <CheckCircle2 className="h-4 w-4 text-positive"/>}</div>
         <p className={`mt-2 text-xs font-bold uppercase ${item.evidence_status === "missing" ? "text-amber-300" : "text-positive"}`}>{item.evidence_status}</p>
         {item.available_series.length ? <p className="mt-2 text-xs text-muted">Available: {item.available_series.join(", ")}</p> : <p className="mt-2 text-xs text-muted">Needed: {item.required_source}</p>}
       </article>)}
-    </section>
+    </section>}
+
 
     <section className="grid gap-5 lg:grid-cols-2">
       <div className="rounded-xl border border-border bg-surface p-5"><h3 className="font-bold">Industry economics</h3><p className="mt-1 text-xs text-muted">Verified fundamentals: {industry.economics.verified_company_count}/{industry.economics.listed_company_count} companies ({industry.economics.verified_coverage_pct.toFixed(1)}%)</p><div className="mt-4 space-y-3">{industry.economics.sector_medians.map(metric=><div key={metric.key} className="flex items-center justify-between gap-4 border-b border-border pb-2"><div><p className="text-sm font-medium">{metric.label}</p><p className="text-[10px] text-muted">{metric.companies_covered} verified companies</p></div><p className="font-mono font-bold">{number(metric.value, metric.unit)}</p></div>)}</div></div>

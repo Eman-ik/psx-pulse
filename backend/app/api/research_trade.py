@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from research_system.research_trade_unified import ResearchTradeUnifiedFlow
 from research_system.services import TradeHorizon
 
-router = APIRouter(prefix="/research-trade", tags=["research-trade"])
+router = APIRouter(prefix="/api/research-trade", tags=["research-trade"])
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -168,9 +168,9 @@ def unified_research_trade_flow(request: UnifiedFlowRequest) -> Dict[str, Any]:
         # Transform gates to response format
         gates_response = [
             DecisionGateResponse(
-                gate_name=gate.gate_name,
-                passed=gate.passed,
-                issue=gate.issue,
+                gate_name=gate.get('gate_name') if isinstance(gate, dict) else gate.gate_name,
+                passed=gate.get('passed') if isinstance(gate, dict) else gate.passed,
+                issue=gate.get('issue') if isinstance(gate, dict) else gate.issue,
             )
             for gate in result["gates"]
         ]
@@ -178,13 +178,13 @@ def unified_research_trade_flow(request: UnifiedFlowRequest) -> Dict[str, Any]:
         # Transform evidence score to response format
         evidence = result["evidence_score"]
         evidence_response = EvidenceCoverageScoreResponse(
-            coverage_pct=evidence.coverage_pct,
-            total_sections=evidence.total_sections,
-            real_sections=evidence.real_sections,
-            missing_evidence=evidence.missing_evidence,
-            data_freshness_score=evidence.data_freshness_score,
-            source_reliability=evidence.source_reliability,
-            overall_evidence_score=evidence.overall_evidence_score,
+            coverage_pct=evidence.get('coverage_pct') if isinstance(evidence, dict) else evidence.coverage_pct,
+            total_sections=evidence.get('total_sections') if isinstance(evidence, dict) else evidence.total_sections,
+            real_sections=evidence.get('real_sections') if isinstance(evidence, dict) else evidence.real_sections,
+            missing_evidence=evidence.get('missing_evidence', []) if isinstance(evidence, dict) else evidence.missing_evidence,
+            data_freshness_score=evidence.get('data_freshness_score', 0) if isinstance(evidence, dict) else evidence.data_freshness_score,
+            source_reliability=evidence.get('source_reliability', 0) if isinstance(evidence, dict) else evidence.source_reliability,
+            overall_evidence_score=evidence.get('overall_evidence_score', 0) if isinstance(evidence, dict) else evidence.overall_evidence_score,
         )
 
         # Transform thesis to response format
@@ -203,13 +203,14 @@ def unified_research_trade_flow(request: UnifiedFlowRequest) -> Dict[str, Any]:
 
         # Transform calculator to response format
         calc = result["calculator"]
+        risk_metrics = calc.get('risk_metrics', {}) if isinstance(calc, dict) else calc.risk_metrics
         calculator_response = CalculatorMetricsResponse(
-            position_size_shares=int(calc.risk_metrics.position_size),
-            capital_required=float(calc.risk_metrics.capital_required),
-            risk_per_share=float(calc.risk_metrics.risk_per_share),
-            max_loss=float(calc.risk_metrics.max_loss),
-            allocation_pct=float(calc.risk_metrics.allocation_pct),
-            warnings=calc.warnings or [],
+            position_size_shares=int(risk_metrics.get('position_size', 0)) if isinstance(risk_metrics, dict) else int(risk_metrics.position_size),
+            capital_required=float(risk_metrics.get('capital_required', 0)) if isinstance(risk_metrics, dict) else float(risk_metrics.capital_required),
+            risk_per_share=float(risk_metrics.get('risk_per_share', 0)) if isinstance(risk_metrics, dict) else float(risk_metrics.risk_per_share),
+            max_loss=float(risk_metrics.get('max_loss', 0)) if isinstance(risk_metrics, dict) else float(risk_metrics.max_loss),
+            allocation_pct=float(risk_metrics.get('allocation_pct', 0)) if isinstance(risk_metrics, dict) else float(risk_metrics.allocation_pct),
+            warnings=calc.get('warnings', []) if isinstance(calc, dict) else (calc.warnings or []),
         )
 
         return {

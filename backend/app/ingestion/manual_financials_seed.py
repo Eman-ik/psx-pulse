@@ -108,6 +108,7 @@ def _get_or_create_source_document(db: Session, issuer: Issuer, label: str) -> S
     document = SourceDocument(
         issuer_id=issuer.id,
         url=None,
+        local_path=label,
         content_hash=content_hash,
         document_type="analyst_report_manual_entry",
         source_tier="primary",

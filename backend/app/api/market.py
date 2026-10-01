@@ -123,9 +123,8 @@ def market_snapshot(db: Session = Depends(get_db)) -> dict:
     if not latest_date:
         return {"error": "No price data available"}
 
-    # Get index data for KSE-100, KSE-30, KMI-30
     indices_data = {}
-    for code in ["KSE-100", "KSE-30", "KMI-30"]:
+    for code in ["KSE100", "FERTIX", "CEMENTIX"]:
         index = db.execute(select(MarketIndex).where(MarketIndex.code == code)).scalar_one_or_none()
         if index:
             latest = db.execute(

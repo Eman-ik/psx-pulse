@@ -80,6 +80,7 @@ def _get_or_create_source_document(db: Session, issuer: Issuer, label: str) -> S
         return existing
     document = SourceDocument(
         issuer_id=issuer.id,
+        local_path=label,
         content_hash=content_hash,
         document_type="operational_kpi_manual_entry",
         source_tier="primary",

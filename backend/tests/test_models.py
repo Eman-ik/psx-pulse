@@ -169,6 +169,7 @@ class TestSourceModel:
             company_id=company.id,
             source_type="annual_report",
             title="Annual Report 2026",
+            url="https://example.com/report.pdf",
         )
         test_db.add(source)
         test_db.commit()
@@ -269,6 +270,7 @@ class TestFinancialFactModel:
         source = Source(
             company_id=company.id,
             source_type="annual_report",
+            url="https://example.com/report.pdf",
         )
         test_db.add(source)
         test_db.commit()

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, JSON, String, func
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -21,6 +21,9 @@ class SourceDocument(Base):
     """An immutable original document (filing, announcement, report) with lineage metadata."""
 
     __tablename__ = "source_document"
+    __table_args__ = (
+        CheckConstraint("url IS NOT NULL OR local_path IS NOT NULL", name="ck_source_document_locator"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     issuer_id: Mapped[int | None] = mapped_column(ForeignKey("issuer.id"), nullable=True)

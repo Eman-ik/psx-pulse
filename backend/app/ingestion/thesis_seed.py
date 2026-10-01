@@ -139,7 +139,7 @@ def _get_or_create_source_document(db: Session, issuer: Issuer, label: str) -> S
     if existing is not None:
         return existing
     document = SourceDocument(
-        issuer_id=issuer.id, content_hash=content_hash, document_type="thesis_source", source_tier="primary",
+        issuer_id=issuer.id, local_path=label, content_hash=content_hash, document_type="thesis_source", source_tier="primary",
     )
     db.add(document)
     db.flush()

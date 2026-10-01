@@ -193,6 +193,7 @@ class TestFactStorage:
             company_id=company.id,
             source_type="annual_report",
             title="Annual Report 2026",
+            url="https://example.com/report.pdf",
         )
         test_db.add(source)
         test_db.commit()
@@ -226,6 +227,7 @@ class TestFactStorage:
             company_id=company.id,
             source_type="annual_report",
             title="Annual Report 2026",
+            url="https://example.com/report.pdf",
         )
         test_db.add(source)
         test_db.commit()
@@ -259,6 +261,7 @@ class TestPipelineProcessing:
             company_id=company.id,
             source_type="annual_report",
             title="Annual Report 2026",
+            url="https://example.com/report.pdf",
         )
         test_db.add(source)
         test_db.commit()
@@ -300,6 +303,7 @@ class TestPipelineProcessing:
             company_id=company.id,
             source_type="annual_report",
             title="Annual Report 2026",
+            url="https://example.com/report.pdf",
         )
         test_db.add(source)
         test_db.commit()

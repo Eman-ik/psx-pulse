@@ -89,7 +89,14 @@ def test_company_overview_for_nonexistent_issuer_returns_null():
 
 @pytest.mark.requires_seeded_data
 def test_market_prices_unadjusted_matches_raw_bar_count():
-    response = client.get("/market/1/prices")
+    from sqlalchemy import select
+
+    from app.db.models import Security
+    from app.db.session import SessionLocal
+
+    with SessionLocal() as db:
+        security_id = db.execute(select(Security.id).where(Security.symbol == "FFC")).scalar_one()
+    response = client.get(f"/market/{security_id}/prices")
     assert response.status_code == 200
     data = response.json()
     assert data["adjusted"] is False

@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey
+from sqlalchemy import CheckConstraint, Column, Integer, String, DateTime, Date, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -7,6 +7,7 @@ from app.db.base import Base
 
 class Source(Base):
     __tablename__ = "sources"
+    __table_args__ = (CheckConstraint("url IS NOT NULL OR file_path IS NOT NULL", name="ck_sources_locator"),)
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)

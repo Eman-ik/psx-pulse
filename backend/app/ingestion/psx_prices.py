@@ -11,25 +11,31 @@ import psxdata
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import PriceOHLCV, Security
+from app.db.models import IngestionRun, PriceOHLCV, Security
+from app.ingestion.runs import ingestion_run
 
 logger = logging.getLogger(__name__)
 
 
-def backfill_security_prices(db: Session, security: Security, start: date, end: date) -> dict[str, int]:
+def backfill_security_prices(db: Session, security: Security, start: date, end: date, run: IngestionRun) -> dict[str, int]:
     """Fetches [start, end] history for one security and inserts any missing daily bars.
 
     Idempotent: only inserts dates not already present for this security (checked against the
     uq_price_ohlcv_security_date constraint too, as a second line of defense).
     """
+    empty = {"inserted": 0, "skipped_existing": 0, "skipped_anomaly": 0, "fetched": 0}
     try:
         bars = psxdata.stocks(security.symbol, start=start.isoformat(), end=end.isoformat())
     except Exception as exc:
         logger.warning("psxdata.stocks failed for %s: %s", security.symbol, exc)
-        return {"inserted": 0, "skipped_existing": 0, "skipped_anomaly": 0, "fetched": 0}
+        run.add_error(f"{security.symbol}: {type(exc).__name__}: {exc}")
+        db.commit()
+        return empty
 
     if bars is None or len(bars) == 0:
-        return {"inserted": 0, "skipped_existing": 0, "skipped_anomaly": 0, "fetched": 0}
+        run.add_error(f"{security.symbol}: no bars returned for {start}..{end}")
+        db.commit()
+        return empty
 
     existing_dates = set(
         db.execute(
@@ -66,11 +72,13 @@ def backfill_security_prices(db: Session, security: Security, start: date, end: 
                 adjusted=False,
                 is_delayed=True,
                 source="psxdata",
+                ingestion_run_id=run.id,
             )
         )
         existing_dates.add(trade_date)
         inserted += 1
 
+    run.rows_inserted += inserted
     db.commit()
     return {
         "inserted": inserted,
@@ -82,9 +90,13 @@ def backfill_security_prices(db: Session, security: Security, start: date, end: 
 
 def backfill_all(db: Session, securities: list[Security], start: date, end: date) -> dict[str, dict]:
     results = {}
-    for security in securities:
-        logger.info("Backfilling %s from %s to %s", security.symbol, start, end)
-        results[security.symbol] = backfill_security_prices(db, security, start, end)
+    with ingestion_run(
+        db, "psxdata", table="price_ohlcv", start=start.isoformat(), end=end.isoformat(),
+        symbols=[s.symbol for s in securities], psxdata_version=getattr(psxdata, "__version__", None),
+    ) as run:
+        for security in securities:
+            logger.info("Backfilling %s from %s to %s", security.symbol, start, end)
+            results[security.symbol] = backfill_security_prices(db, security, start, end, run)
     return results
 
 

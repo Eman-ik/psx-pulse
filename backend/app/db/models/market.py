@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -44,6 +44,32 @@ class CorporateAction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+INGESTION_RUN_STATUSES = ("running", "ok", "partial", "failed")
+
+
+class IngestionRun(Base):
+    """One execution of a data loader. Fetch failures are recorded here, never papered over
+    with generated values: 'partial' means some items failed and got no rows."""
+
+    __tablename__ = "ingestion_run"
+    __table_args__ = (
+        CheckConstraint("status IN ('running','ok','partial','failed')", name="ck_ingestion_run_status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(40))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="running")
+    params: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    rows_inserted: Mapped[int] = mapped_column(Integer, default=0)
+    errors: Mapped[list] = mapped_column(JSON, default=list)
+
+    def add_error(self, message: str) -> None:
+        # Reassign so SQLAlchemy sees the JSON change.
+        self.errors = [*(self.errors or []), message]
+
+
 class PriceOHLCV(Base):
     """Daily OHLCV bar. is_delayed defaults True since v1 has no licensed real-time feed.
 
@@ -60,6 +86,8 @@ class PriceOHLCV(Base):
     security_id: Mapped[int] = mapped_column(ForeignKey("security.id"), index=True)
     trade_date: Mapped[date] = mapped_column(Date, index=True)
     source: Mapped[str] = mapped_column(String(40))
+    ingestion_run_id: Mapped[int] = mapped_column(ForeignKey("ingestion_run.id"), index=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     open: Mapped[float] = mapped_column(Numeric(14, 4))
     high: Mapped[float] = mapped_column(Numeric(14, 4))
     low: Mapped[float] = mapped_column(Numeric(14, 4))
@@ -101,6 +129,8 @@ class IndexOHLCV(Base):
     market_index_id: Mapped[int] = mapped_column(ForeignKey("market_index.id"), index=True)
     trade_date: Mapped[date] = mapped_column(Date, index=True)
     source: Mapped[str] = mapped_column(String(40))
+    ingestion_run_id: Mapped[int] = mapped_column(ForeignKey("ingestion_run.id"), index=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     open: Mapped[float] = mapped_column(Numeric(14, 4))
     high: Mapped[float] = mapped_column(Numeric(14, 4))
     low: Mapped[float] = mapped_column(Numeric(14, 4))

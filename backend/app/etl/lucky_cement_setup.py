@@ -16,7 +16,7 @@ def create_lucky_cement(db: Session) -> Company:
     Sector: Materials
     Industry: Cement
     Listed: PSX
-    Fiscal year end: March 31 (month 3)
+    Fiscal year end: June 30 (month 6)
     Currency: PKR
     """
     existing = db.query(Company).filter(Company.ticker == "LUCK").first()
@@ -28,11 +28,11 @@ def create_lucky_cement(db: Session) -> Company:
         name="Lucky Cement Limited",
         sector="Materials",
         industry="Cement",
-        listed_date=date(1980, 1, 1),  # Approximate listing date
-        fiscal_year_end=3,  # March 31
+        listed_date=None,
+        fiscal_year_end=6,
         currency="PKR",
         status="active",
-        coverage_tier="partial",  # Will be "full" after extraction complete
+        coverage_tier="price_only",
     )
     db.add(company)
     db.commit()
@@ -53,9 +53,9 @@ def create_luck_periods(db: Session, company_id: int) -> dict:
 
     # Annual periods (3 years)
     annual_configs = [
-        (2024, date(2023, 4, 1), date(2024, 3, 31)),
-        (2025, date(2024, 4, 1), date(2025, 3, 31)),
-        (2026, date(2025, 4, 1), date(2026, 3, 31)),
+        (2024, date(2023, 7, 1), date(2024, 6, 30)),
+        (2025, date(2024, 7, 1), date(2025, 6, 30)),
+        (2026, date(2025, 7, 1), date(2026, 6, 30)),
     ]
 
     for fiscal_year, start_date, end_date in annual_configs:
@@ -86,10 +86,10 @@ def create_luck_periods(db: Session, company_id: int) -> dict:
 
     # Quarterly periods (FY2026 only)
     quarterly_configs = [
-        (1, date(2025, 4, 1), date(2025, 6, 30)),
-        (2, date(2025, 7, 1), date(2025, 9, 30)),
-        (3, date(2025, 10, 1), date(2025, 12, 31)),
-        (4, date(2026, 1, 1), date(2026, 3, 31)),
+        (1, date(2025, 7, 1), date(2025, 9, 30)),
+        (2, date(2025, 10, 1), date(2025, 12, 31)),
+        (3, date(2026, 1, 1), date(2026, 3, 31)),
+        (4, date(2026, 4, 1), date(2026, 6, 30)),
     ]
 
     for quarter, start_date, end_date in quarterly_configs:

@@ -25,7 +25,8 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Issuer, PriceOHLCV, Security
+from app.db.models import IngestionRun, Issuer, PriceOHLCV, Security
+from app.ingestion.runs import ingestion_run
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +193,7 @@ def _parse_row(row: dict[str, str]) -> dict | None:
     }
 
 
-def import_one_file(db: Session, path: Path, security: Security) -> dict[str, int]:
+def import_one_file(db: Session, path: Path, security: Security, run: IngestionRun) -> dict[str, int]:
     """Idempotent: only inserts dates not already present for this security."""
     with open(path, encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
@@ -222,11 +223,15 @@ def import_one_file(db: Session, path: Path, security: Security) -> dict[str, in
                 adjusted=False,
                 is_delayed=True,
                 source="investing_csv",
+                ingestion_run_id=run.id,
             )
         )
         existing_dates.add(parsed["trade_date"])
         inserted += 1
 
+    if skipped_bad_row:
+        run.add_error(f"{security.symbol}: {skipped_bad_row} unparseable or OHLC-inconsistent rows skipped in {path.name}")
+    run.rows_inserted += inserted
     db.commit()
     return {
         "inserted": inserted,
@@ -240,16 +245,19 @@ def import_matched(db: Session, matches: list[FileMatch]) -> dict[str, dict]:
     """Imports only matches that already have a resolved symbol -- call after reviewing
     match_files()'s output, not directly on its raw result."""
     results: dict[str, dict] = {}
-    for m in matches:
-        if not m.symbol:
-            continue
-        security = db.execute(select(Security).where(Security.symbol == m.symbol)).scalar_one_or_none()
-        if security is None:
-            results[m.symbol] = {"error": "security not found"}
-            continue
-        stats = import_one_file(db, m.path, security)
-        results[m.symbol] = stats
-        logger.info("Imported %s from %s: %s", m.symbol, m.path.name, stats)
+    matched = [m for m in matches if m.symbol]
+    with ingestion_run(
+        db, "investing_csv", table="price_ohlcv", files={m.symbol: str(m.path) for m in matched}
+    ) as run:
+        for m in matched:
+            security = db.execute(select(Security).where(Security.symbol == m.symbol)).scalar_one_or_none()
+            if security is None:
+                results[m.symbol] = {"error": "security not found"}
+                run.add_error(f"{m.symbol}: security not found, {m.path.name} not imported")
+                continue
+            stats = import_one_file(db, m.path, security, run)
+            results[m.symbol] = stats
+            logger.info("Imported %s from %s: %s", m.symbol, m.path.name, stats)
     return results
 
 

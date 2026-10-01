@@ -12,7 +12,8 @@ import psxdata
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from app.db.models import IndexOHLCV, MarketIndex
+from app.db.models import IndexOHLCV, IngestionRun, MarketIndex
+from app.ingestion.runs import ingestion_run
 
 logger = logging.getLogger(__name__)
 
@@ -32,19 +33,24 @@ def get_or_create_index(db: Session, code: str, name: str) -> MarketIndex:
     return index
 
 
-def backfill_index_prices(db: Session, index: MarketIndex, start: date, end: date) -> dict[str, int]:
+def backfill_index_prices(db: Session, index: MarketIndex, start: date, end: date, run: IngestionRun) -> dict[str, int]:
     """Fetches [start, end] history for one index and inserts any missing daily bars.
 
     Idempotent: only inserts dates not already present for this index.
     """
+    empty = {"inserted": 0, "skipped_existing": 0, "skipped_anomaly": 0, "fetched": 0}
     try:
         bars = psxdata.stocks(index.code, start=start.isoformat(), end=end.isoformat())
     except Exception as exc:
         logger.warning("psxdata.stocks failed for index %s: %s", index.code, exc)
-        return {"inserted": 0, "skipped_existing": 0, "skipped_anomaly": 0, "fetched": 0}
+        run.add_error(f"{index.code}: {type(exc).__name__}: {exc}")
+        db.commit()
+        return empty
 
     if bars is None or len(bars) == 0:
-        return {"inserted": 0, "skipped_existing": 0, "skipped_anomaly": 0, "fetched": 0}
+        run.add_error(f"{index.code}: no bars returned for {start}..{end}")
+        db.commit()
+        return empty
 
     existing_dates = set(
         db.execute(
@@ -80,11 +86,13 @@ def backfill_index_prices(db: Session, index: MarketIndex, start: date, end: dat
                 volume=int(row["volume"]) if row["volume"] == row["volume"] else None,
                 is_delayed=True,
                 source="psxdata",
+                ingestion_run_id=run.id,
             )
         )
         existing_dates.add(trade_date)
         inserted += 1
 
+    run.rows_inserted += inserted
     db.commit()
     return {
         "inserted": inserted,
@@ -96,10 +104,14 @@ def backfill_index_prices(db: Session, index: MarketIndex, start: date, end: dat
 
 def backfill_all(db: Session, start: date, end: date) -> dict[str, dict]:
     results = {}
-    for spec in TRACKED_INDICES:
-        index = get_or_create_index(db, spec["code"], spec["name"])
-        logger.info("Backfilling index %s from %s to %s", index.code, start, end)
-        results[index.code] = backfill_index_prices(db, index, start, end)
+    with ingestion_run(
+        db, "psxdata", table="index_ohlcv", start=start.isoformat(), end=end.isoformat(),
+        indices=[spec["code"] for spec in TRACKED_INDICES], psxdata_version=getattr(psxdata, "__version__", None),
+    ) as run:
+        for spec in TRACKED_INDICES:
+            index = get_or_create_index(db, spec["code"], spec["name"])
+            logger.info("Backfilling index %s from %s to %s", index.code, start, end)
+            results[index.code] = backfill_index_prices(db, index, start, end, run)
     return results
 
 

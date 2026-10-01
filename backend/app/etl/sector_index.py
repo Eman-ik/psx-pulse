@@ -22,10 +22,11 @@ first principles using each sector's active companies (is_active=True). Methodol
 import logging
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.db.models import IndexOHLCV, Issuer, MarketIndex, PriceOHLCV, Sector, Security
+from app.db.models import IndexOHLCV, IngestionRun, Issuer, MarketIndex, PriceOHLCV, Sector, Security
+from app.ingestion.runs import ingestion_run
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,15 @@ def compute_sector_index(db: Session, sector_name: str, index_code: str, index_n
 
     Returns a summary dict describing what was written.
     """
+    with ingestion_run(db, "derived:sector_index", table="index_ohlcv", sector=sector_name, index_code=index_code) as run:
+        result = _compute_sector_index(db, sector_name, index_code, index_name, run)
+        if result["status"] != "ok":
+            run.add_error(f"{index_code}: {result['status']}")
+        run.rows_inserted += result["bars_written"]
+    return result
+
+
+def _compute_sector_index(db: Session, sector_name: str, index_code: str, index_name: str, run: IngestionRun) -> dict:
     # Resolve sector
     sector = db.execute(select(Sector).where(Sector.name == sector_name)).scalar_one_or_none()
     if sector is None:
@@ -129,18 +139,12 @@ def compute_sector_index(db: Session, sector_name: str, index_code: str, index_n
         db.add(market_index)
         db.flush()
 
-    # Upsert IndexOHLCV rows
-    existing_dates = {
-        row.trade_date
-        for row in db.execute(
-            select(IndexOHLCV.trade_date).where(IndexOHLCV.market_index_id == market_index.id)
-        ).all()
-    }
+    # Replace the whole series: base_date moves as history grows, and appending only new
+    # dates would leave old and new bars on different bases.
+    db.execute(delete(IndexOHLCV).where(IndexOHLCV.market_index_id == market_index.id))
 
     bars_written = 0
     for trade_date, level in index_bars:
-        if trade_date in existing_dates:
-            continue
         db.add(IndexOHLCV(
             market_index_id=market_index.id,
             trade_date=trade_date,
@@ -148,6 +152,7 @@ def compute_sector_index(db: Session, sector_name: str, index_code: str, index_n
             volume=None,
             is_delayed=True,
             source="derived:sector_index",
+            ingestion_run_id=run.id,
         ))
         bars_written += 1
 

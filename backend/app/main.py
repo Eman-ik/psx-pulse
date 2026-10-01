@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import admin, analyst, comparison, companies, equity_research, financials, live, macro, market, ml_signals, news, quant_forecast, realtime, research_data, research_trade, research_workspace, research_workspace_api, screener, screeners, screening_api, sectors, signals
+from app.api import admin, analyst, comparison, companies, equity_research, financials, live, macro, market, ml_signals, news, quant_forecast, realtime, research_data, research_trade, research_workspace, research_workspace_api, screener, screeners, screening_api, sectors, signals, sources
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,7 @@ app.include_router(research_workspace_api.router)
 app.include_router(research_trade.router)
 app.include_router(research_workspace.router)
 app.include_router(realtime.router)
+app.include_router(sources.router)
 
 
 @app.on_event("startup")

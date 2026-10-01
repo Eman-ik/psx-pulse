@@ -26,11 +26,11 @@ class HistoricalPriceBackfiller:
         self.today = datetime.now().date()
 
     def backfill_all(self):
-        """Backfill all securities with 180+ days of historical data"""
+        """Backfill all securities with 365+ days of historical data"""
         try:
             print("\n" + "="*60)
-            print("HISTORICAL PRICE BACKFILL - EXTENDED")
-            print("Generating 180+ days of realistic price data for momentum analysis")
+            print("HISTORICAL PRICE BACKFILL - FULL YEAR")
+            print("Generating 365+ days of realistic price data for complete momentum analysis")
             print("="*60 + "\n")
 
             securities = self.db.query(Security).all()
@@ -51,12 +51,12 @@ class HistoricalPriceBackfiller:
                 current_price = float(current_price_record.close)
                 print(f"[BACKFILL] {security.symbol}: Current price = PKR {current_price:.2f}")
 
-                # Generate 180+ days of historical data
+                # Generate 365+ days of historical data
                 count = 0
                 base_price = current_price
 
-                # Start from 180 days ago, work forward
-                for days_ago in range(179, -1, -1):
+                # Start from 366 days ago, work forward (ensure 365-day lookback has data)
+                for days_ago in range(365, -1, -1):
                     trade_date = self.today - timedelta(days=days_ago)
 
                     # Skip weekends (Saturday=5, Sunday=6)
@@ -110,7 +110,7 @@ class HistoricalPriceBackfiller:
             print("SUCCESS: Historical backfill complete!")
             print("="*60)
             print(f"\nTotal prices created: {total_prices_created}")
-            print(f"Trading days: ~120-130 (excluding weekends)")
+            print(f"Trading days: ~250-260 (excluding weekends)")
             print(f"Companies: {len(securities)}")
             print(f"\nNow you can use:")
             print(f"  - Technical Screener: Moving averages, RSI")

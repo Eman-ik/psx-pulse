@@ -148,6 +148,8 @@ def filter_momentum_signals(
                 "price": signal.price,
                 "return_1m": round(signal.return_1m, 2) if signal.return_1m else None,
                 "return_3m": round(signal.return_3m, 2) if signal.return_3m else None,
+                "return_6m": round(signal.return_6m, 2) if signal.return_6m else None,
+                "return_12m": round(signal.return_12m, 2) if signal.return_12m else None,
                 "momentum_score": round(signal.momentum_score, 2),
                 "trend": signal.trend,
             }

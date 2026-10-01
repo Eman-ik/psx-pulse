@@ -92,7 +92,7 @@ class PSXScraper:
         for sector_name in set(c['sector'] for c in PSX_COMPANIES.values()):
             sector = self.db.query(Sector).filter_by(name=sector_name).first()
             if not sector:
-                sector = Sector(name=sector_name, description=f"{sector_name} sector")
+                sector = Sector(name=sector_name)
                 self.db.add(sector)
             sectors_map[sector_name] = sector
         self.db.commit()
@@ -107,20 +107,18 @@ class PSXScraper:
             # Create issuer
             issuer = self.db.query(Issuer).filter_by(name=data['name']).first()
             if not issuer:
-                issuer = Issuer(name=data['name'], status='active')
+                issuer = Issuer(name=data['name'])
                 self.db.add(issuer)
                 self.db.flush()
 
             # Create security
-            sector = sectors_map.get(data['sector'])
             security = Security(
                 symbol=symbol,
-                name=data['name'],
                 issuer_id=issuer.id,
-                sector_id=sector.id if sector else None,
+                security_type='ordinary_share',
+                listing_status='listed',
                 is_active=True
             )
-            self.db.add(security)
             count += 1
             print(f"  [+] {symbol}: {data['name']}")
 

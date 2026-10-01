@@ -68,7 +68,7 @@ class MockDataIngester:
         for sector_name in sectors_list:
             existing = self.db.query(Sector).filter_by(name=sector_name).first()
             if not existing:
-                sector = Sector(name=sector_name, description=f"{sector_name} sector")
+                sector = Sector(name=sector_name)
                 self.db.add(sector)
 
         self.db.commit()
@@ -87,7 +87,7 @@ class MockDataIngester:
             # Create issuer
             issuer = self.db.query(Issuer).filter_by(name=data['name']).first()
             if not issuer:
-                issuer = Issuer(name=data['name'], status='active')
+                issuer = Issuer(name=data['name'])
                 self.db.add(issuer)
                 self.db.flush()
 
@@ -97,13 +97,11 @@ class MockDataIngester:
             # Create security
             security = Security(
                 symbol=symbol,
-                name=data['name'],
                 issuer_id=issuer.id,
-                sector_id=sector.id if sector else None,
-                is_active=True,
-                market_cap=random.uniform(5000000000, 100000000000)
+                security_type='ordinary_share',
+                listing_status='listed',
+                is_active=True
             )
-            self.db.add(security)
             count += 1
             print(f"  [+] {symbol}: {data['name']}")
 
@@ -211,11 +209,7 @@ class MockDataIngester:
             # Get or create index
             index = self.db.query(MarketIndex).filter_by(code=code).first()
             if not index:
-                index = MarketIndex(
-                    code=code,
-                    name=name,
-                    description=f"Pakistan Stock Exchange {code} Index"
-                )
+                index = MarketIndex(code=code, name=name)
                 self.db.add(index)
                 self.db.flush()
 

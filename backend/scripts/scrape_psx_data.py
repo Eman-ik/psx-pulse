@@ -119,6 +119,7 @@ class PSXScraper:
                 listing_status='listed',
                 is_active=True
             )
+            self.db.add(security)
             count += 1
             print(f"  [+] {symbol}: {data['name']}")
 

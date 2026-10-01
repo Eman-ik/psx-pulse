@@ -24,6 +24,7 @@ app.add_middleware(
 
 app.include_router(comparison.router)
 app.include_router(analyst.router)
+app.include_router(sprint4_endpoints.router)
 app.include_router(companies.router)
 app.include_router(sectors.router)
 app.include_router(financials.router)
@@ -45,7 +46,6 @@ app.include_router(research_trade.router)
 app.include_router(research_workspace.router)
 app.include_router(realtime.router)
 app.include_router(sources.router)
-app.include_router(sprint4_endpoints.router)
 
 
 @app.on_event("startup")

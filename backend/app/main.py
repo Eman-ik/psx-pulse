@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import market, research_data, research_trade, research_workspace_api, screeners, screening_api, sources, sprint4_endpoints
+from app.api import data_status, market, research_data, research_trade, research_workspace_api, screeners, screening_api, sources, sprint4_endpoints
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ app.add_middleware(
 
 app.include_router(sprint4_endpoints.router)
 app.include_router(market.router)
+app.include_router(data_status.router)
 app.include_router(screeners.router)
 app.include_router(screening_api.router)
 app.include_router(research_data.router)

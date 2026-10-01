@@ -6,6 +6,7 @@ import Sidebar from '@/components/dashboard/Sidebar'
 
 interface MarketSnapshot {
   timestamp: string
+  freshness: { as_of: string | null; retrieved_at: string | null; sources: string[]; stale: boolean }
   indices: Record<string, any>
   breadth: { advancers: number; decliners: number; unchanged: number; total: number }
   gainers: Array<{ symbol: string; name: string; price: number; change_pct: number; volume: number }>
@@ -87,9 +88,19 @@ export default function MarketPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Market Overview</h1>
-              <p className="text-sm text-muted">End-of-day PSX data (delayed)</p>
+              <p className="text-sm text-muted">
+                End-of-day PSX data (delayed) · close as of {marketData?.freshness.as_of ?? '—'} · source:{' '}
+                {marketData?.freshness.sources.join(', ') || '—'}
+              </p>
             </div>
           </div>
+
+          {marketData?.freshness.stale && (
+            <div className="rounded-lg border border-negative/30 bg-negative/5 p-4 text-sm text-negative">
+              Prices are stale: the latest close on file is {marketData.freshness.as_of}. Figures below describe that
+              date, not today.
+            </div>
+          )}
 
           {/* Index Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

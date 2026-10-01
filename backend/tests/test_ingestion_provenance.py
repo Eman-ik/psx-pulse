@@ -67,6 +67,30 @@ def test_run_with_only_failures_is_failed(db, monkeypatch):
     assert db.execute(select(PriceOHLCV)).first() is None
 
 
+def test_freshness_reports_age_source_and_staleness(db):
+    from datetime import timedelta
+
+    from app.api.data_status import STALE_AFTER_DAYS, freshness
+
+    empty = freshness(db, PriceOHLCV)
+    assert empty["as_of"] is None and empty["stale"] is True and empty["sources"] == []
+
+    run = IngestionRun(source="psxdata", status="ok", rows_inserted=2, errors=[])
+    db.add(run)
+    db.flush()
+    recent = date.today() - timedelta(days=1)
+    old = date.today() - timedelta(days=STALE_AFTER_DAYS + 1)
+    for security_id, trade_date in ((1, recent), (2, old)):
+        db.add(PriceOHLCV(security_id=security_id, trade_date=trade_date, open=1, high=1, low=1, close=1,
+                          source="psxdata", ingestion_run_id=run.id))
+    db.commit()
+
+    assert freshness(db, PriceOHLCV)["stale"] is False
+    stale_one = freshness(db, PriceOHLCV, PriceOHLCV.security_id == 2)
+    assert stale_one["stale"] is True and stale_one["as_of"] == old.isoformat()
+    assert stale_one["sources"] == ["psxdata"] and stale_one["retrieved_at"]
+
+
 def test_bar_without_run_is_rejected(db):
     db.add(PriceOHLCV(security_id=1, trade_date=date(2026, 9, 22), open=1, high=1, low=1, close=1, source="psxdata"))
     with pytest.raises(IntegrityError):

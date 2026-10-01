@@ -1,294 +1,268 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Search, Loader2, AlertCircle, Download } from "lucide-react";
-import { ResearchInsightsEngine, type ResearchInsight } from "@/lib/research-insights-engine";
+import { useEffect, useState } from "react";
+import { AlertCircle, Loader2, Search } from "lucide-react";
 
-interface CompanyData {
-  id: number;
-  ticker: string;
+const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+type Freshness = { as_of: string | null; retrieved_at: string | null; sources: string[]; stale: boolean };
+
+type Technical = {
+  symbol: string;
   name: string;
   sector: string;
-  coverage_tier: string;
+  price: number;
+  change_pct: number;
+  price_vs_20dma: number;
+  price_vs_50dma: number;
+  price_vs_200dma: number;
+  rsi: number | null;
+  volume_vs_avg: number;
+  price_near_52week_high: boolean;
+  price_near_52week_low: boolean;
+};
+
+type Momentum = {
+  symbol: string;
+  sector: string;
+  return_1m: number | null;
+  return_3m: number | null;
+  return_6m: number | null;
+  return_12m: number | null;
+};
+
+type Screen<T> = { freshness: Freshness; signals: T[] };
+
+const PERIODS = [
+  ["return_1m", "1 month"],
+  ["return_3m", "3 months"],
+  ["return_6m", "6 months"],
+  ["return_12m", "12 months"],
+] as const;
+
+const pct = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
+const tone = (v: number | null) => (v == null ? "text-muted" : v >= 0 ? "text-positive" : "text-negative");
+
+function trendReading(t: Technical) {
+  const above = [t.price_vs_20dma, t.price_vs_50dma, t.price_vs_200dma].filter((v) => v > 0).length;
+  if (above === 3) return "Trading above its 20, 50 and 200-day averages.";
+  if (above === 0) return "Trading below its 20, 50 and 200-day averages.";
+  return `Trading above ${above} of its 20, 50 and 200-day averages.`;
 }
 
-const SECTION_ORDER = [
-  "businessModel",
-  "financialHealth",
-  "profitability",
-  "growth",
-  "leverage",
-  "liquidity",
-  "cashFlow",
-  "valuation",
-  "risks",
-  "opportunities",
-  "competition",
-  "management",
-  "governance",
-  "catalysts",
-  "thesis",
-  "recommendation",
-];
+function rsiReading(rsi: number | null) {
+  if (rsi == null) return "Not enough history to compute.";
+  if (rsi >= 70) return "Above 70, conventionally read as overbought.";
+  if (rsi <= 30) return "Below 30, conventionally read as oversold.";
+  return "Between 30 and 70, the neutral range.";
+}
+
+function sectorRank(all: Momentum[], symbol: string, sector: string, key: (typeof PERIODS)[number][0]) {
+  const peers = all.filter((m) => m.sector === sector && m[key] != null).sort((a, b) => b[key]! - a[key]!);
+  const index = peers.findIndex((m) => m.symbol === symbol);
+  return index < 0 ? null : { rank: index + 1, of: peers.length };
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-border bg-surface p-6">
+      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Row({ label, value, valueClass = "", note }: { label: string; value: string; valueClass?: string; note?: string }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/50 py-2 last:border-0">
+      <span className="text-sm text-muted">{label}</span>
+      <span className="text-right">
+        <span className={`font-semibold tabular-nums ${valueClass}`}>{value}</span>
+        {note && <span className="ml-2 text-xs text-muted">{note}</span>}
+      </span>
+    </div>
+  );
+}
 
 export function ResearchStudioProduction() {
-  const [ticker, setTicker] = useState("LUCK");
-  const [company, setCompany] = useState<CompanyData | null>(null);
-  const [companyData, setCompanyData] = useState<any>(null);
-  const [insights, setInsights] = useState<Record<string, ResearchInsight> | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState("LUCK");
+  const [technical, setTechnical] = useState<Screen<Technical> | null>(null);
+  const [momentum, setMomentum] = useState<Screen<Momentum> | null>(null);
+  const [symbol, setSymbol] = useState("LUCK");
+  const [statementFacts, setStatementFacts] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<string>("thesis");
-
-  const searchCompany = async (searchTicker: string) => {
-    if (!searchTicker.trim()) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Step 1: Search for company
-      const companyRes = await fetch(
-        `http://localhost:8000/companies/search?q=${searchTicker}`
-      );
-      if (!companyRes.ok) throw new Error("Company not found");
-
-      const companies = await companyRes.json();
-      if (companies.length === 0) throw new Error("Company not found");
-
-      const foundCompany = companies[0];
-      setCompany(foundCompany);
-
-      // Step 2: Fetch company details
-      const detailRes = await fetch(`http://localhost:8000/companies/${foundCompany.ticker}`);
-      if (!detailRes.ok) throw new Error("Failed to fetch company details");
-      const detail = await detailRes.json();
-
-      // Step 3: Fetch periods and financials
-      const periodsRes = await fetch(`http://localhost:8000/companies/${detail.id}/periods`);
-      if (!periodsRes.ok) throw new Error("Failed to fetch periods");
-      const periods = await periodsRes.json();
-
-      // Get latest annual period
-      const latestAnnual = periods
-        .filter((p: any) => p.period_type === "annual")
-        .sort((a: any, b: any) => b.fiscal_year - a.fiscal_year)[0];
-
-      if (!latestAnnual) throw new Error("No financial data available");
-
-      // Step 4: Fetch facts for latest period
-      const factsRes = await fetch(`http://localhost:8000/periods/${latestAnnual.id}/facts`);
-      if (!factsRes.ok) throw new Error("Failed to fetch financials");
-      const facts = await factsRes.json();
-
-      // Step 5: Build financial data structure
-      const financials: Record<string, any[]> = {};
-      facts.forEach((fact: any) => {
-        if (!financials[fact.metric]) {
-          financials[fact.metric] = [];
-        }
-        financials[fact.metric].push({
-          period_end: latestAnnual.fiscal_year.toString(),
-          value: parseFloat(fact.value),
-          unit: fact.unit,
-        });
-      });
-
-      const builtData = {
-        ticker: detail.ticker,
-        overview: {
-          issuer: {
-            name: detail.name,
-            sector_name: detail.sector,
-            business_description: `${detail.name} is a leading company in the ${detail.sector} sector.`,
-            website: null,
-            auditor: null,
-            fiscal_year_end_month: 3,
-            establishment_year: 1975,
-          },
-          financials,
-          ratios: {},
-          payouts: [],
-          announcements: [],
-          sources: [],
-          operational_metrics: {},
-          thesis: null,
-        },
-      };
-
-      setCompanyData(builtData);
-
-      // Step 6: Generate insights
-      const generatedInsights = await ResearchInsightsEngine.generateResearchReport(
-        foundCompany.ticker,
-        builtData
-      );
-      setInsights(generatedInsights);
-      setTicker(searchTicker.toUpperCase());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    // Load LUCK by default
-    searchCompany("LUCK");
+    const get = (path: string) => fetch(`${API}${path}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    Promise.all([get("/screeners/technical"), get("/screeners/momentum"), get("/data/status")])
+      .then(([t, m, status]) => {
+        setTechnical(t);
+        setMomentum(m);
+        setStatementFacts(status.fundamentals.statement_facts);
+      })
+      .catch(() => setError("Could not reach the research API on port 8000."))
+      .finally(() => setLoading(false));
   }, []);
 
-  const currentInsight = insights?.[activeSection as keyof typeof insights];
+  const t = technical?.signals.find((s) => s.symbol === symbol);
+  const m = momentum?.signals.find((s) => s.symbol === symbol);
+  const freshness = technical?.freshness;
+  const known = technical?.signals.map((s) => s.symbol).sort() ?? [];
 
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
-      {/* Header */}
-      <div className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">Research Studio</h1>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2 bg-accent text-background rounded-lg hover:opacity-90 transition"
-            >
-              <Download className="w-4 h-4" />
-              Export Report
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="flex gap-2">
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b border-border/40">
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+          <h1 className="mb-4 text-3xl font-bold">Research Studio</h1>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSymbol(query.trim().toUpperCase());
+            }}
+          >
             <input
-              type="text"
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value.toUpperCase())}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") searchCompany(ticker);
+              value={query}
+              onChange={(e) => {
+                const value = e.target.value.toUpperCase();
+                setQuery(value);
+                if (known.includes(value)) setSymbol(value);
               }}
-              placeholder="Enter ticker (e.g., LUCK, FFC, CHCC)..."
-              className="flex-1 px-4 py-2 bg-surface border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+              placeholder="Ticker, e.g. LUCK, FFC, DGKC"
+              aria-label="Ticker"
+              list="known-symbols"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
             />
-            <button
-              onClick={() => searchCompany(ticker)}
-              disabled={loading}
-              className="px-6 py-2 bg-accent text-background rounded-lg hover:opacity-90 disabled:opacity-50 transition flex items-center gap-2"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              Search
+            <datalist id="known-symbols">
+              {known.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+            <button type="submit" className="flex items-center gap-2 rounded-lg bg-accent px-5 py-2 text-background hover:opacity-90">
+              <Search className="h-4 w-4" />
+              Open
             </button>
-          </div>
+          </form>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-500">
-            <AlertCircle className="w-5 h-5" />
-            {error}
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+        {loading && (
+          <div className="flex items-center gap-2 text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading market data…
           </div>
         )}
 
-        {loading ? (
-          <div className="flex items-center justify-center h-96">
-            <div className="text-center">
-              <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-accent" />
-              <p className="text-muted">Generating research report for {ticker}...</p>
-            </div>
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-negative/40 bg-negative/10 p-4 text-negative">
+            <AlertCircle className="h-5 w-5" /> {error}
           </div>
-        ) : company && insights ? (
+        )}
+
+        {!loading && !error && !t && (
+          <div className="rounded-lg border border-border bg-surface p-6">
+            <p className="font-semibold">No price history on file for {symbol}.</p>
+            <p className="mt-1 text-sm text-muted">Covered tickers: {known.join(", ") || "none yet"}.</p>
+          </div>
+        )}
+
+        {t && freshness && (
           <>
-            {/* Company Info */}
-            <div className="mb-8 p-6 bg-surface border border-border rounded-lg">
-              <h2 className="text-2xl font-bold mb-2">{company.name}</h2>
-              <div className="flex gap-4 text-sm text-muted">
-                <span>Ticker: <strong>{company.ticker}</strong></span>
-                <span>Sector: <strong>{company.sector}</strong></span>
-                <span>Coverage: <strong>{company.coverage_tier}</strong></span>
+            {freshness.stale && (
+              <div className="flex items-center gap-2 rounded-lg border border-negative/40 bg-negative/10 p-4 text-negative">
+                <AlertCircle className="h-5 w-5" />
+                Prices are stale: the latest close on file is {freshness.as_of}. Readings below describe that date, not today.
               </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-              {/* Section Navigation */}
-              <div className="lg:col-span-1">
-                <div className="sticky top-24 bg-surface border border-border rounded-lg p-4">
-                  <h3 className="font-bold text-sm text-muted mb-4">Research Sections</h3>
-                  <div className="space-y-1">
-                    {SECTION_ORDER.map((section) => {
-                      const sectionName =
-                        section.charAt(0).toUpperCase() +
-                        section
-                          .slice(1)
-                          .replace(/([A-Z])/g, " $1")
-                          .trim();
-
-                      return (
-                        <button
-                          key={section}
-                          onClick={() => setActiveSection(section)}
-                          className={`w-full text-left px-3 py-2 rounded text-sm transition ${
-                            activeSection === section
-                              ? "bg-accent text-background font-medium"
-                              : "hover:bg-accent/20 text-foreground"
-                          }`}
-                        >
-                          {sectionName}
-                        </button>
-                      );
-                    })}
-                  </div>
+            <section className="rounded-lg border border-border bg-surface p-6">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold">{t.name}</h2>
+                  <p className="text-sm text-muted">
+                    {t.symbol} · {t.sector}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold tabular-nums">PKR {t.price.toFixed(2)}</p>
+                  <p className={`text-sm font-semibold ${tone(t.change_pct)}`}>{pct(t.change_pct)} on the day</p>
                 </div>
               </div>
+              <p className="mt-4 text-xs text-muted">
+                Close as of {freshness.as_of} · source: {freshness.sources.join(", ")} end-of-day (delayed) · retrieved{" "}
+                {freshness.retrieved_at ? new Date(freshness.retrieved_at).toLocaleString() : "—"}
+              </p>
+            </section>
 
-              {/* Content Area */}
-              <div className="lg:col-span-3">
-                {currentInsight && (
-                  <div className="bg-surface border border-border rounded-lg p-8">
-                    <h2 className="text-2xl font-bold mb-2">{currentInsight.title}</h2>
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted">Confidence:</span>
-                        <div className="w-24 h-2 bg-border rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent transition-all"
-                            style={{ width: `${currentInsight.confidence}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">{currentInsight.confidence}%</span>
-                      </div>
-                    </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Section title="Trend">
+                <Row label="vs 20-day average" value={pct(t.price_vs_20dma)} valueClass={tone(t.price_vs_20dma)} />
+                <Row label="vs 50-day average" value={pct(t.price_vs_50dma)} valueClass={tone(t.price_vs_50dma)} />
+                <Row label="vs 200-day average" value={pct(t.price_vs_200dma)} valueClass={tone(t.price_vs_200dma)} />
+                <p className="mt-3 text-sm">{trendReading(t)}</p>
+              </Section>
 
-                    <div className="prose prose-invert max-w-none mb-6">
-                      <p className="whitespace-pre-wrap text-foreground">{currentInsight.content}</p>
-                    </div>
-
-                    {currentInsight.evidence && currentInsight.evidence.length > 0 && (
-                      <div className="mt-6 pt-6 border-t border-border">
-                        <h4 className="font-semibold text-sm mb-3">Evidence & Sources</h4>
-                        <ul className="space-y-2">
-                          {currentInsight.evidence.map((item, idx) => (
-                            <li key={idx} className="text-sm text-muted flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 bg-accent rounded-full" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <Section title="Momentum and activity">
+                <Row label="RSI (14-day)" value={t.rsi == null ? "—" : t.rsi.toFixed(1)} />
+                <p className="mb-3 text-sm">{rsiReading(t.rsi)}</p>
+                <Row label="Volume vs 20-day average" value={`${t.volume_vs_avg.toFixed(2)}×`} />
+                <Row
+                  label="52-week range"
+                  value={t.price_near_52week_high ? "Within 5% of high" : t.price_near_52week_low ? "Within 5% of low" : "Mid-range"}
+                />
+              </Section>
             </div>
-          </>
-        ) : null}
-      </div>
 
-      {/* Footer */}
-      <div className="border-t border-border/40 bg-background/95 mt-12 py-6">
-        <div className="max-w-7xl mx-auto px-6 text-center text-sm text-muted">
-          <p>© 2026 Khronos Research Platform. All insights based on verified financial data.</p>
-        </div>
-      </div>
+            {m && momentum && (
+              <Section title={`Price returns vs ${t.sector} peers`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-muted">
+                        <th className="py-2 font-medium">Period</th>
+                        <th className="py-2 text-right font-medium">Return</th>
+                        <th className="py-2 text-right font-medium">Rank in sector</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {PERIODS.map(([key, label]) => {
+                        const rank = sectorRank(momentum.signals, t.symbol, t.sector, key);
+                        return (
+                          <tr key={key} className="border-t border-border/50">
+                            <td className="py-2">{label}</td>
+                            <td className={`py-2 text-right font-semibold tabular-nums ${tone(m[key])}`}>{pct(m[key])}</td>
+                            <td className="py-2 text-right tabular-nums">{rank ? `${rank.rank} of ${rank.of}` : "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-3 text-xs text-muted">
+                  Unadjusted closes: dividends and bonus issues are not included, so total return can be higher.
+                </p>
+              </Section>
+            )}
+
+            <Section title="Fundamentals">
+              <p className="text-sm">
+                {statementFacts
+                  ? `Statements are on file for some companies, but this view doesn't show them yet.`
+                  : `No source-linked financial statements are on file for any company yet.`}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Valuation, profitability and balance-sheet analysis appear here once statements are loaded with a link to the
+                filing they came from.
+              </p>
+            </Section>
+
+            <p className="text-xs text-muted">
+              Readings use fixed, conventional thresholds and describe the data. They are not recommendations.
+            </p>
+          </>
+        )}
+      </main>
     </div>
   );
 }

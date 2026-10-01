@@ -102,12 +102,12 @@ class TechnicalScreener:
         if not latest:
             return None
 
-        # Get historical prices (200 days for 200 DMA)
+        # 252 trading days covers both the 200 DMA and the 52-week high/low below.
         historical = db.execute(
             select(PriceOHLCV)
             .where(PriceOHLCV.security_id == security.id)
             .order_by(PriceOHLCV.trade_date.desc())
-            .limit(200)
+            .limit(252)
         ).scalars().all()
 
         if len(historical) < 20:

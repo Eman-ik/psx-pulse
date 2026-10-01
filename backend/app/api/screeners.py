@@ -3,6 +3,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.api.data_status import freshness
+from app.db.models import PriceOHLCV
 from app.db.session import get_db
 from app.research_system.technical_screener import TechnicalScreener
 from app.research_system.momentum_screener import MomentumScreener
@@ -17,6 +19,7 @@ def run_technical_screener(db: Session = Depends(get_db)) -> dict:
 
     return {
         "timestamp": session.created_at.isoformat(),
+        "freshness": freshness(db, PriceOHLCV),
         "total_screened": session.total_screened,
         "results_count": len(session.signals),
         "signals": [
@@ -49,6 +52,7 @@ def run_momentum_screener(db: Session = Depends(get_db)) -> dict:
 
     return {
         "timestamp": session.created_at.isoformat(),
+        "freshness": freshness(db, PriceOHLCV),
         "total_screened": session.total_screened,
         "results_count": len(session.signals),
         "signals": [
@@ -97,6 +101,7 @@ def filter_technical_signals(
 
     return {
         "timestamp": session.created_at.isoformat(),
+        "freshness": freshness(db, PriceOHLCV),
         "total_screened": session.total_screened,
         "passed_filters": len(filtered),
         "signals": [
@@ -145,6 +150,7 @@ def filter_momentum_signals(
 
     return {
         "timestamp": session.created_at.isoformat(),
+        "freshness": freshness(db, PriceOHLCV),
         "total_screened": session.total_screened,
         "passed_filters": len(filtered),
         "signals": [

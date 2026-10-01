@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import Session
 
+from app.api.data_status import freshness
 from app.api.deps import get_db
 from app.core.config import get_settings
 from app.db.models import CorporateAction, IndexOHLCV, MarketIndex, PriceOHLCV, Security, Sector, Issuer
@@ -29,10 +30,12 @@ def list_prices(
     if end:
         stmt = stmt.where(PriceOHLCV.trade_date <= end)
     bars = db.execute(stmt.order_by(PriceOHLCV.trade_date)).scalars().all()
+    data_freshness = freshness(db, PriceOHLCV, PriceOHLCV.security_id == security_id)
 
     if not adjusted:
         return {
             "adjusted": False,
+            "freshness": data_freshness,
             "delayed_data_notice": settings.data_delay_disclaimer,
             "bars": [
                 {
@@ -67,6 +70,7 @@ def list_prices(
                 else ""
             )
         ),
+        "freshness": data_freshness,
         "corporate_actions_on_file": len(actions),
         "unverified_corporate_actions": unverified_count,
         "delayed_data_notice": settings.data_delay_disclaimer,
@@ -94,6 +98,7 @@ def list_index_prices(
     return {
         "code": index.code,
         "name": index.name,
+        "freshness": freshness(db, IndexOHLCV, IndexOHLCV.market_index_id == index.id),
         "delayed_data_notice": settings.data_delay_disclaimer,
         "bars": [
             {
@@ -214,12 +219,13 @@ def market_snapshot(db: Session = Depends(get_db)) -> dict:
                     "volume": latest.volume,
                 })
 
-    gainers.sort(key=lambda x: x["change_pct"], reverse=True)
-    losers = sorted(gainers, key=lambda x: x["change_pct"])[:5]
-    gainers = gainers[:5]
+    movers = sorted(gainers, key=lambda x: x["change_pct"], reverse=True)
+    gainers = [m for m in movers if m["change_pct"] > 0][:5]
+    losers = [m for m in reversed(movers) if m["change_pct"] < 0][:5]
 
     return {
         "timestamp": latest_date.isoformat(),
+        "freshness": freshness(db, PriceOHLCV),
         "indices": indices_data,
         "breadth": {
             "advancers": advancers,

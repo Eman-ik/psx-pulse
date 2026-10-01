@@ -1,17 +1,7 @@
-import { ResearchHub } from "@/components/research/ResearchHub";
-import Sidebar from "@/components/dashboard/Sidebar";
-import Topbar from "@/components/dashboard/Topbar";
+import { ResearchStudioProduction } from "@/components/research/ResearchStudioProduction";
 
-export const metadata = { title: "Research Hub | PSX QuantResearch" };
+export const metadata = { title: "Research Studio | Khronos" };
 
 export default function ResearchPage() {
-  return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar isLive={false} />
-        <ResearchHub />
-      </div>
-    </div>
-  );
+  return <ResearchStudioProduction />;
 }

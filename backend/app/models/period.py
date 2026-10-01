@@ -22,6 +22,6 @@ class Period(Base):
 
     # Relationships
     company = relationship("Company", back_populates="periods")
-    financial_facts = relationship("FinancialFact", back_populates="period", cascade="all, delete-orphan")
+    financial_facts = relationship("app.models.financial_fact.FinancialFact", back_populates="period", cascade="all, delete-orphan")
     derived_metrics = relationship("DerivedMetric", back_populates="period", cascade="all, delete-orphan")
     research_insights = relationship("ResearchInsight", back_populates="period", cascade="all, delete-orphan")

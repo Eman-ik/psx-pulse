@@ -221,6 +221,7 @@ def import_one_file(db: Session, path: Path, security: Security) -> dict[str, in
                 volume=parsed["volume"],
                 adjusted=False,
                 is_delayed=True,
+                source="investing_csv",
             )
         )
         existing_dates.add(parsed["trade_date"])

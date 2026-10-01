@@ -1,10 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, Activity, Wifi, WifiOff } from 'lucide-react'
+import { TrendingUp, TrendingDown, Activity } from 'lucide-react'
 import Sidebar from '@/components/dashboard/Sidebar'
-import Topbar from '@/components/dashboard/Topbar'
-import { useMarketRealtime } from '@/hooks/useMarketRealtime'
 
 interface MarketSnapshot {
   timestamp: string
@@ -15,7 +13,6 @@ interface MarketSnapshot {
 }
 
 export default function MarketPage() {
-  const { data: wsData, connected, error } = useMarketRealtime()
   const [marketData, setMarketData] = useState<MarketSnapshot | null>(null)
   const [indices, setIndices] = useState<Record<string, any>>({})
   const [breadth, setBreadth] = useState<any>(null)
@@ -24,34 +21,18 @@ export default function MarketPage() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
-  // Handle WebSocket updates
-  useEffect(() => {
-    if (!wsData) return
-
-    if (wsData.type === 'market_update') {
-      // Update individual prices
-      if (wsData.indices) {
-        setIndices((prev) => ({ ...prev, ...wsData.indices }))
-      }
-    } else if (wsData.type === 'market_snapshot') {
-      // Full snapshot update
-      setIndices(wsData.data.indices)
-      setBreadth(wsData.data.breadth)
-      setGainers(wsData.data.gainers)
-      setLosers(wsData.data.losers)
-      setLoading(false)
-    }
-  }, [wsData])
-
-  // Fetch initial market data via HTTP
   useEffect(() => {
     const fetchMarketData = async () => {
       try {
-        const response = await fetch('http://localhost:5000/market/overview/snapshot')
+        const response = await fetch('http://localhost:8000/market/overview/snapshot')
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`)
         }
         const result = await response.json()
+        if (result.error) {
+          setFetchError(result.error)
+          return
+        }
         setMarketData(result)
         setIndices(result.indices || {})
         setBreadth(result.breadth)
@@ -74,7 +55,6 @@ export default function MarketPage() {
       <div className="flex min-h-screen w-full bg-bg">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar />
           <main className="flex-1 px-6 py-6 flex items-center justify-center">
             <div className="text-muted">Loading market data...</div>
           </main>
@@ -88,7 +68,6 @@ export default function MarketPage() {
       <div className="flex min-h-screen w-full bg-bg">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar />
           <main className="flex-1 px-6 py-6 lg:px-8">
             <div className="rounded-lg border border-negative/30 bg-negative/5 p-4 text-negative">
               <p className="font-semibold">Error Loading Market Data</p>
@@ -104,25 +83,11 @@ export default function MarketPage() {
     <div className="flex min-h-screen w-full bg-bg">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
         <main className="flex-1 px-6 py-6 lg:px-8 space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Market Overview</h1>
-              <p className="text-sm text-muted">Real-time PSX market data</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {connected ? (
-                <div className="flex items-center gap-2 text-positive">
-                  <Wifi className="h-4 w-4" />
-                  <span className="text-xs font-semibold">Live</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-muted">
-                  <WifiOff className="h-4 w-4" />
-                  <span className="text-xs font-semibold">Offline</span>
-                </div>
-              )}
+              <p className="text-sm text-muted">End-of-day PSX data (delayed)</p>
             </div>
           </div>
 

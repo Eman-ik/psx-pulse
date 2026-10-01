@@ -146,7 +146,8 @@ def compute_sector_index(db: Session, sector_name: str, index_code: str, index_n
             trade_date=trade_date,
             open=level, high=level, low=level, close=level,
             volume=None,
-            is_delayed=False,
+            is_delayed=True,
+            source="derived:sector_index",
         ))
         bars_written += 1
 

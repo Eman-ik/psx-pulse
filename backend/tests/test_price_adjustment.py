@@ -16,6 +16,7 @@ def _bar(trade_date: date, close: float) -> PriceOHLCV:
         close=close,
         volume=1000,
         is_delayed=True,
+        source="test",
     )
 
 

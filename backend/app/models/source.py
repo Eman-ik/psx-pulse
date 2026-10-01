@@ -27,4 +27,4 @@ class Source(Base):
     # Relationships
     company = relationship("Company", back_populates="sources")
     documents = relationship("Document", back_populates="source", cascade="all, delete-orphan")
-    financial_facts = relationship("FinancialFact", back_populates="source", cascade="all, delete-orphan")
+    financial_facts = relationship("app.models.financial_fact.FinancialFact", back_populates="source", cascade="all, delete-orphan")

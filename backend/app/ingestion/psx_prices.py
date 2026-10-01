@@ -65,6 +65,7 @@ def backfill_security_prices(db: Session, security: Security, start: date, end: 
                 volume=int(row["volume"]) if row["volume"] == row["volume"] else None,
                 adjusted=False,
                 is_delayed=True,
+                source="psxdata",
             )
         )
         existing_dates.add(trade_date)

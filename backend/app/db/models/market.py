@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -45,14 +45,21 @@ class CorporateAction(Base):
 
 
 class PriceOHLCV(Base):
-    """Daily OHLCV bar. is_delayed defaults True since v1 has no licensed real-time feed."""
+    """Daily OHLCV bar. is_delayed defaults True since v1 has no licensed real-time feed.
+
+    source has no default on purpose: every writer must name where the bar came from.
+    """
 
     __tablename__ = "price_ohlcv"
-    __table_args__ = (UniqueConstraint("security_id", "trade_date", name="uq_price_ohlcv_security_date"),)
+    __table_args__ = (
+        UniqueConstraint("security_id", "trade_date", name="uq_price_ohlcv_security_date"),
+        CheckConstraint("source <> ''", name="ck_price_ohlcv_source_nonempty"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     security_id: Mapped[int] = mapped_column(ForeignKey("security.id"), index=True)
     trade_date: Mapped[date] = mapped_column(Date, index=True)
+    source: Mapped[str] = mapped_column(String(40))
     open: Mapped[float] = mapped_column(Numeric(14, 4))
     high: Mapped[float] = mapped_column(Numeric(14, 4))
     low: Mapped[float] = mapped_column(Numeric(14, 4))
@@ -85,11 +92,15 @@ class IndexOHLCV(Base):
     """
 
     __tablename__ = "index_ohlcv"
-    __table_args__ = (UniqueConstraint("market_index_id", "trade_date", name="uq_index_ohlcv_index_date"),)
+    __table_args__ = (
+        UniqueConstraint("market_index_id", "trade_date", name="uq_index_ohlcv_index_date"),
+        CheckConstraint("source <> ''", name="ck_index_ohlcv_source_nonempty"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     market_index_id: Mapped[int] = mapped_column(ForeignKey("market_index.id"), index=True)
     trade_date: Mapped[date] = mapped_column(Date, index=True)
+    source: Mapped[str] = mapped_column(String(40))
     open: Mapped[float] = mapped_column(Numeric(14, 4))
     high: Mapped[float] = mapped_column(Numeric(14, 4))
     low: Mapped[float] = mapped_column(Numeric(14, 4))

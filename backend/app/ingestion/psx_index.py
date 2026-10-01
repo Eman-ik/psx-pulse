@@ -79,6 +79,7 @@ def backfill_index_prices(db: Session, index: MarketIndex, start: date, end: dat
                 close=float(row["close"]),
                 volume=int(row["volume"]) if row["volume"] == row["volume"] else None,
                 is_delayed=True,
+                source="psxdata",
             )
         )
         existing_dates.add(trade_date)

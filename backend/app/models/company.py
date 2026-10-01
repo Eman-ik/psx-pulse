@@ -24,7 +24,7 @@ class Company(Base):
     # Relationships
     periods = relationship("Period", back_populates="company", cascade="all, delete-orphan")
     sources = relationship("Source", back_populates="company", cascade="all, delete-orphan")
-    financial_facts = relationship("FinancialFact", back_populates="company", cascade="all, delete-orphan")
+    financial_facts = relationship("app.models.financial_fact.FinancialFact", back_populates="company", cascade="all, delete-orphan")
     derived_metrics = relationship("DerivedMetric", back_populates="company", cascade="all, delete-orphan")
     research_insights = relationship("ResearchInsight", back_populates="company", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="company", cascade="all, delete-orphan")

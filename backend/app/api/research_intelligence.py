@@ -27,6 +27,8 @@ from app.analysis.risk_engine import RiskEngine
 from app.analysis.catalyst_engine import CatalystEngine
 from app.analysis.valuation_context import ValuationContextEngine
 from app.analysis.what_to_watch import WhatToWatchEngine
+from app.analysis.evidence_context import ResearchContext
+from app.analysis.consistency_validator import ConsistencyValidator
 
 router = APIRouter(prefix="/api/v1/research", tags=["research"])
 
@@ -59,6 +61,9 @@ def unified_research_intelligence(ticker: str, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=404, detail=f"No issuer data for {symbol}")
 
     try:
+        # Create evidence context once per request
+        context = ResearchContext(db, issuer_id)
+
         # Run all intelligence engines in parallel conceptually
         business_health = BusinessHealthEngine.analyze(db, issuer_id)
         what_changed = WhatChangedEngine.analyze(db, issuer_id)
@@ -69,6 +74,23 @@ def unified_research_intelligence(ticker: str, db: Session = Depends(get_db)) ->
         catalysts = CatalystEngine.analyze(db, issuer_id)
         valuation = ValuationContextEngine.analyze(db, issuer_id)
         watch_list = WhatToWatchEngine.analyze(db, issuer_id)
+
+        # Build output map for consistency validator
+        all_outputs = {
+            "business_health": business_health,
+            "what_changed": what_changed,
+            "earnings_quality": earnings_quality,
+            "bull_bear_case": bull_bear,
+            "red_flags": red_flags,
+            "risk_engine": risks,
+            "catalyst_engine": catalysts,
+            "valuation_context": valuation,
+            "watch_list": watch_list,
+        }
+
+        # Validate logical consistency across engines
+        validator = ConsistencyValidator(context, all_outputs)
+        validation_report = validator.validate_all()
 
         # Composite confidence score (0-100)
         # Based on data availability and signal strength
@@ -121,6 +143,8 @@ def unified_research_intelligence(ticker: str, db: Session = Depends(get_db)) ->
             },
             # Actionable monitoring
             "before_you_buy": watch_list.get("watch_metrics", []),
+            # Cross-engine consistency validation
+            "validation": validation_report,
         }
 
     except Exception as e:

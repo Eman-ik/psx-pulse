@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/config';
 import EngineResultCard from './EngineResultCard';
 import ValidationIndicator from './ValidationIndicator';
 import ConfidenceBadge from './ConfidenceBadge';
@@ -32,7 +33,7 @@ interface ResearchIntelligenceDashboardProps {
 
 const ResearchIntelligenceDashboard: React.FC<ResearchIntelligenceDashboardProps> = ({
   ticker,
-  apiUrl = 'http://localhost:5000',
+  apiUrl = API_BASE_URL,
 }) => {
   const [data, setData] = useState<ResearchData | null>(null);
   const [loading, setLoading] = useState(true);

@@ -18,17 +18,7 @@ from sqlalchemy import select
 
 from app.api.deps import get_db
 from app.db.models import Security
-from app.analysis.business_health import BusinessHealthEngine
-from app.analysis.what_changed import WhatChangedEngine
-from app.analysis.earnings_quality_v2 import EarningsQualityEngine
-from app.analysis.bull_bear_case import BullBearCaseEngine
-from app.analysis.red_flags import RedFlagEngine
-from app.analysis.risk_engine import RiskEngine
-from app.analysis.catalyst_engine import CatalystEngine
-from app.analysis.valuation_context import ValuationContextEngine
-from app.analysis.what_to_watch import WhatToWatchEngine
-from app.analysis.evidence_context import ResearchContext
-from app.analysis.consistency_validator import ConsistencyValidator
+from app.analysis.research_orchestrator import ResearchOrchestrator
 
 router = APIRouter(prefix="/api/v1/research", tags=["research"])
 
@@ -61,49 +51,20 @@ def unified_research_intelligence(ticker: str, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=404, detail=f"No issuer data for {symbol}")
 
     try:
-        # Create evidence context once per request
-        context = ResearchContext(db, issuer_id)
+        # Single orchestrated analysis run
+        analysis = ResearchOrchestrator.analyze(db, issuer_id)
 
-        # Run all intelligence engines with shared ResearchContext (single database scan)
-        business_health = BusinessHealthEngine.analyze(context)
-        what_changed = WhatChangedEngine.analyze(context)
-        earnings_quality = EarningsQualityEngine.analyze(context)
-        bull_bear = BullBearCaseEngine.analyze(context)
-        red_flags = RedFlagEngine.detect(context)
-        risks = RiskEngine.analyze(context)
-        catalysts = CatalystEngine.analyze(context)
-        valuation = ValuationContextEngine.analyze(context)
-        watch_list = WhatToWatchEngine.analyze(context)
-
-        # Build output map for consistency validator
-        all_outputs = {
-            "business_health": business_health,
-            "what_changed": what_changed,
-            "earnings_quality": earnings_quality,
-            "bull_bear_case": bull_bear,
-            "red_flags": red_flags,
-            "risk_engine": risks,
-            "catalyst_engine": catalysts,
-            "valuation_context": valuation,
-            "watch_list": watch_list,
-        }
-
-        # Validate logical consistency across engines
-        validator = ConsistencyValidator(context, all_outputs)
-        validation_report = validator.validate_all()
-
-        # Composite confidence score based on actual data coverage + consistency
-        # Use weighted average of engine confidences + validation status
-        engine_confidences = {
-            "business_health": business_health.get("data_coverage_pct", 0),
-            "what_changed": what_changed.get("data_coverage_pct", 0),
-            "earnings_quality": earnings_quality.get("data_coverage_pct", 0),
-            "valuation": valuation.get("data_coverage_pct", 0),
-        }
-        avg_coverage = int(sum(engine_confidences.values()) / len(engine_confidences))
-        # Penalize if validation found contradictions
-        consistency_penalty = 0 if validation_report.get("overall_valid") else 20
-        confidence_score = max(0, min(100, avg_coverage - consistency_penalty))
+        business_health = analysis.get("business_health", {})
+        what_changed = analysis.get("what_changed", {})
+        earnings_quality = analysis.get("earnings_quality", {})
+        bull_bear = analysis.get("bull_bear_case", {})
+        red_flags = analysis.get("red_flags", {})
+        risks = analysis.get("risk_engine", {})
+        catalysts = analysis.get("catalyst_engine", {})
+        valuation = analysis.get("valuation_context", {})
+        watch_list = analysis.get("what_to_watch", {})
+        validation_report = analysis.get("validation", {})
+        confidence_score = analysis.get("confidence_score", 0)
 
         return {
             "ticker": symbol,

@@ -20,6 +20,8 @@ from app.etl.industry_intelligence import SECTOR_PROFIT_DRIVERS
 from app.research_system import research_view as rv
 from app.research_system.momentum_screener import MAX_ANCHOR_GAP_DAYS, MomentumScreener
 from app.research_system.technical_screener import TechnicalScreener
+from app.analysis.research_orchestrator import ResearchOrchestrator
+from app.analysis.research_overview_builder import ResearchOverviewBuilder
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/companies", tags=["research-studio"])
@@ -152,9 +154,13 @@ def search(q: str = Query(min_length=1, max_length=40), db: Session = Depends(ge
 def overview(ref: str, db: Session = Depends(get_db)) -> dict:
     security = _security(db, ref)
     issuer = security.issuer
-    view = _research_view(db, security)
     payload = fundamentals_payload(security.symbol, db)
     profile = _profile_document(db, issuer.id)
+
+    # Use the new unified intelligence engines instead of old research_view
+    analysis = ResearchOrchestrator.analyze(db, issuer.id)
+    overview_summary = ResearchOverviewBuilder.build(analysis)
+
     return {
         "generated_at": _now(),
         "as_of": _latest_market_date(db).isoformat() if _latest_market_date(db) else None,
@@ -174,7 +180,7 @@ def overview(ref: str, db: Session = Depends(get_db)) -> dict:
             "profile": profile is not None,
             "tier": "full" if payload["facts"] else "price_only",
         },
-        "research_view": view,
+        "research_overview": overview_summary,  # New unified intelligence engines
         "latest_events": _events(db, security, limit=5, offset=0, category=None)["events"],
     }
 

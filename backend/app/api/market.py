@@ -89,7 +89,10 @@ def list_index_prices(
     index = db.execute(select(MarketIndex).where(MarketIndex.code == code)).scalar_one_or_none()
     if index is None:
         return None
-    stmt = select(IndexOHLCV).where(IndexOHLCV.market_index_id == index.id)
+    stmt = select(IndexOHLCV).where(
+        IndexOHLCV.market_index_id == index.id,
+        IndexOHLCV.quality_status.in_(["verified", "provisional"])
+    )
     if start:
         stmt = stmt.where(IndexOHLCV.trade_date >= start)
     if end:
@@ -134,14 +137,22 @@ def market_snapshot(db: Session = Depends(get_db)) -> dict:
         if index:
             latest = db.execute(
                 select(IndexOHLCV)
-                .where(IndexOHLCV.market_index_id == index.id, IndexOHLCV.trade_date == latest_date)
+                .where(
+                    IndexOHLCV.market_index_id == index.id,
+                    IndexOHLCV.trade_date == latest_date,
+                    IndexOHLCV.quality_status.in_(["verified", "provisional"])
+                )
             ).scalar_one_or_none()
 
             if latest:
                 # Get previous close for change calculation
                 prev = db.execute(
                     select(IndexOHLCV)
-                    .where(IndexOHLCV.market_index_id == index.id, IndexOHLCV.trade_date < latest_date)
+                    .where(
+                        IndexOHLCV.market_index_id == index.id,
+                        IndexOHLCV.trade_date < latest_date,
+                        IndexOHLCV.quality_status.in_(["verified", "provisional"])
+                    )
                     .order_by(desc(IndexOHLCV.trade_date))
                     .limit(1)
                 ).scalar_one_or_none()

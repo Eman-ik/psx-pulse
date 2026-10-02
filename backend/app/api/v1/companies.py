@@ -263,8 +263,12 @@ def events(ref: str, limit: int = Query(20, ge=1, le=100), offset: int = Query(0
 def _index_return(db: Session, index_id: int, latest: date, days: int, end_price: float) -> float | None:
     target = latest - timedelta(days=days)
     bar = db.execute(
-        select(IndexOHLCV).where(IndexOHLCV.market_index_id == index_id, IndexOHLCV.trade_date <= target,
-                                 IndexOHLCV.trade_date >= target - timedelta(days=MAX_ANCHOR_GAP_DAYS))
+        select(IndexOHLCV).where(
+            IndexOHLCV.market_index_id == index_id,
+            IndexOHLCV.trade_date <= target,
+            IndexOHLCV.trade_date >= target - timedelta(days=MAX_ANCHOR_GAP_DAYS),
+            IndexOHLCV.quality_status.in_(["verified", "provisional"])
+        )
         .order_by(IndexOHLCV.trade_date.desc()).limit(1)
     ).scalar_one_or_none()
     return None if bar is None else round((end_price - float(bar.close)) / float(bar.close) * 100, 2)
@@ -286,7 +290,13 @@ def technicals(ref: str, bars: int = Query(252, ge=20, le=1000), db: Session = D
     if rows and latest:
         for code in ("KSE100", SECTOR_INDEX.get(sector)):
             index = db.execute(select(MarketIndex).where(MarketIndex.code == code)).scalar_one_or_none() if code else None
-            last = db.execute(select(IndexOHLCV).where(IndexOHLCV.market_index_id == index.id, IndexOHLCV.trade_date == latest)).scalar_one_or_none() if index else None
+            last = db.execute(
+                select(IndexOHLCV).where(
+                    IndexOHLCV.market_index_id == index.id,
+                    IndexOHLCV.trade_date == latest,
+                    IndexOHLCV.quality_status.in_(["verified", "provisional"])
+                )
+            ).scalar_one_or_none() if index else None
             if last is None:
                 relative[code or "SECTOR_INDEX"] = {"status": "UNAVAILABLE"}
                 continue

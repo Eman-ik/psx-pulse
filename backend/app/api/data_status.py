@@ -59,9 +59,15 @@ def data_status(db: Session = Depends(get_db)) -> dict:
             "securities": db.execute(select(func.count(func.distinct(PriceOHLCV.security_id)))).scalar(),
         },
         "indices": {
-            **freshness(db, IndexOHLCV),
-            "bars": db.execute(select(func.count(IndexOHLCV.id))).scalar(),
-            "indices": db.execute(select(func.count(func.distinct(IndexOHLCV.market_index_id)))).scalar(),
+            **freshness(db, IndexOHLCV, IndexOHLCV.quality_status.in_(["verified", "provisional"])),
+            "bars": db.execute(
+                select(func.count(IndexOHLCV.id)).where(IndexOHLCV.quality_status.in_(["verified", "provisional"]))
+            ).scalar(),
+            "indices": db.execute(
+                select(func.count(func.distinct(IndexOHLCV.market_index_id))).where(
+                    IndexOHLCV.quality_status.in_(["verified", "provisional"])
+                )
+            ).scalar(),
         },
         "fundamentals": {
             "statement_facts": db.execute(select(func.count(FinancialFact.id))).scalar()

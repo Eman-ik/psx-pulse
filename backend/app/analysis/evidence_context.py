@@ -11,6 +11,7 @@ This ensures:
 from enum import Enum
 from typing import Dict, List, Optional, Set
 from datetime import date
+from collections import defaultdict
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
@@ -107,27 +108,26 @@ class ResearchContext:
         self._compute_confidence()
 
     def _load_metrics(self) -> None:
-        """Scan database and build complete metric inventory."""
-        # Get all distinct metrics for this issuer
-        metric_names = self.db.execute(
-            select(FinancialFact.line_item)
-            .where(FinancialFact.issuer_id == self.issuer_id)
-            .distinct()
-        ).scalars().all()
+        """Scan database and build complete metric inventory in one query."""
+        # Single query: fetch all metrics for this issuer at once
+        rows = self.db.execute(
+            select(FinancialFact.line_item, FinancialFact.period_end, FinancialFact.value)
+            .where(
+                FinancialFact.issuer_id == self.issuer_id,
+                FinancialFact.superseded_by_id.is_(None),
+            )
+            .order_by(FinancialFact.line_item, FinancialFact.period_end)
+        ).all()
 
-        for metric in metric_names:
-            rows = self.db.execute(
-                select(FinancialFact.period_end, FinancialFact.value)
-                .where(
-                    FinancialFact.issuer_id == self.issuer_id,
-                    FinancialFact.line_item == metric,
-                    FinancialFact.superseded_by_id.is_(None),
-                )
-                .order_by(FinancialFact.period_end)
-            ).all()
+        # Group by metric name in Python (zero queries, single pass)
+        metrics_dict: Dict[str, Dict[date, float]] = defaultdict(dict)
+        for line_item, period_end, value in rows:
+            if value is not None:
+                metrics_dict[line_item][period_end] = float(value)
 
-            values = {period_end: float(value) for period_end, value in rows if value is not None}
-            self.metrics[metric] = MetricCoverage(metric, values)
+        # Build MetricCoverage objects
+        for metric_name, values in metrics_dict.items():
+            self.metrics[metric_name] = MetricCoverage(metric_name, values)
 
     def _compute_confidence(self) -> None:
         """For each analysis domain, compute what we can and cannot claim."""
@@ -337,7 +337,12 @@ class ContextualizedOutput:
         self.score = score
         self.narrative = narrative
         self.confidence = confidence or self.context.domain_status(self.engine_name)["confidence"]
-        self.data_coverage = data_coverage or self.context.domain_status(self.engine_name)["coverage_pct"]
+        # Use is not None to preserve explicit 0 values
+        self.data_coverage = (
+            data_coverage
+            if data_coverage is not None
+            else self.context.domain_status(self.engine_name)["coverage_pct"]
+        )
         self.missing_critical = self.context.domain_status(self.engine_name).get("missing", [])
 
     def to_dict(self) -> Dict:

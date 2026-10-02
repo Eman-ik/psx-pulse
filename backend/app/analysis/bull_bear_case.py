@@ -15,10 +15,8 @@ class BullBearCaseEngine:
     """Generate strongest evidence-based bull and bear theses."""
 
     @staticmethod
-    def analyze(db: Session, issuer_id: int) -> Dict:
-        """Generate bull, bear, and critical debate theses with Evidence Context."""
-        # Single database scan
-        context = ResearchContext(db, issuer_id)
+    def analyze(context: ResearchContext) -> Dict:
+        """Generate bull, bear, and critical debate theses using shared Evidence Context."""
         output = ContextualizedOutput("bull_bear_case", context)
 
         # Check data availability upfront

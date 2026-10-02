@@ -114,10 +114,31 @@ const ResearchIntelligenceDashboard: React.FC<ResearchIntelligenceDashboardProps
       <div className="rounded-lg border border-gray-200 bg-white p-6">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-3xl font-bold text-gray-900">{data.ticker}</h1>
-          <ConfidenceBadge confidence="High" size="lg" />
+          {/* Use actual confidence from backend, not hardcoded HIGH */}
+          <ConfidenceBadge
+            confidence={
+              data.confidence_score >= 80
+                ? "High"
+                : data.confidence_score >= 50
+                ? "Medium"
+                : "Low"
+            }
+            size="lg"
+          />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="space-y-1">
+            <p className="text-xs text-gray-500 uppercase">Evidence Confidence</p>
+            <p className="text-lg font-semibold text-gray-900">
+              {data.confidence_score >= 80
+                ? "High"
+                : data.confidence_score >= 50
+                ? "Medium"
+                : "Low"}
+              <span className="text-sm text-gray-500 ml-1">({data.confidence_score}%)</span>
+            </p>
+          </div>
           <div className="space-y-1">
             <p className="text-xs text-gray-500 uppercase">Business Health</p>
             <p className="text-lg font-semibold text-gray-900">{summary.business_health || '—'}</p>

@@ -64,16 +64,16 @@ def unified_research_intelligence(ticker: str, db: Session = Depends(get_db)) ->
         # Create evidence context once per request
         context = ResearchContext(db, issuer_id)
 
-        # Run all intelligence engines in parallel conceptually
-        business_health = BusinessHealthEngine.analyze(db, issuer_id)
-        what_changed = WhatChangedEngine.analyze(db, issuer_id)
-        earnings_quality = EarningsQualityEngine.analyze(db, issuer_id)
-        bull_bear = BullBearCaseEngine.analyze(db, issuer_id)
-        red_flags = RedFlagEngine.detect(db, issuer_id)
-        risks = RiskEngine.analyze(db, issuer_id)
-        catalysts = CatalystEngine.analyze(db, issuer_id)
-        valuation = ValuationContextEngine.analyze(db, issuer_id)
-        watch_list = WhatToWatchEngine.analyze(db, issuer_id)
+        # Run all intelligence engines with shared ResearchContext (single database scan)
+        business_health = BusinessHealthEngine.analyze(context)
+        what_changed = WhatChangedEngine.analyze(context)
+        earnings_quality = EarningsQualityEngine.analyze(context)
+        bull_bear = BullBearCaseEngine.analyze(context)
+        red_flags = RedFlagEngine.detect(context)
+        risks = RiskEngine.analyze(context)
+        catalysts = CatalystEngine.analyze(context)
+        valuation = ValuationContextEngine.analyze(context)
+        watch_list = WhatToWatchEngine.analyze(context)
 
         # Build output map for consistency validator
         all_outputs = {
@@ -92,16 +92,18 @@ def unified_research_intelligence(ticker: str, db: Session = Depends(get_db)) ->
         validator = ConsistencyValidator(context, all_outputs)
         validation_report = validator.validate_all()
 
-        # Composite confidence score (0-100)
-        # Based on data availability and signal strength
-        confidence_signals = [
-            1 if business_health.get("status") == "complete" else 0,
-            1 if what_changed.get("status") == "complete" else 0,
-            1 if earnings_quality.get("status") == "complete" else 0,
-            1 if bull_bear.get("key_metrics") else 0,
-            1 if len(red_flags.get("flags", [])) >= 0 else 0,
-        ]
-        confidence_score = int((sum(confidence_signals) / len(confidence_signals)) * 100)
+        # Composite confidence score based on actual data coverage + consistency
+        # Use weighted average of engine confidences + validation status
+        engine_confidences = {
+            "business_health": business_health.get("data_coverage_pct", 0),
+            "what_changed": what_changed.get("data_coverage_pct", 0),
+            "earnings_quality": earnings_quality.get("data_coverage_pct", 0),
+            "valuation": valuation.get("data_coverage_pct", 0),
+        }
+        avg_coverage = int(sum(engine_confidences.values()) / len(engine_confidences))
+        # Penalize if validation found contradictions
+        consistency_penalty = 0 if validation_report.get("overall_valid") else 20
+        confidence_score = max(0, min(100, avg_coverage - consistency_penalty))
 
         return {
             "ticker": symbol,

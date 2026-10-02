@@ -6,6 +6,7 @@ the thesis is holding or breaking down. Watch these metrics/signals before buyin
 
 from typing import Dict, List
 
+from app.analysis.period_alignment import PeriodAlignedAnalyzer
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
 
@@ -157,6 +158,7 @@ class WhatToWatchEngine:
             "Dividend cut signaling cash generation stress",
             "Technical breakdown below 200-day moving average",
         ]
+        result["period_type"] = "Point+Trend"  # Uses latest point values + monitors for trend changes
         result["validation"] = output.validate()
 
         return result

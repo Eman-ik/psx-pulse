@@ -6,6 +6,7 @@ The discount may therefore reflect concern over X rather than weak current funda
 
 from typing import Optional, Dict
 
+from app.analysis.period_alignment import PeriodAlignedAnalyzer
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
 
@@ -123,6 +124,7 @@ class ValuationContextEngine:
             "roe": roe,
             "revenue_growth": rev_growth,
         }
+        result["period_type"] = "Point"  # Valuation multiples are point-in-time values
         result["validation"] = output.validate()
 
         return result

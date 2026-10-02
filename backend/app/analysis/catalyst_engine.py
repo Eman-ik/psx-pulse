@@ -9,6 +9,7 @@ For now, this engine returns a gate indicating data unavailability.
 
 from typing import Dict
 
+from app.analysis.period_alignment import PeriodAlignedAnalyzer
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
 

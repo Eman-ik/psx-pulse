@@ -8,7 +8,6 @@ For now, this engine returns a gate indicating data unavailability.
 """
 
 from typing import Dict
-from sqlalchemy.orm import Session
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
@@ -17,9 +16,8 @@ class CatalystEngine:
     """Identify and categorize catalysts that could move the thesis."""
 
     @staticmethod
-    def analyze(db: Session, issuer_id: int) -> Dict:
+    def analyze(context: ResearchContext) -> Dict:
         """Gate: Catalyst data not yet available. Awaiting announcement database integration."""
-        context = ResearchContext(db, issuer_id)
         output = ContextualizedOutput("catalyst_engine", context)
 
         output.set_assessment(

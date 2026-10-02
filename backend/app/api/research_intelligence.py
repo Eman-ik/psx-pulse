@@ -174,10 +174,14 @@ def quick_view(ticker: str, db: Session = Depends(get_db)) -> dict:
     if issuer_id is None:
         raise HTTPException(status_code=404, detail=f"No issuer data for {symbol}")
 
-    business_health = BusinessHealthEngine.analyze(db, issuer_id)
-    bull_bear = BullBearCaseEngine.analyze(db, issuer_id)
-    valuation = ValuationContextEngine.analyze(db, issuer_id)
-    risks = RiskEngine.analyze(db, issuer_id)
+    # Create shared ResearchContext once
+    context = ResearchContext(db, issuer_id)
+
+    # All engines use the same context
+    business_health = BusinessHealthEngine.analyze(context)
+    bull_bear = BullBearCaseEngine.analyze(context)
+    valuation = ValuationContextEngine.analyze(context)
+    risks = RiskEngine.analyze(context)
 
     return {
         "ticker": symbol,

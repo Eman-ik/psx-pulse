@@ -4,7 +4,6 @@ Not just "risk score". Probability × Impact × Trend, ranked by severity.
 """
 
 from typing import Optional, Dict, List
-from sqlalchemy.orm import Session
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
@@ -13,10 +12,8 @@ class RiskEngine:
     """Comprehensive risk assessment across all dimensions."""
 
     @staticmethod
-    def analyze(db: Session, issuer_id: int) -> Dict:
-        """Identify and rank risks across all categories using Evidence Context."""
-        # Single database scan
-        context = ResearchContext(db, issuer_id)
+    def analyze(context: ResearchContext) -> Dict:
+        """Identify and rank risks using shared Evidence Context."""
         output = ContextualizedOutput("risk_engine", context)
 
         risks = []

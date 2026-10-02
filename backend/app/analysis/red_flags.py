@@ -5,7 +5,6 @@ inventory growing faster than revenue, etc.
 """
 
 from typing import Optional, Dict, List
-from sqlalchemy.orm import Session
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
@@ -21,10 +20,8 @@ class RedFlagEngine:
         return (values[-1] - values[-2]) / abs(values[-2])
 
     @staticmethod
-    def detect(db: Session, issuer_id: int) -> Dict:
-        """Detect all red flags in financial statements using Evidence Context."""
-        # Single database scan
-        context = ResearchContext(db, issuer_id)
+    def detect(context: ResearchContext) -> Dict:
+        """Detect all red flags using shared Evidence Context."""
         output = ContextualizedOutput("red_flags", context)
 
         flags = []

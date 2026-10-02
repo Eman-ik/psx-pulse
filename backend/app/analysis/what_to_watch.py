@@ -5,7 +5,6 @@ the thesis is holding or breaking down. Watch these metrics/signals before buyin
 """
 
 from typing import Dict, List
-from sqlalchemy.orm import Session
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
@@ -14,10 +13,8 @@ class WhatToWatchEngine:
     """Generate specific monitoring framework from research."""
 
     @staticmethod
-    def analyze(db: Session, issuer_id: int) -> Dict:
-        """Create actionable watch list for monitoring thesis health using Evidence Context."""
-        # Single database scan
-        context = ResearchContext(db, issuer_id)
+    def analyze(context: ResearchContext) -> Dict:
+        """Create actionable watch list using shared Evidence Context."""
         output = ContextualizedOutput("what_to_watch", context)
 
         # Get latest values from context

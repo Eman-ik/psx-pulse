@@ -6,7 +6,6 @@ Revenue has expanded for three consecutive reporting periods...
 """
 
 from typing import Optional, Dict
-from sqlalchemy.orm import Session
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
@@ -39,10 +38,8 @@ class BusinessHealthEngine:
         return "Deteriorating"
 
     @staticmethod
-    def analyze(db: Session, issuer_id: int) -> Dict:
-        """Full business health diagnosis with Evidence Context."""
-        # Single database scan—all engines read from this
-        context = ResearchContext(db, issuer_id)
+    def analyze(context: ResearchContext) -> Dict:
+        """Full business health diagnosis using shared Evidence Context."""
         output = ContextualizedOutput("business_health", context)
 
         # Check critical metrics upfront

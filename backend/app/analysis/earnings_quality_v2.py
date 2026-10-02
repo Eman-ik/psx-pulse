@@ -5,7 +5,6 @@ NOW WITH: Separate confidence/coverage from assessment.
 """
 
 from typing import Optional, Dict
-from sqlalchemy.orm import Session
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
@@ -14,11 +13,8 @@ class EarningsQualityEngine:
     """Assess quality and sustainability of reported earnings."""
 
     @staticmethod
-    def analyze(db: Session, issuer_id: int) -> Dict:
-        """Assess earnings quality with evidence-based confidence."""
-
-        # Single source of truth for data availability
-        context = ResearchContext(db, issuer_id)
+    def analyze(context: ResearchContext) -> Dict:
+        """Assess earnings quality using shared Evidence Context."""
         output = ContextualizedOutput("earnings_quality", context)
 
         # Check critical metrics upfront

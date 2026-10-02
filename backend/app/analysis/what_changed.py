@@ -6,7 +6,6 @@ Interpretation: The latest result is operationally stronger but deterioration in
 """
 
 from typing import Optional, Dict
-from sqlalchemy.orm import Session
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
@@ -15,10 +14,8 @@ class WhatChangedEngine:
     """Detect and articulate period-over-period changes."""
 
     @staticmethod
-    def analyze(db: Session, issuer_id: int) -> Dict:
-        """Detect key changes between latest two periods using Evidence Context."""
-        # Single database scan
-        context = ResearchContext(db, issuer_id)
+    def analyze(context: ResearchContext) -> Dict:
+        """Detect key changes between latest two periods using shared Evidence Context."""
         output = ContextualizedOutput("what_changed", context)
 
         # Get all periods from context

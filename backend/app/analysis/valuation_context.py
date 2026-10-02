@@ -5,7 +5,6 @@ The discount may therefore reflect concern over X rather than weak current funda
 """
 
 from typing import Optional, Dict
-from sqlalchemy.orm import Session
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
 
@@ -14,10 +13,8 @@ class ValuationContextEngine:
     """Interpret valuation relative to history and peers."""
 
     @staticmethod
-    def analyze(db: Session, issuer_id: int, sector_median_pe: Optional[float] = None) -> Dict:
-        """Assess valuation in context of history and peers using Evidence Context."""
-        # Single database scan
-        context = ResearchContext(db, issuer_id)
+    def analyze(context: ResearchContext, sector_median_pe: Optional[float] = None) -> Dict:
+        """Assess valuation using shared Evidence Context."""
         output = ContextualizedOutput("valuation_context", context)
 
         # Get data from context

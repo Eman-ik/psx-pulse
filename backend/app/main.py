@@ -20,6 +20,7 @@ from app.api import (
     sources,
     sprint4_endpoints,
 )
+from app.api.v1 import companies as v1_companies
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ app.include_router(sectors.router)
 app.include_router(research_workspace.router)
 app.include_router(admin.router)
 app.include_router(signals.router)
+app.include_router(v1_companies.router)
 app.include_router(market.router)
 app.include_router(data_status.router)
 app.include_router(fundamentals.router)

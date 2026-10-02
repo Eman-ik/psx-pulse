@@ -9,15 +9,18 @@ company found this way) are created as minimal Issuer stubs — no Security, no 
 purely so the ownership graph has somewhere to point. is_psx_listed=False marks these.
 """
 
+import hashlib
 import logging
 import re
+from datetime import datetime, timezone
 
 import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import BoardMembership, Issuer, Person
+from app.db.models import BoardMembership, IngestionRun, Issuer, Person, SourceDocument
+from app.ingestion.runs import ingestion_run
 from app.ingestion.psx_announcements import BASE_URL, HEADERS
 from app.ingestion.psx_financials import MONTH_TO_NUM, fetch_company_financials_html
 
@@ -62,7 +65,7 @@ def _parse_profile_section(soup: BeautifulSoup) -> dict:
         elif label == "AUDITOR":
             result["auditor"] = text
         elif label == "Fiscal Year End":
-            result["fiscal_year_end_month"] = MONTH_TO_NUM.get(text, 12)
+            result["fiscal_year_end_month"] = MONTH_TO_NUM.get(text)  # None if PSX shows something unexpected
 
     people_block = section.find("div", class_="profile__item--people")
     key_people = []
@@ -111,16 +114,36 @@ def _get_or_create_person(db: Session, full_name: str) -> Person:
     return person
 
 
-def ingest_company_profile(db: Session, issuer: Issuer, symbol: str) -> dict[str, int]:
+def _record_profile_document(db: Session, issuer: Issuer, symbol: str, section_text: str) -> None:
+    """One source_document per distinct profile content; an unchanged re-fetch just refreshes
+    fetched_at, so 'profile as of' always reflects the last successful retrieval."""
+    content_hash = hashlib.sha256(f"profile::{symbol}::{section_text}".encode()).hexdigest()
+    existing = db.execute(select(SourceDocument).where(SourceDocument.content_hash == content_hash)).scalar_one_or_none()
+    if existing is not None:
+        existing.fetched_at = datetime.now(timezone.utc)
+        return
+    db.add(SourceDocument(
+        issuer_id=issuer.id, url=f"{BASE_URL}/company/{symbol}", content_hash=content_hash,
+        document_type="company_profile", source_tier="primary",
+    ))
+
+
+def ingest_company_profile(db: Session, issuer: Issuer, symbol: str, run: IngestionRun) -> dict[str, int]:
+    failed = {"profile_updated": 0, "board_members_inserted": 0, "parent_linked": 0}
     html = fetch_company_financials_html(symbol)  # same page fetch as psx_financials.py
     if html is None:
-        return {"profile_updated": 0, "board_members_inserted": 0, "parent_linked": 0}
+        run.add_error(f"{symbol}: company page could not be fetched")
+        db.commit()
+        return failed
 
     soup = BeautifulSoup(html, "lxml")
     profile = _parse_profile_section(soup)
     if not profile:
-        logger.warning("No #profile section found for %s", symbol)
-        return {"profile_updated": 0, "board_members_inserted": 0, "parent_linked": 0}
+        run.add_error(f"{symbol}: no #profile section on the company page")
+        db.commit()
+        return failed
+    section = soup.find("div", id="profile")
+    _record_profile_document(db, issuer, symbol, section.get_text(" ", strip=True))
 
     issuer.business_description = profile.get("business_description")
     issuer.address = profile.get("address")
@@ -152,6 +175,7 @@ def ingest_company_profile(db: Session, issuer: Issuer, symbol: str) -> dict[str
         db.add(BoardMembership(person_id=person.id, issuer_id=issuer.id, role=role))
         board_members_inserted += 1
 
+    run.rows_inserted += board_members_inserted + 1
     db.commit()
     return {
         "profile_updated": 1,
@@ -162,12 +186,14 @@ def ingest_company_profile(db: Session, issuer: Issuer, symbol: str) -> dict[str
 
 if __name__ == "__main__":
     from app.db.session import SessionLocal
-    from app.ingestion.seed_identity import seed_fertilizer_sector
 
     logging.basicConfig(level=logging.INFO)
 
     with SessionLocal() as session:
-        securities = seed_fertilizer_sector(session)
-        for security in securities:
-            stats = ingest_company_profile(session, security.issuer, security.symbol)
-            print(f"{security.symbol}: {stats}")
+        from app.db.models import Security
+
+        securities = session.execute(select(Security).where(Security.is_active.is_(True))).scalars().all()
+        with ingestion_run(session, "psx_company_page", table="issuer_profile", symbols=[s.symbol for s in securities]) as run:
+            for security in securities:
+                stats = ingest_company_profile(session, security.issuer, security.symbol, run)
+                print(f"{security.symbol}: {stats}")

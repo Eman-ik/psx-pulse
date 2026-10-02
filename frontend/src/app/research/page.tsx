@@ -1,7 +1,12 @@
+import { Suspense } from "react";
 import { ResearchStudioProduction } from "@/components/research/ResearchStudioProduction";
 
-export const metadata = { title: "Research Studio | Khronos" };
+export const metadata = { title: "Equity Research Studio | Khronos" };
 
 export default function ResearchPage() {
-  return <ResearchStudioProduction />;
+  return (
+    <Suspense fallback={null}>
+      <ResearchStudioProduction />
+    </Suspense>
+  );
 }

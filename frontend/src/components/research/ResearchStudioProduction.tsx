@@ -1,266 +1,188 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Search } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
-import { useEffect, useState } from "react";
-import { AlertCircle, Loader2, Search } from "lucide-react";
+import type { SearchResult } from "@/lib/studio-api";
 import { Fundamentals } from "@/components/research/Fundamentals";
+import { BusinessTab, GovernanceTab } from "./studio/BusinessTab";
+import { EventsTab } from "./studio/EventsTab";
+import { EvidenceTab } from "./studio/EvidenceTab";
+import { OverviewTab } from "./studio/OverviewTab";
+import { PeersTab } from "./studio/PeersTab";
+import { TechnicalsTab } from "./studio/TechnicalsTab";
+import { ValuationTab } from "./studio/ValuationTab";
+import { Card, day, Label, num } from "./studio/ui";
 
-
-type Freshness = { as_of: string | null; retrieved_at: string | null; sources: string[]; stale: boolean };
-
-type Technical = {
-  symbol: string;
-  name: string;
-  sector: string;
-  price: number;
-  change_pct: number | null;
-  price_vs_20dma: number | null;
-  price_vs_50dma: number | null;
-  price_vs_200dma: number | null;
-  rsi: number | null;
-  volume_vs_avg: number | null;
-  lookback_days: number;
-  lookback_complete: boolean;
-  near_lookback_high: boolean;
-  near_lookback_low: boolean;
-};
-
-type Momentum = {
-  symbol: string;
-  sector: string;
-  return_1m: number | null;
-  return_3m: number | null;
-  return_6m: number | null;
-  return_12m: number | null;
-};
-
-type Screen<T> = { freshness: Freshness; signals: T[] };
-
-const PERIODS = [
-  ["return_1m", "1 month"],
-  ["return_3m", "3 months"],
-  ["return_6m", "6 months"],
-  ["return_12m", "12 months"],
+const TABS = [
+  ["overview", "Overview"],
+  ["business", "Business"],
+  ["financials", "Financials"],
+  ["valuation", "Valuation"],
+  ["technicals", "Technicals"],
+  ["events", "News & events"],
+  ["peers", "Peers"],
+  ["governance", "Governance"],
+  ["evidence", "Evidence"],
 ] as const;
+type TabId = (typeof TABS)[number][0];
 
-const pct = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
-const tone = (v: number | null) => (v == null ? "text-muted" : v >= 0 ? "text-positive" : "text-negative");
+const DEFAULT_SYMBOL = "FFC";
 
-function trendReading(t: Technical) {
-  const known = [t.price_vs_20dma, t.price_vs_50dma, t.price_vs_200dma].filter((v): v is number => v != null);
-  const above = known.filter((v) => v > 0).length;
-  const caveat = known.length < 3 ? " Some averages need more history than is on file." : "";
-  if (known.length === 0) return "Not enough history for any moving average.";
-  if (above === known.length) return `Trading above all ${known.length} computable averages.${caveat}`;
-  if (above === 0) return `Trading below all ${known.length} computable averages.${caveat}`;
-  return `Trading above ${above} of ${known.length} computable averages.${caveat}`;
-}
+function CompanySearch({ onSelect }: { onSelect: (symbol: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
 
-function rsiReading(rsi: number | null) {
-  if (rsi == null) return "Not enough history to compute.";
-  if (rsi >= 70) return "Above 70, conventionally read as overbought.";
-  if (rsi <= 30) return "Below 30, conventionally read as oversold.";
-  return "Between 30 and 70, the neutral range.";
-}
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetch(`${API_BASE_URL}/api/v1/companies/search?q=${encodeURIComponent(q)}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((d) => setResults(d.results))
+        .catch(() => setResults([]));
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-function sectorRank(all: Momentum[], symbol: string, sector: string, key: (typeof PERIODS)[number][0]) {
-  const peers = all.filter((m) => m.sector === sector && m[key] != null).sort((a, b) => b[key]! - a[key]!);
-  const index = peers.findIndex((m) => m.symbol === symbol);
-  return index < 0 ? null : { rank: index + 1, of: peers.length };
-}
+  useEffect(() => {
+    const close = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const pick = (symbol: string) => {
+    onSelect(symbol);
+    setQuery("");
+    setOpen(false);
+  };
+
   return (
-    <section className="rounded-lg border border-border bg-surface p-6">
-      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Row({ label, value, valueClass = "", note }: { label: string; value: string; valueClass?: string; note?: string }) {
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/50 py-2 last:border-0">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-right">
-        <span className={`font-semibold tabular-nums ${valueClass}`}>{value}</span>
-        {note && <span className="ml-2 text-xs text-muted">{note}</span>}
-      </span>
+    <div ref={box} className="relative w-full sm:max-w-md">
+      <label className="relative block">
+        <span className="sr-only">Search companies by ticker or name</span>
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && results[0]) pick(results[0].symbol);
+            if (e.key === "Escape") setOpen(false);
+          }}
+          placeholder="Search ticker or company"
+          role="combobox"
+          aria-expanded={open && results.length > 0}
+          aria-controls="company-results"
+          className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+        />
+      </label>
+      {open && results.length > 0 && (
+        <ul id="company-results" role="listbox" className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-border bg-[#f4f6fa] shadow-lg">
+          {results.map((r) => (
+            <li key={r.security_id} role="option" aria-selected={false}>
+              <button type="button" onClick={() => pick(r.symbol)} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent/10">
+                <span>
+                  <span className="font-semibold">{r.symbol}</span> <span className="text-muted">{r.name}</span>
+                  <span className="block text-xs text-muted">{r.sector ?? "No sector"}</span>
+                </span>
+                <span className="text-right text-xs">
+                  {r.price.close == null ? "No price" : num(r.price.close)}
+                  <span className="block text-muted">{r.price.freshness.stale ? "stale" : day(r.price.freshness.as_of)}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
 export function ResearchStudioProduction() {
-  const [query, setQuery] = useState("LUCK");
-  const [technical, setTechnical] = useState<Screen<Technical> | null>(null);
-  const [momentum, setMomentum] = useState<Screen<Momentum> | null>(null);
-  const [symbol, setSymbol] = useState("LUCK");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const symbol = (params.get("t") ?? DEFAULT_SYMBOL).toUpperCase();
+  const requested = params.get("tab");
+  const tab: TabId = TABS.some(([id]) => id === requested) ? (requested as TabId) : "overview";
 
-  useEffect(() => {
-    const get = (path: string) => fetch(`${API_BASE_URL}${path}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    Promise.all([get("/screeners/technical"), get("/screeners/momentum")])
-      .then(([t, m]) => {
-        setTechnical(t);
-        setMomentum(m);
-      })
-      .catch(() => setError(`Could not reach the research API at ${API_BASE_URL}.`))
-      .finally(() => setLoading(false));
-  }, []);
+  const go = (next: { t?: string; tab?: TabId }) => {
+    const q = new URLSearchParams(params.toString());
+    q.set("t", next.t ?? symbol);
+    q.set("tab", next.tab ?? (next.t ? "overview" : tab));
+    router.replace(`${pathname}?${q.toString()}`, { scroll: false });
+  };
 
-  const t = technical?.signals.find((s) => s.symbol === symbol);
-  const m = momentum?.signals.find((s) => s.symbol === symbol);
-  const freshness = technical?.freshness;
-  const known = technical?.signals.map((s) => s.symbol).sort() ?? [];
+  const onTabKey = (e: React.KeyboardEvent) => {
+    const i = TABS.findIndex(([id]) => id === tab);
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (step) {
+      e.preventDefault();
+      go({ tab: TABS[(i + step + TABS.length) % TABS.length][0] });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/40">
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-          <h1 className="mb-4 text-3xl font-bold">Research Studio</h1>
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSymbol(query.trim().toUpperCase());
-            }}
-          >
-            <input
-              value={query}
-              onChange={(e) => {
-                const value = e.target.value.toUpperCase();
-                setQuery(value);
-                if (known.includes(value)) setSymbol(value);
-              }}
-              placeholder="Ticker, e.g. LUCK, FFC, DGKC"
-              aria-label="Ticker"
-              list="known-symbols"
-              className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-            <datalist id="known-symbols">
-              {known.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-            <button type="submit" className="flex items-center gap-2 rounded-lg bg-accent px-5 py-2 text-background hover:opacity-90">
-              <Search className="h-4 w-4" />
-              Open
-            </button>
-          </form>
+        <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold">Equity Research Studio</h1>
+              <p className="text-xs text-muted">
+                <Label kind="VERIFIED" /> source-backed data only; anything missing is shown as missing
+              </p>
+            </div>
+            <CompanySearch onSelect={(s) => go({ t: s })} />
+          </div>
+          <div role="tablist" aria-label="Research sections" onKeyDown={onTabKey} className="-mb-px flex gap-1 overflow-x-auto">
+            {TABS.map(([id, label]) => (
+              <button
+                key={id}
+                role="tab"
+                id={`tab-${id}`}
+                aria-selected={tab === id}
+                aria-controls="studio-panel"
+                tabIndex={tab === id ? 0 : -1}
+                onClick={() => go({ tab: id })}
+                className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition ${
+                  tab === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
-        {loading && (
-          <div className="flex items-center gap-2 text-muted">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading market data…
-          </div>
+      <main id="studio-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        <p className="mb-4 text-xs text-muted">
+          Viewing <span className="font-semibold text-foreground">{symbol}</span>. Research evidence, not a recommendation.
+        </p>
+        {tab === "overview" && <OverviewTab symbol={symbol} onOpenTab={(t) => go({ tab: t as TabId })} />}
+        {tab === "business" && <BusinessTab symbol={symbol} />}
+        {tab === "financials" && (
+          <Card title="Financial statements and ratios">
+            <Fundamentals symbol={symbol} api={API_BASE_URL} />
+          </Card>
         )}
-
-        {error && (
-          <div className="flex items-center gap-2 rounded-lg border border-negative/40 bg-negative/10 p-4 text-negative">
-            <AlertCircle className="h-5 w-5" /> {error}
-          </div>
-        )}
-
-        {!loading && !error && !t && (
-          <div className="rounded-lg border border-border bg-surface p-6">
-            <p className="font-semibold">No price history on file for {symbol}.</p>
-            <p className="mt-1 text-sm text-muted">Covered tickers: {known.join(", ") || "none yet"}.</p>
-          </div>
-        )}
-
-        {t && freshness && (
-          <>
-            {freshness.stale && (
-              <div className="flex items-center gap-2 rounded-lg border border-negative/40 bg-negative/10 p-4 text-negative">
-                <AlertCircle className="h-5 w-5" />
-                Prices are stale: the latest close on file is {freshness.as_of}. Readings below describe that date, not today.
-              </div>
-            )}
-
-            <section className="rounded-lg border border-border bg-surface p-6">
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold">{t.name}</h2>
-                  <p className="text-sm text-muted">
-                    {t.symbol} · {t.sector}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold tabular-nums">PKR {t.price.toFixed(2)}</p>
-                  <p className={`text-sm font-semibold ${tone(t.change_pct)}`}>{pct(t.change_pct)} on the day</p>
-                </div>
-              </div>
-              <p className="mt-4 text-xs text-muted">
-                Close as of {freshness.as_of} · source: {freshness.sources.join(", ")} end-of-day (delayed) · retrieved{" "}
-                {freshness.retrieved_at ? new Date(freshness.retrieved_at).toLocaleString() : "—"}
-              </p>
-            </section>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <Section title="Trend">
-                <Row label="vs 20-day average" value={pct(t.price_vs_20dma)} valueClass={tone(t.price_vs_20dma)} />
-                <Row label="vs 50-day average" value={pct(t.price_vs_50dma)} valueClass={tone(t.price_vs_50dma)} />
-                <Row label="vs 200-day average" value={pct(t.price_vs_200dma)} valueClass={tone(t.price_vs_200dma)} />
-                <p className="mt-3 text-sm">{trendReading(t)}</p>
-              </Section>
-
-              <Section title="Momentum and activity">
-                <Row label="RSI (14-day)" value={t.rsi == null ? "—" : t.rsi.toFixed(1)} />
-                <p className="mb-3 text-sm">{rsiReading(t.rsi)}</p>
-                <Row
-                  label="Volume vs prior 20-day average"
-                  value={t.volume_vs_avg == null ? "—" : `${t.volume_vs_avg.toFixed(2)}×`}
-                />
-                <Row
-                  label={t.lookback_complete ? "52-week range" : `${t.lookback_days}-day range (less than a year on file)`}
-                  value={t.near_lookback_high ? "Within 5% of high" : t.near_lookback_low ? "Within 5% of low" : "Mid-range"}
-                />
-              </Section>
-            </div>
-
-            {m && momentum && (
-              <Section title={`Price returns vs ${t.sector} peers`}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-muted">
-                        <th className="py-2 font-medium">Period</th>
-                        <th className="py-2 text-right font-medium">Return</th>
-                        <th className="py-2 text-right font-medium">Rank in sector</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {PERIODS.map(([key, label]) => {
-                        const rank = sectorRank(momentum.signals, t.symbol, t.sector, key);
-                        return (
-                          <tr key={key} className="border-t border-border/50">
-                            <td className="py-2">{label}</td>
-                            <td className={`py-2 text-right font-semibold tabular-nums ${tone(m[key])}`}>{pct(m[key])}</td>
-                            <td className="py-2 text-right tabular-nums">{rank ? `${rank.rank} of ${rank.of}` : "—"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="mt-3 text-xs text-muted">
-                  Unadjusted closes: dividends and bonus issues are not included, so total return can be higher.
-                </p>
-              </Section>
-            )}
-
-            <Section title="Fundamentals">
-              <Fundamentals symbol={t.symbol} api={API_BASE_URL} />
-            </Section>
-
-            <p className="text-xs text-muted">
-              Readings use fixed, conventional thresholds and describe the data. They are not recommendations.
-            </p>
-          </>
-        )}
+        {tab === "valuation" && <ValuationTab symbol={symbol} />}
+        {tab === "technicals" && <TechnicalsTab symbol={symbol} />}
+        {tab === "events" && <EventsTab symbol={symbol} />}
+        {tab === "peers" && <PeersTab symbol={symbol} />}
+        {tab === "governance" && <GovernanceTab symbol={symbol} />}
+        {tab === "evidence" && <EvidenceTab symbol={symbol} />}
       </main>
     </div>
   );

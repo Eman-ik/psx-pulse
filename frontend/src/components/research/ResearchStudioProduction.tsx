@@ -15,6 +15,7 @@ import { PeersTab } from "./studio/PeersTab";
 import { TechnicalsTab } from "./studio/TechnicalsTab";
 import { ValuationTab } from "./studio/ValuationTab";
 import { Card, day, Label, num } from "./studio/ui";
+import TradePlanningView from "./TradePlanningView";
 
 const TABS = [
   ["overview", "Overview"],
@@ -23,6 +24,7 @@ const TABS = [
   ["financials", "Financials"],
   ["valuation", "Valuation"],
   ["technicals", "Technicals"],
+  ["trade", "Trade Plan"],
   ["events", "News & events"],
   ["peers", "Peers"],
   ["governance", "Governance"],
@@ -182,6 +184,7 @@ export function ResearchStudioProduction() {
         )}
         {tab === "valuation" && <ValuationTab symbol={symbol} />}
         {tab === "technicals" && <TechnicalsTab symbol={symbol} />}
+        {tab === "trade" && <TradePlanningView ticker={symbol} />}
         {tab === "events" && <EventsTab symbol={symbol} />}
         {tab === "peers" && <PeersTab symbol={symbol} />}
         {tab === "governance" && <GovernanceTab symbol={symbol} />}

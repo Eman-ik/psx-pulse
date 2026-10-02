@@ -19,6 +19,7 @@ from app.api import (
     sectors,
     signals,
     sources,
+    trade_planning,
 )
 from app.api.v1 import companies as v1_companies
 from app.core.config import get_settings
@@ -54,6 +55,7 @@ app.include_router(screeners.router)
 app.include_router(screening_api.router)
 app.include_router(research_intelligence.router)
 app.include_router(research_trade.router)
+app.include_router(trade_planning.router)
 app.include_router(sources.router)
 
 

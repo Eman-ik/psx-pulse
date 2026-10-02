@@ -38,7 +38,7 @@ class RiskEngine:
             # If metric missing, label as sector-level structural risk
             risks.append({
                 "category": "Business",
-                "title": "Customer concentration risk",
+                "title": "Customer base structure risk",
                 "description": "Typical structural risk in fertilizer sector—customer base often concentrated.",
                 "probability": "Medium",
                 "impact": "Medium",

@@ -103,9 +103,104 @@ class ResearchContext:
         # Track what's missing for transparency
         self.missing_metrics: Set[str] = set()
 
+        # Period alignment tracking
+        self._period_types: Dict[date, str] = {}  # {period_end: "FY"|"Q"|"TTM"}
+
         # Load all available data
         self._load_metrics()
         self._compute_confidence()
+        self._detect_period_types()
+
+    def _detect_period_types(self) -> None:
+        """Detect whether each period is FY, Q, or TTM based on month-end date."""
+        all_periods = set()
+        for metric in self.metrics.values():
+            all_periods.update(metric.periods)
+
+        for period_end in all_periods:
+            month = period_end.month
+            # FY periods end in Dec/Mar/Jun/Sep depending on fiscal year end
+            # Q periods end in last day of quarter month (Mar/Jun/Sep/Dec)
+            # Heuristic: if period_end is last day of month, it's likely FY or Q
+            # TTM would be calculated on the fly
+            if month == 12 and period_end.day == 31:
+                self._period_types[period_end] = "FY"
+            elif month in [3, 6, 9, 12] and period_end.day >= 28:
+                self._period_types[period_end] = "Q"
+            else:
+                self._period_types[period_end] = "Other"
+
+    def get_period_type(self, period_end: date) -> str:
+        """Get the type of period: 'FY', 'Q', or 'Other'."""
+        return self._period_types.get(period_end, "Unknown")
+
+    def get_aligned_values(
+        self,
+        metrics: List[str],
+        period_type: str = "FY",
+        limit: int = 3,
+    ) -> List[Dict[str, any]]:
+        """Get aligned values for multiple metrics from the same period.
+
+        Args:
+            metrics: List of metric names to fetch
+            period_type: "FY", "Q", or "TTM" (currently only FY/Q supported)
+            limit: Number of most recent periods to return
+
+        Returns:
+            List of dicts: [{period_end, metric1_value, metric2_value, ...}, ...]
+            Only includes periods where ALL requested metrics have data.
+        """
+        if period_type not in ["FY", "Q", "TTM"]:
+            return []
+
+        # Collect all periods of the requested type that have all metrics
+        aligned_data = {}
+
+        for metric_name in metrics:
+            if metric_name not in self.metrics:
+                return []  # Cannot align if any metric missing
+
+            metric = self.metrics[metric_name]
+            for period_end, value in metric.values.items():
+                if self.get_period_type(period_end) == period_type:
+                    if period_end not in aligned_data:
+                        aligned_data[period_end] = {"period_end": period_end}
+                    aligned_data[period_end][metric_name] = value
+
+        # Filter to periods with ALL metrics
+        complete_periods = [
+            data for data in aligned_data.values()
+            if len(data) == len(metrics) + 1  # +1 for period_end key
+        ]
+
+        # Sort by period_end descending and limit
+        complete_periods.sort(key=lambda x: x["period_end"], reverse=True)
+        return complete_periods[:limit]
+
+    def get_aligned_series(
+        self,
+        metrics: List[str],
+        period_type: str = "FY",
+    ) -> Dict[str, List[float]]:
+        """Get aligned time series for multiple metrics (same periods only).
+
+        Returns:
+            {metric_name: [values in chronological order], ...}
+            Only includes periods where ALL metrics have data.
+        """
+        aligned = self.get_aligned_values(metrics, period_type, limit=100)
+        if not aligned:
+            return {m: [] for m in metrics}
+
+        result = {m: [] for m in metrics}
+        # Sort chronologically (oldest first)
+        for period_data in reversed(aligned):
+            for metric in metrics:
+                if metric in period_data:
+                    result[metric].append(period_data[metric])
+
+        return result
 
     def _load_metrics(self) -> None:
         """Scan database and build complete metric inventory in one query."""

@@ -119,12 +119,16 @@ class PriceOHLCV(Base):
     """Daily OHLCV bar. is_delayed defaults True since v1 has no licensed real-time feed.
 
     source has no default on purpose: every writer must name where the bar came from.
+    is_synthetic: explicitly marks bars generated for demo/testing (false = assumed real).
+    quality_status: one of 'unknown' (legacy), 'verified' (trusted source), 'provisional' (best effort),
+                    'rejected' (should not be used).
     """
 
     __tablename__ = "price_ohlcv"
     __table_args__ = (
         UniqueConstraint("security_id", "trade_date", name="uq_price_ohlcv_security_date"),
         CheckConstraint("source <> ''", name="ck_price_ohlcv_source_nonempty"),
+        CheckConstraint("quality_status IN ('unknown', 'verified', 'provisional', 'rejected')", name="ck_price_ohlcv_quality_status"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -145,6 +149,8 @@ class PriceOHLCV(Base):
     circuit_upper: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
     circuit_lower: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
     is_delayed: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_synthetic: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    quality_status: Mapped[str] = mapped_column(String(20), default="unknown")
 
 
 class MarketIndex(Base):
@@ -162,12 +168,17 @@ class MarketIndex(Base):
 class IndexOHLCV(Base):
     """Daily OHLCV bar for a market index. Same shape as PriceOHLCV; kept as a separate table
     rather than reusing security_id, since an index isn't a Security.
+
+    is_synthetic: explicitly marks bars generated for demo/testing (false = assumed real).
+    quality_status: one of 'unknown' (legacy), 'verified' (trusted source), 'provisional' (best effort),
+                    'rejected' (should not be used).
     """
 
     __tablename__ = "index_ohlcv"
     __table_args__ = (
         UniqueConstraint("market_index_id", "trade_date", name="uq_index_ohlcv_index_date"),
         CheckConstraint("source <> ''", name="ck_index_ohlcv_source_nonempty"),
+        CheckConstraint("quality_status IN ('unknown', 'verified', 'provisional', 'rejected')", name="ck_index_ohlcv_quality_status"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -182,3 +193,5 @@ class IndexOHLCV(Base):
     close: Mapped[float] = mapped_column(Numeric(14, 4))
     volume: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_delayed: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_synthetic: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    quality_status: Mapped[str] = mapped_column(String(20), default="unknown")

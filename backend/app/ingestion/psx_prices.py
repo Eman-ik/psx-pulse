@@ -73,6 +73,8 @@ def backfill_security_prices(db: Session, security: Security, start: date, end: 
                 is_delayed=True,
                 source="psxdata",
                 ingestion_run_id=run.id,
+                is_synthetic=False,
+                quality_status="verified",
             )
         )
         existing_dates.add(trade_date)

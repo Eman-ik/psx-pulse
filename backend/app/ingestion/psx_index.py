@@ -87,6 +87,8 @@ def backfill_index_prices(db: Session, index: MarketIndex, start: date, end: dat
                 is_delayed=True,
                 source="psxdata",
                 ingestion_run_id=run.id,
+                is_synthetic=False,
+                quality_status="verified",
             )
         )
         existing_dates.add(trade_date)

@@ -20,7 +20,7 @@ from app.api.deps import get_db
 from app.db.models import Security
 from app.analysis.business_health import BusinessHealthEngine
 from app.analysis.what_changed import WhatChangedEngine
-from app.analysis.earnings_quality import EarningsQualityEngine
+from app.analysis.earnings_quality_v2 import EarningsQualityEngine
 from app.analysis.bull_bear_case import BullBearCaseEngine
 from app.analysis.red_flags import RedFlagEngine
 from app.analysis.risk_engine import RiskEngine
@@ -89,8 +89,9 @@ def unified_research_intelligence(ticker: str, db: Session = Depends(get_db)) ->
             "generated_at": None,  # Add timestamp in production
             # The 30-second view
             "executive_summary": {
-                "business_health": business_health.get("overall", "Unknown"),
+                "business_health": business_health.get("assessment", "Unknown"),
                 "earnings_trend": business_health.get("components", {}).get("profitability", "Unknown"),
+                "earnings_quality": earnings_quality.get("assessment", "Unknown"),
                 "valuation_assessment": valuation.get("assessment", "Unknown"),
                 "risk_level": risks.get("summary", {}).get("high", 0),
                 "key_insight": bull_bear.get("critical_debate", ""),
@@ -154,14 +155,12 @@ def quick_view(ticker: str, db: Session = Depends(get_db)) -> dict:
 
     return {
         "ticker": symbol,
-        "business_health": business_health.get("overall", "Unknown"),
+        "business_health": business_health.get("assessment", "Unknown"),
         "trend": business_health.get("narrative", ""),
         "valuation": valuation.get("assessment", ""),
         "bull_thesis": bull_bear.get("bull_case", {}).get("thesis", ""),
         "bear_thesis": bull_bear.get("bear_case", {}).get("thesis", ""),
         "key_debate": bull_bear.get("critical_debate", ""),
-        "major_risks": sum(1 for r in risks.get("all_risks", []) if r.get("impact") == "High"),
-        "watchlist": [m.get("metric") for m in [
-            w for w in risks.get("all_risks", []) if w.get("probability") == "High"
-        ]],
+        "major_risks": risks.get("summary", {}).get("high", 0),
+        "watchlist": [r.get("title") for r in risks.get("high_priority_risks", [])],
     }

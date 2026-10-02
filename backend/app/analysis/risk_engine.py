@@ -6,6 +6,7 @@ Not just "risk score". Probability × Impact × Trend, ranked by severity.
 from typing import Optional, Dict, List
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
+from app.analysis.period_alignment import PeriodAlignedAnalyzer
 
 
 class RiskEngine:
@@ -13,10 +14,12 @@ class RiskEngine:
 
     @staticmethod
     def analyze(context: ResearchContext) -> Dict:
-        """Identify and rank risks using shared Evidence Context."""
+        """Identify and rank risks using period-aligned Evidence Context."""
         output = ContextualizedOutput("risk_engine", context)
+        analyzer = PeriodAlignedAnalyzer(context)
 
         risks = []
+        period_type = "Q"  # Default to Q for latest snapshot
 
         # BUSINESS RISKS
         # Customer concentration: company-specific, requires customer_concentration metric
@@ -57,8 +60,21 @@ class RiskEngine:
             })
 
         # FINANCIAL RISKS
-        leverage = context.get_value("debt_to_equity")
-        if context.has_metric("debt_to_equity") and leverage and leverage > 1.5:
+        # Calculate leverage from aligned period (not pre-calculated debt_to_equity)
+        debt_equity_aligned = context.get_aligned_values(
+            ["total_debt", "total_equity"],
+            period_type="Q",
+            limit=1
+        )
+        leverage = None
+        if debt_equity_aligned and debt_equity_aligned[0].get("total_debt") and debt_equity_aligned[0].get("total_equity"):
+            debt = debt_equity_aligned[0]["total_debt"]
+            equity = debt_equity_aligned[0]["total_equity"]
+            if equity > 0:
+                leverage = debt / equity
+                period_type = context.get_period_type(debt_equity_aligned[0].get("period_end"))
+
+        if leverage and leverage > 1.5:
             risks.append({
                 "category": "Financial",
                 "title": "High leverage",
@@ -176,6 +192,7 @@ class RiskEngine:
         result["high_priority_risks"] = high_risks[:3]
         result["all_risks"] = risks
         result["recommendation"] = "High caution" if len(high_risks) > 2 else ("Monitor" if len(high_risks) > 0 else "Acceptable")
+        result["period_type"] = period_type  # Explicitly document which period type was analyzed
 
         # Validate
         result["validation"] = output.validate()

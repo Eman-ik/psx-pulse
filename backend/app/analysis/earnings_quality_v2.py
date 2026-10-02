@@ -7,6 +7,7 @@ NOW WITH: Separate confidence/coverage from assessment.
 from typing import Optional, Dict
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
+from app.analysis.period_alignment import PeriodAlignedAnalyzer
 
 
 class EarningsQualityEngine:
@@ -14,8 +15,9 @@ class EarningsQualityEngine:
 
     @staticmethod
     def analyze(context: ResearchContext) -> Dict:
-        """Assess earnings quality using shared Evidence Context."""
+        """Assess earnings quality using period-aligned Evidence Context."""
         output = ContextualizedOutput("earnings_quality", context)
+        analyzer = PeriodAlignedAnalyzer(context)
 
         # Check critical metrics upfront
         has_pat = context.has_metric("profit_after_tax")
@@ -32,16 +34,46 @@ class EarningsQualityEngine:
                 "quality": "Cannot assess",
                 "confidence": "None",
                 "reason": "Profit after tax not available",
+                "period_type": "Q",
             }
 
-        # Gather values
-        pat = context.get_value("profit_after_tax")
-        ocf = context.get_value("operating_cash_flow")
-        ebit = context.get_value("operating_profit")
-        other_income = context.get_value("other_income")
-        finance_cost = context.get_value("finance_cost")
-        revenue = context.get_value("revenue")
-        tax_expense = context.get_value("tax_expense")
+        # Get aligned FY period data (most reliable for earnings quality assessment)
+        aligned_fy = context.get_aligned_values(
+            ["profit_after_tax", "operating_cash_flow", "operating_profit",
+             "other_income", "finance_cost", "revenue", "tax_expense"],
+            period_type="FY",
+            limit=1
+        )
+
+        if not aligned_fy:
+            # Fall back to Q if FY not available
+            aligned_fy = context.get_aligned_values(
+                ["profit_after_tax", "operating_cash_flow", "operating_profit",
+                 "other_income", "finance_cost", "revenue", "tax_expense"],
+                period_type="Q",
+                limit=1
+            )
+
+        if not aligned_fy:
+            return {
+                "status": "insufficient_data",
+                "quality": "Cannot assess",
+                "confidence": "None",
+                "reason": "No aligned period data available",
+                "period_type": "FY/Q",
+            }
+
+        latest = aligned_fy[0]
+        period_type = context.get_period_type(latest.get("period_end"))
+
+        # Gather values from aligned period
+        pat = latest.get("profit_after_tax")
+        ocf = latest.get("operating_cash_flow")
+        ebit = latest.get("operating_profit")
+        other_income = latest.get("other_income")
+        finance_cost = latest.get("finance_cost")
+        revenue = latest.get("revenue")
+        tax_expense = latest.get("tax_expense")
 
         issues = []
         positive_indicators = []
@@ -50,13 +82,13 @@ class EarningsQualityEngine:
         # ============================================================================
         # INTEGRITY CHECK: Can we actually claim "HIGH" quality?
         # ============================================================================
-        if not has_ocf:
+        if ocf is None:
             critical_missing.append("operating_cash_flow")
-        if not has_ebit:
+        if ebit is None:
             critical_missing.append("operating_profit")
 
-        # Check 1: PAT vs OCF (core quality indicator)
-        if has_ocf and pat and ocf:
+        # Check 1: PAT vs OCF (core quality indicator, period-aligned)
+        if ocf is not None and pat is not None:
             if ocf > pat * 1.1:
                 positive_indicators.append("Operating cash flow exceeds reported earnings, supporting quality.")
             elif ocf < pat * 0.7:
@@ -64,12 +96,12 @@ class EarningsQualityEngine:
                     f"Operating cash flow ({ocf:.0f}) is materially weaker than reported "
                     f"earnings ({pat:.0f}), indicating potential quality concerns."
                 )
-        elif not has_ocf:
+        elif ocf is None:
             # Cannot make high-confidence quality claims without this
             issues.append("Operating cash flow unavailable—cannot validate earnings against cash reality.")
 
-        # Check 2: Other income contribution
-        if has_other_income and other_income and pat:
+        # Check 2: Other income contribution (period-aligned ratio)
+        if other_income is not None and pat is not None:
             other_income_pct = (other_income / pat) * 100 if pat > 0 else 0
             if other_income_pct > 25:
                 issues.append(
@@ -81,8 +113,8 @@ class EarningsQualityEngine:
                     f"Other income contributes {other_income_pct:.0f}% to reported profit."
                 )
 
-        # Check 3: Finance cost burden
-        if has_finance_cost and has_ebit and finance_cost and ebit:
+        # Check 3: Finance cost burden (period-aligned ratio)
+        if finance_cost is not None and ebit is not None:
             finance_cost_pct = (finance_cost / ebit) * 100 if ebit > 0 else 0
             if finance_cost_pct > 30:
                 issues.append(
@@ -90,18 +122,18 @@ class EarningsQualityEngine:
                     f"materially reducing net earnings."
                 )
 
-        # Check 4: Tax rate anomalies
-        if has_tax_expense and has_ebit and tax_expense and ebit:
+        # Check 4: Tax rate anomalies (period-aligned ratio)
+        if tax_expense is not None and ebit is not None:
             tax_rate = (tax_expense / ebit) * 100 if ebit > 0 else 0
             if tax_rate < 5:
                 issues.append("Tax rate unusually low; earnings may include one-off tax benefits.")
             elif tax_rate > 40:
                 issues.append("Tax rate unusually high; reported earnings may be suppressed by tax charges.")
 
-        # Check 5: Operating leverage
-        if has_revenue and has_ebit and revenue and ebit:
+        # Check 5: Operating leverage (period-aligned margins)
+        if revenue is not None and ebit is not None:
             ebit_margin = (ebit / revenue) * 100 if revenue > 0 else 0
-            if has_pat and pat:
+            if pat is not None:
                 pat_margin = (pat / revenue) * 100 if revenue > 0 else 0
                 if ebit_margin > 0 and pat_margin > 0:
                     leverage_ratio = ebit_margin / pat_margin
@@ -166,11 +198,13 @@ class EarningsQualityEngine:
         result["issues"] = issues
         result["positive_indicators"] = positive_indicators
         result["quality_rationale"] = {
-            "has_ocf_validation": has_ocf,
-            "has_ebit_validation": has_ebit,
+            "has_ocf_validation": ocf is not None,
+            "has_ebit_validation": ebit is not None,
             "issues_count": len(issues),
             "positive_signals": len(positive_indicators),
         }
+        result["period_type"] = period_type  # Explicitly document which period type was analyzed
+        result["period_end"] = latest.get("period_end").isoformat() if latest.get("period_end") else None
 
         # Validation: check for contradictions with context
         validation = output.validate()

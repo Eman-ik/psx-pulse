@@ -112,23 +112,21 @@ class ResearchContext:
         self._detect_period_types()
 
     def _detect_period_types(self) -> None:
-        """Detect whether each period is FY, Q, or TTM based on month-end date."""
+        """
+        Period types are now loaded from database (FinancialFact.period_type).
+        This method is kept as a placeholder for any missing periods.
+        """
+        # For any period_end that wasn't set during _load_metrics(),
+        # default to "Unknown" rather than guessing from date
         all_periods = set()
         for metric in self.metrics.values():
             all_periods.update(metric.periods)
 
         for period_end in all_periods:
-            month = period_end.month
-            # FY periods end in Dec/Mar/Jun/Sep depending on fiscal year end
-            # Q periods end in last day of quarter month (Mar/Jun/Sep/Dec)
-            # Heuristic: if period_end is last day of month, it's likely FY or Q
-            # TTM would be calculated on the fly
-            if month == 12 and period_end.day == 31:
-                self._period_types[period_end] = "FY"
-            elif month in [3, 6, 9, 12] and period_end.day >= 28:
-                self._period_types[period_end] = "Q"
-            else:
-                self._period_types[period_end] = "Other"
+            if period_end not in self._period_types:
+                # Period exists in data but period_type wasn't in FinancialFact
+                # This indicates incomplete data ingestion
+                self._period_types[period_end] = "Unknown"
 
     def get_period_type(self, period_end: date) -> str:
         """Get the type of period: 'FY', 'Q', or 'Other'."""
@@ -136,31 +134,40 @@ class ResearchContext:
 
     def get_aligned_values(
         self,
-        metrics: List[str],
+        required_metrics: List[str],
+        optional_metrics: Optional[List[str]] = None,
         period_type: str = "FY",
         limit: int = 3,
     ) -> List[Dict[str, any]]:
-        """Get aligned values for multiple metrics from the same period.
+        """Get aligned values for metrics from the same period.
 
         Args:
-            metrics: List of metric names to fetch
-            period_type: "FY", "Q", or "TTM" (currently only FY/Q supported)
+            required_metrics: Must exist in period for it to be included
+            optional_metrics: Included if present, skipped if missing
+            period_type: "FY", "Q", "HY", or "TTM"
             limit: Number of most recent periods to return
 
         Returns:
-            List of dicts: [{period_end, metric1_value, metric2_value, ...}, ...]
-            Only includes periods where ALL requested metrics have data.
+            List of dicts: [{period_end, metric1, metric2, ...}, ...]
+            Only includes periods where ALL required metrics have data.
+            Optional metrics are attached when available.
         """
-        if period_type not in ["FY", "Q", "TTM"]:
+        if optional_metrics is None:
+            optional_metrics = []
+
+        if period_type not in ["FY", "Q", "HY", "TTM"]:
             return []
 
-        # Collect all periods of the requested type that have all metrics
+        # Check that all required metrics exist
+        for metric_name in required_metrics:
+            if metric_name not in self.metrics:
+                return []
+
+        # Collect all periods with required metrics
         aligned_data = {}
 
-        for metric_name in metrics:
-            if metric_name not in self.metrics:
-                return []  # Cannot align if any metric missing
-
+        # First pass: add required metrics
+        for metric_name in required_metrics:
             metric = self.metrics[metric_name]
             for period_end, value in metric.values.items():
                 if self.get_period_type(period_end) == period_type:
@@ -168,11 +175,20 @@ class ResearchContext:
                         aligned_data[period_end] = {"period_end": period_end}
                     aligned_data[period_end][metric_name] = value
 
-        # Filter to periods with ALL metrics
+        # Filter to periods with ALL required metrics
         complete_periods = [
             data for data in aligned_data.values()
-            if len(data) == len(metrics) + 1  # +1 for period_end key
+            if len(data) >= len(required_metrics) + 1  # +1 for period_end
         ]
+
+        # Second pass: attach optional metrics where available
+        for metric_name in optional_metrics:
+            if metric_name in self.metrics:
+                metric = self.metrics[metric_name]
+                for period_data in complete_periods:
+                    period_end = period_data["period_end"]
+                    if period_end in metric.values:
+                        period_data[metric_name] = metric.values[period_end]
 
         # Sort by period_end descending and limit
         complete_periods.sort(key=lambda x: x["period_end"], reverse=True)
@@ -180,23 +196,28 @@ class ResearchContext:
 
     def get_aligned_series(
         self,
-        metrics: List[str],
+        required_metrics: List[str],
+        optional_metrics: Optional[List[str]] = None,
         period_type: str = "FY",
     ) -> Dict[str, List[float]]:
-        """Get aligned time series for multiple metrics (same periods only).
+        """Get aligned time series for metrics (same periods only).
 
         Returns:
             {metric_name: [values in chronological order], ...}
-            Only includes periods where ALL metrics have data.
+            Only includes periods where ALL required metrics have data.
         """
-        aligned = self.get_aligned_values(metrics, period_type, limit=100)
-        if not aligned:
-            return {m: [] for m in metrics}
+        if optional_metrics is None:
+            optional_metrics = []
 
-        result = {m: [] for m in metrics}
+        all_metrics = required_metrics + optional_metrics
+        aligned = self.get_aligned_values(required_metrics, optional_metrics, period_type, limit=100)
+        if not aligned:
+            return {m: [] for m in all_metrics}
+
+        result = {m: [] for m in all_metrics}
         # Sort chronologically (oldest first)
         for period_data in reversed(aligned):
-            for metric in metrics:
+            for metric in all_metrics:
                 if metric in period_data:
                     result[metric].append(period_data[metric])
 
@@ -204,9 +225,16 @@ class ResearchContext:
 
     def _load_metrics(self) -> None:
         """Scan database and build complete metric inventory in one query."""
-        # Single query: fetch all metrics for this issuer at once
+        # Single query: fetch all metrics with period_type and scope from database
         rows = self.db.execute(
-            select(FinancialFact.line_item, FinancialFact.period_end, FinancialFact.value)
+            select(
+                FinancialFact.line_item,
+                FinancialFact.period_start,
+                FinancialFact.period_end,
+                FinancialFact.period_type,
+                FinancialFact.scope,
+                FinancialFact.value
+            )
             .where(
                 FinancialFact.issuer_id == self.issuer_id,
                 FinancialFact.superseded_by_id.is_(None),
@@ -214,10 +242,21 @@ class ResearchContext:
             .order_by(FinancialFact.line_item, FinancialFact.period_end)
         ).all()
 
+        # Normalize period_type from database values to canonical form
+        PERIOD_TYPE_MAP = {
+            "annual": "FY",
+            "quarterly": "Q",
+            "half_year": "HY",
+            "ttm": "TTM",
+        }
+
         # Group by metric name in Python (zero queries, single pass)
         metrics_dict: Dict[str, Dict[date, float]] = defaultdict(dict)
-        for line_item, period_end, value in rows:
+        for line_item, period_start, period_end, period_type, scope, value in rows:
             if value is not None:
+                # Store the database period type (not guessed from date)
+                normalized_type = PERIOD_TYPE_MAP.get(period_type, "Unknown")
+                self._period_types[period_end] = normalized_type
                 metrics_dict[line_item][period_end] = float(value)
 
         # Build MetricCoverage objects

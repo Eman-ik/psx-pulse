@@ -24,6 +24,9 @@ Example:
 from typing import Dict, List, Optional
 from datetime import date
 from app.analysis.evidence_context import ResearchContext
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class PeriodAlignedAnalyzer:
@@ -108,10 +111,11 @@ class PeriodAlignedAnalyzer:
 
     def get_fy_trend(
         self,
-        metrics: List[str],
+        required_metrics: List[str],
+        optional_metrics: Optional[List[str]] = None,
         limit: int = 5,
     ) -> List[Dict]:
-        """Get FY trend for multiple metrics over time.
+        """Get FY trend for required metrics over time, with optional metrics attached.
 
         Returns:
             [{
@@ -121,14 +125,20 @@ class PeriodAlignedAnalyzer:
                 ...
             }, ...]
         """
-        return self.context.get_aligned_values(metrics, period_type="FY", limit=limit)
+        return self.context.get_aligned_values(
+            required_metrics,
+            optional_metrics,
+            period_type="FY",
+            limit=limit
+        )
 
     def get_q_trend(
         self,
-        metrics: List[str],
+        required_metrics: List[str],
+        optional_metrics: Optional[List[str]] = None,
         limit: int = 8,
     ) -> List[Dict]:
-        """Get quarterly trend for multiple metrics over time.
+        """Get quarterly trend for required metrics over time, with optional metrics attached.
 
         Returns:
             [{
@@ -138,7 +148,12 @@ class PeriodAlignedAnalyzer:
                 ...
             }, ...]
         """
-        return self.context.get_aligned_values(metrics, period_type="Q", limit=limit)
+        return self.context.get_aligned_values(
+            required_metrics,
+            optional_metrics,
+            period_type="Q",
+            limit=limit
+        )
 
 
 # Example usage in an engine:

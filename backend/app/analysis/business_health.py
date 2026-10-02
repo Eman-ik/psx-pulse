@@ -62,9 +62,11 @@ class BusinessHealthEngine:
                 "reason": "Revenue data not available",
             }
 
-        # Get FY trend with guaranteed period alignment (all metrics from same FY)
+        # Get FY trend with required minimum (revenue + profit) and optional metrics
+        # This allows analysis to degrade gracefully when OCF/debt/equity data is missing
         fy_trend = analyzer.get_fy_trend(
-            ["revenue", "profit_after_tax", "operating_cash_flow", "total_debt", "total_equity"],
+            required_metrics=["revenue", "profit_after_tax"],
+            optional_metrics=["operating_cash_flow", "total_debt", "total_equity"],
             limit=5
         )
 
@@ -73,7 +75,8 @@ class BusinessHealthEngine:
                 "status": "insufficient_data",
                 "overall": "Cannot assess",
                 "confidence": "None",
-                "reason": "Insufficient aligned periods for analysis",
+                "reason": "Insufficient aligned FY periods with revenue + profit (minimum 2 required)",
+                "period_type": "FY",
             }
 
         # Calculate growth rates from aligned periods (guaranteed same FY)
@@ -111,10 +114,14 @@ class BusinessHealthEngine:
                 if revenue and revenue > 0:
                     margins.append(profit / revenue)
 
-        margin_trend = "Expanding" if len(margins) >= 2 and margins[0] > margins[1] else "Contracting"
+        # Only set margin_trend if we have at least 2 periods to compare
+        if len(margins) >= 2:
+            margin_trend = "Expanding" if margins[0] > margins[1] else "Contracting" if margins[0] < margins[1] else "Stable"
+        else:
+            margin_trend = "Unknown"
 
         # Balance sheet direction from aligned periods (debt/equity from same FY)
-        leverage_trend = "Improving"
+        leverage_trend = "Unknown"
         if (has_total_debt and has_equity and
             "total_debt" in fy_trend[0] and "total_equity" in fy_trend[0] and
             "total_debt" in fy_trend[1] and "total_equity" in fy_trend[1]):

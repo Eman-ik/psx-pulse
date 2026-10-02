@@ -3,6 +3,26 @@ import { API_BASE_URL } from '@/lib/config';
 import EngineResultCard from './EngineResultCard';
 import ValidationIndicator from './ValidationIndicator';
 import ConfidenceBadge from './ConfidenceBadge';
+import UnavailableDataNotice from './UnavailableDataNotice';
+import { getAvailableEngines, isEngineOutputAvailable } from '@/lib/data-gating';
+
+interface ValidationResult {
+  contradictions_found: number;
+  warnings_found: number;
+  contradictions: Array<{
+    engines: string[];
+    claims: string[];
+    reason: string;
+    severity: string;
+  }>;
+  warnings: Array<{
+    engine: string;
+    claim: string;
+    issue: string;
+    severity: string;
+  }>;
+  overall_valid: boolean;
+}
 
 interface ResearchData {
   ticker: string;
@@ -24,6 +44,7 @@ interface ResearchData {
     bear_case?: string;
     confirmation_triggers?: string[];
   };
+  validation?: ValidationResult;
 }
 
 interface ResearchIntelligenceDashboardProps {
@@ -116,6 +137,19 @@ const ResearchIntelligenceDashboard: React.FC<ResearchIntelligenceDashboardProps
         </div>
       </div>
 
+      {/* Validation Status */}
+      {data.validation && (
+        <ValidationIndicator
+          valid={data.validation.overall_valid}
+          issues={data.validation.contradictions.map(
+            (c) => `${c.engines.join(' ↔ ')}: ${c.reason}`
+          )}
+          warnings={data.validation.warnings.map(
+            (w) => `${w.engine}: ${w.issue}`
+          )}
+        />
+      )}
+
       {/* Key Insight */}
       {summary.key_insight && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
@@ -124,12 +158,28 @@ const ResearchIntelligenceDashboard: React.FC<ResearchIntelligenceDashboardProps
         </div>
       )}
 
-      {/* Intelligence Engines Grid */}
+      {/* Intelligence Engines Grid — NO MOCK DATA */}
       <div>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Intelligence Engines</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Object.entries(intelligence).map(([key, engine]) => {
             if (key === 'investment_case') return null; // Handle separately
+
+            // Gate out mock data engines
+            if (!isEngineOutputAvailable(engine)) {
+              return (
+                <UnavailableDataNotice
+                  key={key}
+                  metric={formatEngineName(key)}
+                  reason={
+                    engine.status === 'mock_data_gated'
+                      ? 'Real data integration scheduled for Phase 2'
+                      : 'Data not available'
+                  }
+                />
+              );
+            }
+
             return <EngineResultCard key={key} result={{ name: formatEngineName(key), ...engine }} />;
           })}
         </div>

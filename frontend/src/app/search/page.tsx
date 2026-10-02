@@ -5,6 +5,7 @@
  */
 'use client';
 
+import { API_BASE_URL } from "@/lib/config";
 import { useEffect, useState } from 'react';
 import { SearchBar } from '@/components/SearchBar';
 
@@ -18,7 +19,7 @@ export default function SearchPage() {
   const [statusError, setStatusError] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:8000/data/status')
+    fetch(`${API_BASE_URL}/data/status`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(setStatus)
       .catch(() => setStatusError(true));
@@ -41,7 +42,7 @@ export default function SearchPage() {
           <SearchBar />
 
           {statusError && (
-            <p className="mt-12 text-sm text-red-700">Data status unavailable: the API on port 8000 did not respond.</p>
+            <p className="mt-12 text-sm text-red-700">Data status unavailable: the API at {API_BASE_URL} did not respond.</p>
           )}
 
           {status && (

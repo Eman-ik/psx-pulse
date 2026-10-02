@@ -68,9 +68,14 @@ def test_ratio_benchmarks_returns_mean_and_count_per_ratio_key():
 
 @pytest.mark.requires_seeded_data
 def test_company_overview_for_known_pilot_issuer():
-    # FFC is issuer id 1 in this pilot's seed order (see seed_fertilizer_sector) --
-    # if that ever changes, this test's failure is itself useful signal.
-    response = client.get("/companies/1/overview")
+    from sqlalchemy import select
+
+    from app.db.models import Security
+    from app.db.session import SessionLocal
+
+    with SessionLocal() as db:
+        issuer_id = db.execute(select(Security.issuer_id).where(Security.symbol == "FFC")).scalar_one()
+    response = client.get(f"/companies/{issuer_id}/overview")
     assert response.status_code == 200
     data = response.json()
     assert data["symbol"] == "FFC"
@@ -138,9 +143,9 @@ def test_research_workspace_covers_complete_fertilizer_and_cement_universe():
     assert data["count"] == 23
     assert data["sector_counts"] == {"FERTILIZER": 5, "CEMENT": 18}
     assert len(data["entries"]) == 23
-    assert {entry["coverage_tier"] for entry in data["entries"]} == {
-        "full", "unverified", "price_only"
-    }
+    # No unverified fundamentals are loadable since the model-recalled cement seed was deleted.
+    assert {entry["coverage_tier"] for entry in data["entries"]} == {"full", "price_only"}
+    assert data["tier_counts"] == {"full": 3, "unverified": 0, "price_only": 20}
 
 
 @pytest.mark.requires_seeded_data

@@ -21,8 +21,9 @@ from bs4 import BeautifulSoup
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Announcement, Issuer, SourceDocument
+from app.db.models import Announcement, IngestionRun, Issuer, SourceDocument
 from app.etl.sentiment import classify_sentiment
+from app.ingestion.runs import ingestion_run
 
 logger = logging.getLogger(__name__)
 
@@ -38,20 +39,16 @@ TAB_TO_CATEGORY = {
 
 
 def fetch_company_announcements(symbol: str) -> list[dict]:
-    """Scrapes the announcements section of one company's PSX page. Returns raw parsed rows."""
+    """Scrapes the announcements section of one company's PSX page. Raises if the page
+    can't be fetched or has no announcements section, so callers can tell failure from empty."""
     url = f"{BASE_URL}/company/{symbol}"
-    try:
-        response = httpx.get(url, headers=HEADERS, timeout=20)
-        response.raise_for_status()
-    except Exception as exc:
-        logger.warning("Failed to fetch %s: %s", url, exc)
-        return []
+    response = httpx.get(url, headers=HEADERS, timeout=20)
+    response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "lxml")
     section = soup.find("div", id="announcements")
     if section is None:
-        logger.warning("No #announcements section found for %s", symbol)
-        return []
+        raise ValueError(f"no #announcements section on {url}")
 
     rows = []
     for panel in section.find_all("div", class_="tabs__panel"):
@@ -84,9 +81,15 @@ def _parse_announcement_date(date_text: str) -> datetime:
     return datetime.strptime(date_text, "%b %d, %Y").replace(tzinfo=timezone.utc)
 
 
-def ingest_company_announcements(db: Session, issuer: Issuer, symbol: str) -> dict[str, int]:
+def ingest_company_announcements(db: Session, issuer: Issuer, symbol: str, run: IngestionRun) -> dict[str, int]:
     """Fetches and stores announcements for one issuer, deduping on the PDF URL's content hash."""
-    rows = fetch_company_announcements(symbol)
+    try:
+        rows = fetch_company_announcements(symbol)
+    except Exception as exc:
+        logger.warning("Announcements fetch failed for %s: %s", symbol, exc)
+        run.add_error(f"{symbol}: {type(exc).__name__}: {exc}")
+        db.commit()
+        return {"inserted": 0, "skipped": 0, "fetched": 0}
     inserted = skipped = 0
 
     for row in rows:
@@ -132,6 +135,7 @@ def ingest_company_announcements(db: Session, issuer: Issuer, symbol: str) -> di
         )
         inserted += 1
 
+    run.rows_inserted += inserted
     db.commit()
     return {"inserted": inserted, "skipped": skipped, "fetched": len(rows)}
 
@@ -150,20 +154,15 @@ if __name__ == "__main__":
     sector_arg = sys.argv[1] if len(sys.argv) > 1 else "fertilizer"
 
     with SessionLocal() as session:
-        companies: list[dict[str, str]] = []
+        targets = []
         if sector_arg in ("fertilizer", "all"):
-            fertilizer_securities = seed_fertilizer_sector(session)
-            by_symbol = {s.symbol: s for s in fertilizer_securities}
-            for company in FERTILIZER_SECTOR_COMPANIES:
-                security = by_symbol.get(company["symbol"])
-                if security:
-                    stats = ingest_company_announcements(session, security.issuer, company["symbol"])
-                    print(f"{company['symbol']}: {stats}")
+            by_symbol = {s.symbol: s for s in seed_fertilizer_sector(session)}
+            targets += [by_symbol[c["symbol"]] for c in FERTILIZER_SECTOR_COMPANIES if c["symbol"] in by_symbol]
         if sector_arg in ("cement", "all"):
-            cement_securities = seed_cement_sector(session)
-            by_symbol = {s.symbol: s for s in cement_securities}
-            for company in CEMENT_SECTOR_COMPANIES:
-                security = by_symbol.get(company["symbol"])
-                if security:
-                    stats = ingest_company_announcements(session, security.issuer, company["symbol"])
-                    print(f"{company['symbol']}: {stats}")
+            by_symbol = {s.symbol: s for s in seed_cement_sector(session)}
+            targets += [by_symbol[c["symbol"]] for c in CEMENT_SECTOR_COMPANIES if c["symbol"] in by_symbol]
+
+        with ingestion_run(session, "psx_company_page", table="announcement", symbols=[s.symbol for s in targets]) as run:
+            for security in targets:
+                stats = ingest_company_announcements(session, security.issuer, security.symbol, run)
+                print(f"{security.symbol}: {stats}")

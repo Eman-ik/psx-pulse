@@ -1,9 +1,10 @@
 "use client";
 
+import { API_BASE_URL } from "@/lib/config";
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2, Search } from "lucide-react";
+import { Fundamentals } from "@/components/research/Fundamentals";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 type Freshness = { as_of: string | null; retrieved_at: string | null; sources: string[]; stale: boolean };
 
@@ -12,14 +13,16 @@ type Technical = {
   name: string;
   sector: string;
   price: number;
-  change_pct: number;
-  price_vs_20dma: number;
-  price_vs_50dma: number;
-  price_vs_200dma: number;
+  change_pct: number | null;
+  price_vs_20dma: number | null;
+  price_vs_50dma: number | null;
+  price_vs_200dma: number | null;
   rsi: number | null;
-  volume_vs_avg: number;
-  price_near_52week_high: boolean;
-  price_near_52week_low: boolean;
+  volume_vs_avg: number | null;
+  lookback_days: number;
+  lookback_complete: boolean;
+  near_lookback_high: boolean;
+  near_lookback_low: boolean;
 };
 
 type Momentum = {
@@ -44,10 +47,13 @@ const pct = (v: number | null) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.t
 const tone = (v: number | null) => (v == null ? "text-muted" : v >= 0 ? "text-positive" : "text-negative");
 
 function trendReading(t: Technical) {
-  const above = [t.price_vs_20dma, t.price_vs_50dma, t.price_vs_200dma].filter((v) => v > 0).length;
-  if (above === 3) return "Trading above its 20, 50 and 200-day averages.";
-  if (above === 0) return "Trading below its 20, 50 and 200-day averages.";
-  return `Trading above ${above} of its 20, 50 and 200-day averages.`;
+  const known = [t.price_vs_20dma, t.price_vs_50dma, t.price_vs_200dma].filter((v): v is number => v != null);
+  const above = known.filter((v) => v > 0).length;
+  const caveat = known.length < 3 ? " Some averages need more history than is on file." : "";
+  if (known.length === 0) return "Not enough history for any moving average.";
+  if (above === known.length) return `Trading above all ${known.length} computable averages.${caveat}`;
+  if (above === 0) return `Trading below all ${known.length} computable averages.${caveat}`;
+  return `Trading above ${above} of ${known.length} computable averages.${caveat}`;
 }
 
 function rsiReading(rsi: number | null) {
@@ -89,19 +95,17 @@ export function ResearchStudioProduction() {
   const [technical, setTechnical] = useState<Screen<Technical> | null>(null);
   const [momentum, setMomentum] = useState<Screen<Momentum> | null>(null);
   const [symbol, setSymbol] = useState("LUCK");
-  const [statementFacts, setStatementFacts] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const get = (path: string) => fetch(`${API}${path}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    Promise.all([get("/screeners/technical"), get("/screeners/momentum"), get("/data/status")])
-      .then(([t, m, status]) => {
+    const get = (path: string) => fetch(`${API_BASE_URL}${path}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    Promise.all([get("/screeners/technical"), get("/screeners/momentum")])
+      .then(([t, m]) => {
         setTechnical(t);
         setMomentum(m);
-        setStatementFacts(status.fundamentals.statement_facts);
       })
-      .catch(() => setError("Could not reach the research API on port 8000."))
+      .catch(() => setError(`Could not reach the research API at ${API_BASE_URL}.`))
       .finally(() => setLoading(false));
   }, []);
 
@@ -206,10 +210,13 @@ export function ResearchStudioProduction() {
               <Section title="Momentum and activity">
                 <Row label="RSI (14-day)" value={t.rsi == null ? "—" : t.rsi.toFixed(1)} />
                 <p className="mb-3 text-sm">{rsiReading(t.rsi)}</p>
-                <Row label="Volume vs 20-day average" value={`${t.volume_vs_avg.toFixed(2)}×`} />
                 <Row
-                  label="52-week range"
-                  value={t.price_near_52week_high ? "Within 5% of high" : t.price_near_52week_low ? "Within 5% of low" : "Mid-range"}
+                  label="Volume vs prior 20-day average"
+                  value={t.volume_vs_avg == null ? "—" : `${t.volume_vs_avg.toFixed(2)}×`}
+                />
+                <Row
+                  label={t.lookback_complete ? "52-week range" : `${t.lookback_days}-day range (less than a year on file)`}
+                  value={t.near_lookback_high ? "Within 5% of high" : t.near_lookback_low ? "Within 5% of low" : "Mid-range"}
                 />
               </Section>
             </div>
@@ -246,15 +253,7 @@ export function ResearchStudioProduction() {
             )}
 
             <Section title="Fundamentals">
-              <p className="text-sm">
-                {statementFacts
-                  ? `Statements are on file for some companies, but this view doesn't show them yet.`
-                  : `No source-linked financial statements are on file for any company yet.`}
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                Valuation, profitability and balance-sheet analysis appear here once statements are loaded with a link to the
-                filing they came from.
-              </p>
+              <Fundamentals symbol={t.symbol} api={API_BASE_URL} />
             </Section>
 
             <p className="text-xs text-muted">

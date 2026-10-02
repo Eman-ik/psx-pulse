@@ -17,7 +17,7 @@ COPY . .
 # Same value NEXT_PUBLIC_API_BASE_URL has in .env.local for local dev -- baked in at
 # build time since NEXT_PUBLIC_* vars are inlined into the client bundle, not read at
 # runtime. Override with --build-arg for a deploy where the backend isn't at this URL.
-ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8001
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 RUN npm run build
 

@@ -20,7 +20,7 @@ from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent
 KHRONOS_DIR = BACKEND_DIR.parent.parent
-PORT = 8001
+PORT = 8000
 HEALTH_URL = f"http://127.0.0.1:{PORT}/health"
 CHECK_INTERVAL_S = 5
 HEALTH_TIMEOUT_S = 6  # this machine runs at ~1GB free RAM under normal load;

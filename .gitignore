@@ -28,3 +28,10 @@ Thumbs.db
 # KEEP/MODIFY/REPLACE migration map for agents/psxagents/ -- not part of this
 # repo's own history.
 _tradingagents-upstream/
+
+# Local databases, logs and generated output are never source of truth
+*.db
+*.sqlite
+*.sqlite3
+*.log
+output/

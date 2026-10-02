@@ -24,7 +24,7 @@ class ScreeningResult:
     symbol: str
     name: str
     sector: str
-    screen_1_basic_quality: bool  # Passes basic quality checks
+    screen_1_basic_quality: Optional[bool]  # None = tradable, but no statements to check
     screen_1_reasons: list[str] = field(default_factory=list)
 
     screen_2_financial_quality: Optional[bool] = None
@@ -39,32 +39,23 @@ class ScreeningResult:
     screen_4_score: float = 0.0  # 0-100
     screen_4_reasons: list[str] = field(default_factory=list)
 
-    # Composite score: only computed if passes all prior screens
-    composite_watchlist_score: float = 0.0  # 0-100
     tier: str = "price_only"  # watchlist | deep_research | price_only
 
     @property
     def passes_all_screens(self) -> bool:
         """True if company passes screens 1-4 and qualifies for watchlist."""
-        return (
-            self.screen_1_basic_quality and
-            self.screen_2_financial_quality and
-            self.screen_3_valuation and
-            self.screen_4_peer_comparison
-        )
+        return all(s is True for s in self._stages)
 
     @property
     def stage_reached(self) -> int:
         """How far through the funnel: 1=basic, 2=financial, 3=valuation, 4=peer, 5=watchlist."""
-        if self.screen_1_basic_quality is False:
-            return 1
-        if self.screen_2_financial_quality is False:
-            return 2
-        if self.screen_3_valuation is False:
-            return 3
-        if self.screen_4_peer_comparison is False:
-            return 4
-        return 5
+        # First stage that did not pass, whether it failed or could not be evaluated.
+        return next((i for i, s in enumerate(self._stages, start=1) if s is not True), 5)
+
+    @property
+    def _stages(self) -> list[Optional[bool]]:
+        return [self.screen_1_basic_quality, self.screen_2_financial_quality,
+                self.screen_3_valuation, self.screen_4_peer_comparison]
 
 
 @dataclass
@@ -89,7 +80,7 @@ class ScreeningFunnel:
         is_active: bool,
         has_recent_prices: bool,
         balance_sheet_health: Optional[dict] = None,
-    ) -> tuple[bool, list[str]]:
+    ) -> tuple[Optional[bool], list[str]]:
         """Screen 1: Basic Quality
 
         Removes:
@@ -113,7 +104,7 @@ class ScreeningFunnel:
             current_ratio = balance_sheet_health.get("current_ratio", 0)
 
             if debt_to_equity and debt_to_equity > 3.0:
-                reasons.append(f"Debt/Equity too high: {debt_to_equity:.1f}x (max 3.0x)")
+                reasons.append(f"Total liabilities/equity too high: {debt_to_equity:.1f}x (max 3.0x)")
 
             if current_ratio and current_ratio < 0.5:
                 reasons.append(f"Current ratio too low: {current_ratio:.2f}x (min 0.5x)")
@@ -123,8 +114,11 @@ class ScreeningFunnel:
             if len(net_income_trend) >= 2 and all(ni < 0 for ni in net_income_trend[-2:]):
                 reasons.append("Negative earnings in last 2 years")
 
-        passes = len(reasons) == 0
-        return passes, reasons
+        if reasons:
+            return False, reasons
+        if not balance_sheet_health or all(v is None for v in balance_sheet_health.values()):
+            return None, ["Balance-sheet checks not run: no source-linked statements on file"]
+        return True, reasons
 
     @staticmethod
     def screen_2_financial_quality(
@@ -150,7 +144,7 @@ class ScreeningFunnel:
         reasons = []
         scores = []
 
-        if not financials:
+        if not financials or all(v is None for v in financials.values()):
             return None, 0.0, ["No financial data available"]
 
         # Revenue growth
@@ -214,7 +208,9 @@ class ScreeningFunnel:
             if de_current > de_prior:
                 reasons.append(f"D/E increasing: {de_current:.1f}x vs {de_prior:.1f}x")
 
-        composite = sum(scores) / len(scores) if scores else 0
+        if not scores:
+            return None, 0.0, ["No scorable financial metrics"]
+        composite = sum(scores) / len(scores)
         passes = composite >= 50
 
         return passes, composite, reasons
@@ -253,9 +249,7 @@ class ScreeningFunnel:
                     pe_score = min(100, (1 - (pe / pe_sector_median - 0.7)) * 100)
                 else:
                     pe_score = max(0, (1 - (pe / pe_sector_median - 1)) * 100)
-            else:
-                pe_score = 50  # neutral
-            scores.append(pe_score)
+                scores.append(pe_score)
             if pe_sector_median and pe > pe_sector_median * 1.2:
                 reasons.append(f"P/E expensive: {pe:.1f}x vs sector {pe_sector_median:.1f}x")
 
@@ -268,9 +262,7 @@ class ScreeningFunnel:
                     pb_score = min(100, (1 - (pb / pb_sector_median - 0.7)) * 100)
                 else:
                     pb_score = max(0, (1 - (pb / pb_sector_median - 1)) * 100)
-            else:
-                pb_score = 50
-            scores.append(pb_score)
+                scores.append(pb_score)
             if pb_sector_median and pb > pb_sector_median * 1.3:
                 reasons.append(f"P/B expensive: {pb:.1f}x vs sector {pb_sector_median:.1f}x")
 
@@ -279,20 +271,19 @@ class ScreeningFunnel:
         fcf_yield_sector = valuation_metrics.get("fcf_yield_sector")
         if fcf_yield is not None:
             if fcf_yield_sector:
-                fcf_score = min(100, (fcf_yield / fcf_yield_sector) * 100)
-            else:
-                fcf_score = 50 if fcf_yield > 2 else 25
-            scores.append(fcf_score)
+                scores.append(min(100, (fcf_yield / fcf_yield_sector) * 100))
             if fcf_yield and fcf_yield < 1.5:
                 reasons.append(f"FCF yield low: {fcf_yield:.1f}% (target >2%)")
 
         # Dividend Yield
         div_yield = valuation_metrics.get("dividend_yield")
         if div_yield is not None:
-            div_score = min(100, (div_yield / 3) * 100) if div_yield > 0 else 25
+            div_score = min(100, (div_yield / 3) * 100) if div_yield > 0 else 0
             scores.append(div_score)
 
-        composite = sum(scores) / len(scores) if scores else 0
+        if not scores:
+            return None, 0.0, ["No valuation multiples with a sector comparison on file"]
+        composite = sum(scores) / len(scores)
         passes = composite >= 40  # More lenient than screen 2
 
         return passes, composite, reasons
@@ -322,72 +313,38 @@ class ScreeningFunnel:
             return None, 0.0, ["No peer data available"]
 
         # ROE rank
-        roe_rank = peer_metrics.get("roe_percentile", 50)
+        roe_rank = peer_metrics.get("roe_percentile")
         if roe_rank is not None:
             scores.append(roe_rank)
             if roe_rank < 25:
                 reasons.append(f"ROE in bottom quartile of peers ({roe_rank}th percentile)")
 
         # Revenue growth rank
-        rev_rank = peer_metrics.get("revenue_growth_percentile", 50)
+        rev_rank = peer_metrics.get("revenue_growth_percentile")
         if rev_rank is not None:
             scores.append(rev_rank)
             if rev_rank < 25:
                 reasons.append(f"Revenue growth in bottom quartile ({rev_rank}th percentile)")
 
         # Margin rank
-        margin_rank = peer_metrics.get("margin_percentile", 50)
+        margin_rank = peer_metrics.get("margin_percentile")
         if margin_rank is not None:
             scores.append(margin_rank)
             if margin_rank < 25:
                 reasons.append(f"Margins in bottom quartile ({margin_rank}th percentile)")
 
         # Valuation rank (inverted: cheaper is better)
-        valuation_rank = peer_metrics.get("valuation_percentile", 50)
+        valuation_rank = peer_metrics.get("valuation_percentile")
         if valuation_rank is not None:
             valuation_score = 100 - valuation_rank  # Invert so cheaper = higher
             scores.append(valuation_score)
             if valuation_rank > 75:
                 reasons.append(f"Valuation expensive vs peers ({valuation_rank}th percentile)")
 
-        composite = sum(scores) / len(scores) if scores else 0
+        if not scores:
+            return None, 0.0, ["No peer percentiles available"]
+        composite = sum(scores) / len(scores)
         passes = composite >= 40  # Better than median peer
 
         return passes, composite, reasons
 
-
-def run_screening(
-    companies: list[dict],
-    universe_fundamentals: Optional[dict] = None,
-) -> ScreeningSession:
-    """Run the full screening funnel on a list of companies.
-
-    Args:
-        companies: List of company data dicts (symbol, name, sector, etc.)
-        universe_fundamentals: Optional dict mapping symbol -> financial/valuation data
-
-    Returns:
-        ScreeningSession with results for all companies
-    """
-    session = ScreeningSession(
-        created_at=datetime.now(),
-        ticker_count=len(companies),
-    )
-    funnel = ScreeningFunnel()
-
-    for company in companies:
-        symbol = company.get("symbol", "UNKNOWN")
-
-        # For now: return structure but without actual data
-        # This will be populated once we wire up the financial data
-        result = ScreeningResult(
-            symbol=symbol,
-            name=company.get("name", ""),
-            sector=company.get("sector", ""),
-            screen_1_basic_quality=True,  # Placeholder
-            tier="price_only",
-        )
-
-        session.results.append(result)
-
-    return session

@@ -1,5 +1,6 @@
 'use client'
 
+import { API_BASE_URL } from "@/lib/config";
 import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react'
 import Sidebar from '@/components/dashboard/Sidebar'
@@ -25,7 +26,7 @@ export default function MarketPage() {
   useEffect(() => {
     const fetchMarketData = async () => {
       try {
-        const response = await fetch('http://localhost:8000/market/overview/snapshot')
+        const response = await fetch(`${API_BASE_URL}/market/overview/snapshot`)
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`)
         }

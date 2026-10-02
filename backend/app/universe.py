@@ -31,17 +31,12 @@ neither dropping real companies nor inventing them, so build_universe() performs
 
 ## The quarantine note
 
-app/ingestion/manual_financials_seed_cement.py opens with its own "DATA VERIFICATION
-REQUIRED" warning: its balance-sheet figures were recalled from model training data, not
-read off annual reports. Its per-company `source_label` strings nonetheless read like real
-citations ("Bestway Cement Annual Report FY2022-FY2024"), so nothing downstream can tell
-those rows apart from the genuinely-sourced fertilizer rows by inspection. That is exactly
-the failure mode worth spending code on: UNVERIFIED_FUNDAMENTALS below is the explicit list
-that keeps them out of user-facing surfaces until someone opens the PDFs.
-
-With scope narrowed to these two sectors, that quarantine covers 10 of the 18 cement
-companies -- i.e. most of half the product. Verifying them is the critical path, not a
-cleanup task.
+A former cement seed (manual_financials_seed_cement.py) held balance-sheet figures recalled
+from model training data rather than read off annual reports, under citations that looked
+real. It was deleted rather than quarantined: unverifiable figures should not exist in a
+loadable form. Cement fundamentals now have to be entered from the actual annual reports,
+with the report as the source document. UNVERIFIED_FUNDAMENTALS stays as the mechanism for
+any future data that is in the DB but not yet checked.
 
 Promoting a symbol from UNVERIFIED to FULL means: open the annual report, check every line
 item, fix what is wrong, rewrite source_label to cite the verified document, then move the
@@ -92,11 +87,9 @@ KNOWN_INACTIVE: dict[str, str] = {
 # user supplied. See manual_financials_seed.py's module docstring for per-company provenance.
 VERIFIED_FUNDAMENTALS = frozenset({"FFC", "EFERT", "FATIMA"})
 
-# Present in the DB, never checked against the underlying annual report. Read the quarantine
-# note above before touching this. Do not render these as ratios or feed them to a narrative.
-UNVERIFIED_FUNDAMENTALS = frozenset(
-    {"LUCK", "MLCF", "DGKC", "CHCC", "BWCL", "ACPL", "FCCL", "KOHC", "DCL", "GWLC"}
-)
+# Fundamentals in the DB that were never checked against the annual report. Empty since the
+# cement seed (model-recalled figures) was deleted; those companies are now price_only.
+UNVERIFIED_FUNDAMENTALS: frozenset[str] = frozenset()
 
 TIER_FULL = "full"
 TIER_UNVERIFIED = "unverified"
@@ -273,7 +266,9 @@ def write_snapshot(entries: list[UniverseEntry], path: Path = SNAPSHOT_PATH) -> 
 def load_snapshot(path: Path = SNAPSHOT_PATH) -> list[UniverseEntry]:
     """Reads the frozen universe. Raises FileNotFoundError if nobody has built one yet."""
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return [UniverseEntry(**entry) for entry in payload["entries"]]
+    # The snapshot freezes membership; the evidence tier always comes from coverage_tier() so
+    # a stale file can't claim fundamentals that no longer exist.
+    return [UniverseEntry(**{**entry, "coverage_tier": coverage_tier(entry["symbol"])}) for entry in payload["entries"]]
 
 
 def tier_counts(entries: list[UniverseEntry]) -> dict[str, int]:

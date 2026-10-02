@@ -1,7 +1,15 @@
 from app.db.models.identity import BoardMembership, ExternalIdentityMap, Issuer, Person, Sector, Security, TickerHistory
 from app.db.models.evidence import EvidenceLink, Extraction, SourceDocument
 from app.db.models.financials import FinancialFact, RatioDefinition, RatioValue
-from app.db.models.market import CorporateAction, IndexOHLCV, IngestionRun, MarketIndex, PriceOHLCV
+from app.db.models.market import (
+    CorporateAction,
+    CorporateActionCoverage,
+    IndexOHLCV,
+    IngestionRun,
+    MarketIndex,
+    PriceOHLCV,
+    QuarantinedRow,
+)
 from app.db.models.announcements import Announcement, EntityLink
 from app.db.models.macro import MacroObservation, MacroSeries, SectorRiskSnapshot
 from app.db.models.scoring import MlSignalScore, SignalScore
@@ -23,6 +31,8 @@ __all__ = [
     "RatioDefinition",
     "RatioValue",
     "CorporateAction",
+    "CorporateActionCoverage",
+    "QuarantinedRow",
     "IngestionRun",
     "PriceOHLCV",
     "MarketIndex",

@@ -5,6 +5,7 @@
  */
 'use client';
 
+import { API_BASE_URL } from "@/lib/config";
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -32,7 +33,7 @@ export function SearchBar() {
     }
 
     setLoading(true);
-    fetch(`http://localhost:8000/companies/search?q=${encodeURIComponent(query)}`)
+    fetch(`${API_BASE_URL}/companies/search?q=${encodeURIComponent(query)}`)
       .then(res => res.json())
       .then(data => {
         setResults(data || []);

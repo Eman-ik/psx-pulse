@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
 
+from app.api.data_status import freshness
 from app.db.session import get_db
-from app.db.models import Issuer, Security, FinancialFact, RatioValue, RatioDefinition
+from app.db.models import Issuer, PriceOHLCV, Security, FinancialFact, RatioValue, RatioDefinition
 from app.research_system.screening_funnel import (
     ScreeningFunnel, ScreeningResult, ScreeningSession
 )
@@ -146,186 +147,120 @@ def fetch_valuation_metrics(db: Session, symbol: str, peers: list[dict]) -> dict
         "pb_sector_median": pb_median,
         "dividend_yield": div_yield,
         "fcf_yield": fcf_yield,
-        "fcf_yield_sector": 2.0,  # Placeholder for cement sector average
     }
+
+
+# Peer percentile -> fundamentals key; a percentile is only computed when at least
+# MIN_PEERS companies in the sector (including this one) have the metric.
+PEER_METRICS = {
+    "roe_percentile": "roe",
+    "revenue_growth_percentile": "revenue_growth_yoy",
+    "margin_percentile": "net_profit_margin",
+}
+MIN_PEERS = 3
+
+
+def _peer_percentiles(symbol: str, sector: str, fundamentals: dict[str, dict], sectors: dict[str, str]) -> dict:
+    out = {}
+    for pct_key, metric in PEER_METRICS.items():
+        own = fundamentals[symbol].get(metric)
+        values = [f[metric] for s, f in fundamentals.items() if sectors.get(s) == sector and f.get(metric) is not None]
+        if own is not None and len(values) >= MIN_PEERS:
+            out[pct_key] = round(sum(v <= own for v in values) / len(values) * 100)
+    return out
 
 
 @router.get("/run")
 def run_screening_funnel(db: Session = Depends(get_db)):
-    """Run the screening funnel on all companies in the universe."""
-    try:
-        # Load universe
-        universe = load_snapshot()
-        symbols = [e.symbol for e in universe]
+    """Run the screening funnel. A stage with no data to judge is reported as not evaluated
+    (null), never as a pass or a fail, and the company stops there."""
+    universe = load_snapshot()
+    sectors = {e.symbol: e.sector for e in universe}
+    securities_list = db.query(Security).filter(Security.symbol.in_(sectors)).all()
+    fundamentals = {s.symbol: fetch_company_fundamentals(db, s.symbol) for s in securities_list}
 
-        # Fetch all securities matching the universe symbols
-        securities_list = db.query(Security).filter(Security.symbol.in_(symbols)).all()
+    session = ScreeningSession(created_at=datetime.now(), ticker_count=len(securities_list))
+    funnel = ScreeningFunnel()
+    stage_counts = {n: {"passed": 0, "failed": 0, "not_evaluated": 0} for n in range(1, 5)}
 
-        session = ScreeningSession(
-            created_at=datetime.now(),
-            ticker_count=len(securities_list),
+    def record(stage: int, outcome) -> bool:
+        stage_counts[stage]["passed" if outcome is True else "failed" if outcome is False else "not_evaluated"] += 1
+        return outcome is True
+
+    for security in securities_list:
+        symbol, sector = security.symbol, sectors.get(security.symbol, "UNKNOWN")
+        financials_data = fundamentals[symbol]
+        prices = freshness(db, PriceOHLCV, PriceOHLCV.security_id == security.id)
+
+        s1, s1_reasons = funnel.screen_1_basic_quality(
+            company_data={"symbol": symbol},
+            is_active=security.is_active,
+            has_recent_prices=not prices["stale"],
+            balance_sheet_health={
+                "debt_to_equity": financials_data.get("debt_to_equity"),
+                "current_ratio": financials_data.get("current_ratio"),
+            },
         )
+        result = ScreeningResult(symbol=symbol, name=security.issuer.name or symbol, sector=sector,
+                                 screen_1_basic_quality=s1, screen_1_reasons=s1_reasons)
+        session.results.append(result)
+        if not record(1, s1):
+            continue
 
-        funnel = ScreeningFunnel()
+        s2, s2_score, s2_reasons = funnel.screen_2_financial_quality({"symbol": symbol}, financials_data)
+        result.screen_2_financial_quality, result.screen_2_score, result.screen_2_reasons = s2, s2_score, s2_reasons
+        if not record(2, s2):
+            continue
 
-        for security in securities_list:
-            symbol = security.symbol
-            issuer = security.issuer
+        s3, s3_score, s3_reasons = funnel.screen_3_valuation({"symbol": symbol}, fetch_valuation_metrics(db, symbol, []))
+        result.screen_3_valuation, result.screen_3_score, result.screen_3_reasons = s3, s3_score, s3_reasons
+        if not record(3, s3):
+            continue
 
-            # Screen 1: Basic Quality
-            financials_data = fetch_company_fundamentals(db, symbol)
+        s4, s4_score, s4_reasons = funnel.screen_4_peer_comparison(
+            {"symbol": symbol}, _peer_percentiles(symbol, sector, fundamentals, sectors) or None
+        )
+        result.screen_4_peer_comparison, result.screen_4_score, result.screen_4_reasons = s4, s4_score, s4_reasons
+        record(4, s4)
 
-            screen_1_passes, screen_1_reasons = funnel.screen_1_basic_quality(
-                company_data={"symbol": symbol},
-                is_active=security.is_active,
-                has_recent_prices=True,
-                balance_sheet_health={
-                    "debt_to_equity": financials_data.get("debt_to_equity"),
-                    "current_ratio": financials_data.get("current_ratio"),
-                }
-            )
+    watchlist_results = sorted((r for r in session.results if r.passes_all_screens), key=lambda r: r.symbol)
 
-            # Determine sector
-            sector_entry = next((e for e in universe if e.symbol == symbol), None)
-            sector = sector_entry.sector if sector_entry else "UNKNOWN"
+    def stage(r, n, passes, reasons, score=None):
+        # Present for every stage the company reached; passes is null when it couldn't be judged.
+        if r.stage_reached < n:
+            return None
+        return {"passes": passes, "reasons": reasons} | ({} if score is None else {"score": score})
 
-            result = ScreeningResult(
-                symbol=symbol,
-                name=issuer.name or symbol,
-                sector=sector,
-                screen_1_basic_quality=screen_1_passes,
-                screen_1_reasons=screen_1_reasons,
-            )
-
-            if not screen_1_passes:
-                session.results.append(result)
-                continue
-
-            session.passed_screen_1 += 1
-
-            # Screen 2: Financial Quality
-            screen_2_passes, screen_2_score, screen_2_reasons = funnel.screen_2_financial_quality(
-                company_data={"symbol": symbol},
-                financials=financials_data if financials_data else None,
-            )
-
-            result.screen_2_financial_quality = screen_2_passes
-            result.screen_2_score = screen_2_score
-            result.screen_2_reasons = screen_2_reasons
-
-            if screen_2_passes is False:
-                session.results.append(result)
-                continue
-
-            session.passed_screen_2 += 1
-
-            # Screen 3: Valuation
-            peers = []
-            valuation_data = fetch_valuation_metrics(db, symbol, peers)
-
-            screen_3_passes, screen_3_score, screen_3_reasons = funnel.screen_3_valuation(
-                company_data={"symbol": symbol},
-                valuation_metrics=valuation_data if valuation_data else None,
-            )
-
-            result.screen_3_valuation = screen_3_passes
-            result.screen_3_score = screen_3_score
-            result.screen_3_reasons = screen_3_reasons
-
-            if screen_3_passes is False:
-                session.results.append(result)
-                continue
-
-            session.passed_screen_3 += 1
-
-            # Screen 4: Peer Comparison (simplified for now)
-            screen_4_passes = True
-            screen_4_score = 65.0
-            screen_4_reasons = []
-
-            result.screen_4_peer_comparison = screen_4_passes
-            result.screen_4_score = screen_4_score
-            result.screen_4_reasons = screen_4_reasons
-
-            if screen_4_passes:
-                session.passed_screen_4 += 1
-
-                # Compute composite score
-                non_none_scores = [
-                    result.screen_2_score,
-                    result.screen_3_score,
-                    result.screen_4_score,
-                ]
-                result.composite_watchlist_score = sum(non_none_scores) / len(non_none_scores) if non_none_scores else 0
-                result.tier = "watchlist"
-                session.watchlist_companies.append(symbol)
-
-            session.results.append(result)
-
-        # Sort watchlist by composite score
-        watchlist_results = [r for r in session.results if r.passes_all_screens]
-        watchlist_results.sort(key=lambda r: r.composite_watchlist_score, reverse=True)
-
-        return {
-            "session": {
-                "created_at": session.created_at.isoformat(),
-                "ticker_count": session.ticker_count,
-                "passed_screen_1": session.passed_screen_1,
-                "passed_screen_2": session.passed_screen_2,
-                "passed_screen_3": session.passed_screen_3,
-                "passed_screen_4": session.passed_screen_4,
-                "watchlist_count": len(watchlist_results),
-            },
-            "funnel": {
-                "screen_1": session.passed_screen_1,
-                "screen_2": session.passed_screen_2,
-                "screen_3": session.passed_screen_3,
-                "screen_4": session.passed_screen_4,
-                "watchlist": len(watchlist_results),
-            },
-            "watchlist": [
-                {
-                    "rank": i + 1,
-                    "symbol": r.symbol,
-                    "name": r.name,
-                    "sector": r.sector,
-                    "composite_score": r.composite_watchlist_score,
-                    "screen_2_score": r.screen_2_score,
-                    "screen_3_score": r.screen_3_score,
-                    "screen_4_score": r.screen_4_score,
-                }
-                for i, r in enumerate(watchlist_results)
-            ],
-            "details": [
-                {
-                    "symbol": r.symbol,
-                    "name": r.name,
-                    "sector": r.sector,
-                    "stage_reached": r.stage_reached,
-                    "screen_1": {
-                        "passes": r.screen_1_basic_quality,
-                        "reasons": r.screen_1_reasons,
-                    },
-                    "screen_2": {
-                        "passes": r.screen_2_financial_quality,
-                        "score": r.screen_2_score,
-                        "reasons": r.screen_2_reasons,
-                    } if r.screen_2_financial_quality is not None else None,
-                    "screen_3": {
-                        "passes": r.screen_3_valuation,
-                        "score": r.screen_3_score,
-                        "reasons": r.screen_3_reasons,
-                    } if r.screen_3_valuation is not None else None,
-                    "screen_4": {
-                        "passes": r.screen_4_peer_comparison,
-                        "score": r.screen_4_score,
-                        "reasons": r.screen_4_reasons,
-                    } if r.screen_4_peer_comparison is not None else None,
-                }
-                for r in session.results
-            ]
-        }
-
-    except Exception as e:
-        logger.error(f"Screening funnel error: {e}", exc_info=True)
-        return {"error": str(e), "session": {}, "funnel": {}, "watchlist": [], "details": []}
+    return {
+        "session": {
+            "created_at": session.created_at.isoformat(),
+            "ticker_count": session.ticker_count,
+            "watchlist_count": len(watchlist_results),
+        },
+        "funnel": {f"screen_{n}": c["passed"] for n, c in stage_counts.items()} | {"watchlist": len(watchlist_results)},
+        "stage_counts": {f"screen_{n}": c for n, c in stage_counts.items()},
+        "watchlist": [
+            {
+                "symbol": r.symbol,
+                "name": r.name,
+                "sector": r.sector,
+                "screen_2_score": r.screen_2_score,
+                "screen_3_score": r.screen_3_score,
+                "screen_4_score": r.screen_4_score,
+            }
+            for r in watchlist_results
+        ],
+        "details": [
+            {
+                "symbol": r.symbol,
+                "name": r.name,
+                "sector": r.sector,
+                "stage_reached": r.stage_reached,
+                "screen_1": stage(r, 1, r.screen_1_basic_quality, r.screen_1_reasons),
+                "screen_2": stage(r, 2, r.screen_2_financial_quality, r.screen_2_reasons, r.screen_2_score),
+                "screen_3": stage(r, 3, r.screen_3_valuation, r.screen_3_reasons, r.screen_3_score),
+                "screen_4": stage(r, 4, r.screen_4_peer_comparison, r.screen_4_reasons, r.screen_4_score),
+            }
+            for r in session.results
+        ],
+    }

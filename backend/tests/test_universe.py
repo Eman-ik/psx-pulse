@@ -99,10 +99,10 @@ def test_verified_fertilizer_symbols_are_renderable():
         assert coverage_tier(symbol) == TIER_FULL
 
 
-def test_unverified_cement_symbols_are_quarantined():
-    """The cement seed's own header says its figures were never checked against the PDFs."""
+def test_cement_without_verified_statements_is_price_only():
+    """The model-recalled cement seed was deleted, so these have no fundamentals at all."""
     for symbol in ("LUCK", "DGKC", "MLCF", "FCCL", "KOHC", "CHCC", "BWCL", "ACPL", "DCL", "GWLC"):
-        assert coverage_tier(symbol) == TIER_UNVERIFIED
+        assert coverage_tier(symbol) == TIER_PRICE_ONLY
 
 
 def test_uncovered_sector_members_are_price_only():

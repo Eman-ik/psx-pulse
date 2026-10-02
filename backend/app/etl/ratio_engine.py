@@ -191,8 +191,10 @@ def _store_ratio_value(
 POINT_IN_TIME_RATIOS = {
     "gross_profit_margin": ("Gross Profit Margin", "profitability", "percent", "gross_profit", "revenue", 100),
     "operating_profit_margin": ("Operating Profit Margin", "profitability", "percent", "operating_profit", "revenue", 100),
-    "debt_to_assets": ("Debt-to-Assets", "leverage", "ratio", "total_liabilities", "total_assets", 1),
-    "debt_to_equity": ("Debt-to-Equity", "leverage", "ratio", "total_liabilities", "total_equity", 1),
+    # Keys kept for existing callers; names say "liabilities" because no interest-bearing
+    # debt figure is on file, and total liabilities include payables.
+    "debt_to_assets": ("Total Liabilities to Assets", "leverage", "ratio", "total_liabilities", "total_assets", 1),
+    "debt_to_equity": ("Total Liabilities to Equity", "leverage", "ratio", "total_liabilities", "total_equity", 1),
     "current_ratio": ("Current Ratio", "liquidity", "ratio", "current_assets", "current_liabilities", 1),
 }
 
@@ -280,6 +282,10 @@ def compute_cash_flow_ratios(db: Session, issuer_id: int) -> int:
     return inserted
 
 
+PAYOUT_FORMULA = "dividend_per_share / eps * 100, or dividends_paid_total / profit_after_tax * 100 where only totals exist"
+COVERAGE_FORMULA = "eps / dividend_per_share, or profit_after_tax / dividends_paid_total where only totals exist"
+
+
 def compute_dividend_payout_ratio(db: Session, issuer_id: int) -> int:
     """Payout ratio needs matching units on both sides: EPS-vs-DPS (both per-share, e.g.
     FATIMA) or aggregate-dividends-vs-aggregate-PAT (e.g. EFERT) — never mixed.
@@ -295,7 +301,7 @@ def compute_dividend_payout_ratio(db: Session, issuer_id: int) -> int:
             continue
         if definition is None:
             definition = _get_or_create_ratio_definition(
-                db, "dividend_payout_ratio", "Dividend Payout Ratio", "cash_flow", "dividend_per_share / eps * 100",
+                db, "dividend_payout_ratio", "Dividend Payout Ratio", "cash_flow", PAYOUT_FORMULA,
             )
             definition.unit = "percent"
         value = float(d.value / e.value * 100)
@@ -310,7 +316,7 @@ def compute_dividend_payout_ratio(db: Session, issuer_id: int) -> int:
             continue
         if definition is None:
             definition = _get_or_create_ratio_definition(
-                db, "dividend_payout_ratio", "Dividend Payout Ratio", "cash_flow", "dividend_per_share / eps * 100",
+                db, "dividend_payout_ratio", "Dividend Payout Ratio", "cash_flow", PAYOUT_FORMULA,
             )
             definition.unit = "percent"
         value = float(d.value / p.value * 100)
@@ -588,8 +594,7 @@ def compute_dividend_coverage(db: Session, issuer_id: int) -> int:
             continue
         if definition is None:
             definition = _get_or_create_ratio_definition(
-                db, "dividend_coverage", "Dividend Coverage", "cash_flow",
-                "eps / dividend_per_share",
+                db, "dividend_coverage", "Dividend Coverage", "cash_flow", COVERAGE_FORMULA,
             )
             definition.unit = "ratio"
         value = float(eps.value / dps.value)
@@ -605,8 +610,7 @@ def compute_dividend_coverage(db: Session, issuer_id: int) -> int:
             continue
         if definition is None:
             definition = _get_or_create_ratio_definition(
-                db, "dividend_coverage", "Dividend Coverage", "cash_flow",
-                "eps / dividend_per_share",
+                db, "dividend_coverage", "Dividend Coverage", "cash_flow", COVERAGE_FORMULA,
             )
             definition.unit = "ratio"
         value = float(pat.value / div.value)

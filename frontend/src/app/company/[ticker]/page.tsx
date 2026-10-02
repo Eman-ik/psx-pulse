@@ -5,6 +5,7 @@
  */
 'use client';
 
+import { API_BASE_URL } from "@/lib/config";
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { FinancialTable } from '@/components/FinancialTable';
@@ -61,13 +62,13 @@ export default function CompanyPage() {
 
     const fetchCompany = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/companies/${ticker}`);
+        const res = await fetch(`${API_BASE_URL}/companies/${ticker}`);
         if (!res.ok) throw new Error('Company not found');
         const data = await res.json();
         setCompany(data);
 
         // Fetch periods
-        const periodsRes = await fetch(`http://localhost:8000/companies/${data.id}/periods`);
+        const periodsRes = await fetch(`${API_BASE_URL}/companies/${data.id}/periods`);
         const periodsData = await periodsRes.json();
         setPeriods(periodsData);
 
@@ -97,7 +98,7 @@ export default function CompanyPage() {
 
     const fetchFacts = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/periods/${selectedPeriodId}/facts`);
+        const res = await fetch(`${API_BASE_URL}/periods/${selectedPeriodId}/facts`);
         const factsData = await res.json();
         setFacts(factsData);
 
@@ -105,7 +106,7 @@ export default function CompanyPage() {
         const sourcesMap: { [key: number]: Source } = {};
         for (const fact of factsData) {
           if (!sourcesMap[fact.source_id]) {
-            const sourceRes = await fetch(`http://localhost:8000/sources/${fact.source_id}`);
+            const sourceRes = await fetch(`${API_BASE_URL}/sources/${fact.source_id}`);
             const sourceData = await sourceRes.json();
             sourcesMap[fact.source_id] = sourceData;
           }
@@ -113,16 +114,16 @@ export default function CompanyPage() {
         setSources(sourcesMap);
 
         // Fetch prior period facts if available
-        const periodRes = await fetch(`http://localhost:8000/periods/${selectedPeriodId}`);
+        const periodRes = await fetch(`${API_BASE_URL}/periods/${selectedPeriodId}`);
         const period = await periodRes.json();
 
         if (period.period_type === 'annual' && period.fiscal_year > 1) {
           const priorYearRes = await fetch(
-            `http://localhost:8000/companies/${company?.id}/periods?fiscal_year=${period.fiscal_year - 1}&period_type=annual`
+            `${API_BASE_URL}/companies/${company?.id}/periods?fiscal_year=${period.fiscal_year - 1}&period_type=annual`
           );
           const priorPeriods = await priorYearRes.json();
           if (priorPeriods.length > 0) {
-            const priorFactsRes = await fetch(`http://localhost:8000/periods/${priorPeriods[0].id}/facts`);
+            const priorFactsRes = await fetch(`${API_BASE_URL}/periods/${priorPeriods[0].id}/facts`);
             const priorFactsData = await priorFactsRes.json();
             const priorFactsMap: { [key: string]: FinancialFact } = {};
             for (const fact of priorFactsData) {

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -43,6 +43,48 @@ class CorporateAction(Base):
     verified: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # First day the shares trade without the entitlement. Adjustments key off this, never off
+    # the book-closure date; null means it couldn't be determined and the event isn't applied.
+    ex_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    book_closure_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    book_closure_end: Mapped[date | None] = mapped_column(Date, nullable=True)
+    cash_per_share: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)  # PKR, dividends only
+    evidence: Mapped[str | None] = mapped_column(Text, nullable=True)  # the source text the event was read from
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ingestion_run_id: Mapped[int | None] = mapped_column(ForeignKey("ingestion_run.id"), nullable=True)
+
+
+class CorporateActionCoverage(Base):
+    """The date range over which a security's corporate actions have been searched for.
+
+    Outside this window, "no actions on file" means unknown, not "none happened", so
+    adjusted prices there must not be treated as correct.
+    """
+
+    __tablename__ = "corporate_action_coverage"
+
+    security_id: Mapped[int] = mapped_column(ForeignKey("security.id"), primary_key=True)
+    covered_from: Mapped[date] = mapped_column(Date)
+    covered_to: Mapped[date] = mapped_column(Date)
+    source: Mapped[str] = mapped_column(String(60))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class QuarantinedRow(Base):
+    """A row a loader saw but would not store as data: kept with its reason for review
+    instead of being silently dropped or promoted."""
+
+    __tablename__ = "quarantined_row"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ingestion_run_id: Mapped[int] = mapped_column(ForeignKey("ingestion_run.id"), index=True)
+    target_table: Mapped[str] = mapped_column(String(40))
+    natural_key: Mapped[str] = mapped_column(String(200))
+    payload: Mapped[dict] = mapped_column(JSON)
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
 
 INGESTION_RUN_STATUSES = ("running", "ok", "partial", "failed")
 
@@ -62,7 +104,10 @@ class IngestionRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="running")
     params: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    rows_seen: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     rows_inserted: Mapped[int] = mapped_column(Integer, default=0)
+    rows_updated: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    rows_rejected: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # sent to quarantine
     errors: Mapped[list] = mapped_column(JSON, default=list)
 
     def add_error(self, message: str) -> None:

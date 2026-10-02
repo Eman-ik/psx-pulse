@@ -1,5 +1,6 @@
 'use client'
 
+import { API_BASE_URL } from "@/lib/config";
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { BarChart3, TrendingDown, TrendingUp, Target, Users, ChevronDown, ChevronUp, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react'
@@ -10,7 +11,7 @@ interface ScreeningResult {
   sector: string
   stage_reached: number
   screen_1: {
-    passes: boolean
+    passes: boolean | null
     reasons: string[]
   }
   screen_2: {
@@ -31,11 +32,9 @@ interface ScreeningResult {
 }
 
 interface WatchlistCompany {
-  rank: number
   symbol: string
   name: string
   sector: string
-  composite_score: number
   screen_2_score: number
   screen_3_score: number
   screen_4_score: number
@@ -45,12 +44,9 @@ interface ScreeningData {
   session: {
     created_at: string
     ticker_count: number
-    passed_screen_1: number
-    passed_screen_2: number
-    passed_screen_3: number
-    passed_screen_4: number
     watchlist_count: number
   }
+  stage_counts: Record<string, { passed: number; failed: number; not_evaluated: number }>
   funnel: {
     screen_1: number
     screen_2: number
@@ -87,7 +83,7 @@ export function ScreeningFunnelView() {
   useEffect(() => {
     const runScreening = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/screening/run')
+        const response = await fetch(`${API_BASE_URL}/api/screening/run`)
         const result = await response.json()
         setData(result)
       } catch (error) {
@@ -119,15 +115,11 @@ export function ScreeningFunnelView() {
     )
   }
 
-  const escapeRatio = (passed: number, total: number) => passed / total
-  const passRate = (i: number) => {
-    const totals = [
-      data.session.ticker_count,
-      data.session.passed_screen_1,
-      data.session.passed_screen_2,
-      data.session.passed_screen_3,
-    ]
-    return Math.round((data.funnel[`screen_${i}` as keyof typeof data.funnel] / totals[i - 1]) * 100)
+  // Pass rate among companies the stage could actually judge; null when it judged none.
+  const passRate = (stage: number) => {
+    const c = data.stage_counts[`screen_${stage}`]
+    const judged = c.passed + c.failed
+    return judged ? Math.round((c.passed / judged) * 100) : null
   }
 
   return (
@@ -151,7 +143,7 @@ export function ScreeningFunnelView() {
           {[1, 2, 3, 4].map((stage) => {
             const Icon = SCREEN_ICONS[stage as keyof typeof SCREEN_ICONS]
             const passed = data.funnel[`screen_${stage}` as keyof typeof data.funnel]
-            const total = stage === 1 ? data.session.ticker_count : data.funnel[`screen_${stage - 1}` as keyof typeof data.funnel]
+            const counts = data.stage_counts[`screen_${stage}`]
             const rate = passRate(stage)
             const width = stage === 1 ? 100 : (passed / data.session.ticker_count) * 100
 
@@ -163,9 +155,9 @@ export function ScreeningFunnelView() {
                     <span className="text-xs font-semibold">{SCREEN_LABELS[stage as keyof typeof SCREEN_LABELS]}</span>
                   </div>
                   <div className="text-xs text-muted">
-                    <span className="font-mono">{passed}</span> passed
-                    <span className="mx-1">·</span>
-                    <span className="font-mono">{rate}%</span>
+                    <span className="font-mono">{passed}</span> passed · <span className="font-mono">{counts.failed}</span> failed ·{' '}
+                    <span className="font-mono">{counts.not_evaluated}</span> not evaluated
+                    {rate !== null && <span className="ml-1">({rate}% of judged)</span>}
                   </div>
                 </div>
                 <div className="h-2 rounded-full bg-surface-alt overflow-hidden">
@@ -186,7 +178,7 @@ export function ScreeningFunnelView() {
             <p className="text-xs text-muted">Watchlist Companies</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold">{Math.round((data.session.watchlist_count / data.session.ticker_count) * 100)}%</p>
+            <p className="text-2xl font-bold">{data.session.ticker_count ? Math.round((data.session.watchlist_count / data.session.ticker_count) * 100) : 0}%</p>
             <p className="text-xs text-muted">Pass All Screens</p>
           </div>
           <div className="text-center">
@@ -226,11 +218,9 @@ export function ScreeningFunnelView() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted">
-                  <th className="px-4 py-3 text-left font-medium">#</th>
                   <th className="px-4 py-3 text-left font-medium">Symbol</th>
                   <th className="px-4 py-3 text-left font-medium">Company</th>
                   <th className="px-4 py-3 text-left font-medium">Sector</th>
-                  <th className="px-4 py-3 text-center font-medium">Composite</th>
                   <th className="px-4 py-3 text-center font-medium">Financial</th>
                   <th className="px-4 py-3 text-center font-medium">Valuation</th>
                   <th className="px-4 py-3 text-center font-medium">Peer</th>
@@ -239,18 +229,9 @@ export function ScreeningFunnelView() {
               <tbody className="divide-y divide-border">
                 {data.watchlist.map((company) => (
                   <tr key={company.symbol} className="hover:bg-surface-alt/50">
-                    <td className="px-4 py-3 text-xs text-muted tabular-nums font-bold">{company.rank}</td>
                     <td className="px-4 py-3 font-mono text-xs font-semibold text-accent">{company.symbol}</td>
                     <td className="px-4 py-3">{company.name}</td>
                     <td className="px-4 py-3 text-xs text-muted">{company.sector}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-xs font-bold ${
-                        company.composite_score >= 70 ? 'text-positive' :
-                        company.composite_score >= 50 ? 'text-accent' : 'text-negative'
-                      }`}>
-                        {company.composite_score.toFixed(0)}
-                      </span>
-                    </td>
                     <td className="px-4 py-3 text-center text-xs">{company.screen_2_score.toFixed(0)}</td>
                     <td className="px-4 py-3 text-center text-xs">{company.screen_3_score.toFixed(0)}</td>
                     <td className="px-4 py-3 text-center text-xs">{company.screen_4_score.toFixed(0)}</td>
@@ -303,8 +284,8 @@ export function ScreeningFunnelView() {
                     <div className="flex items-center gap-2 mb-2">
                       <AlertCircle className="h-4 w-4 text-muted" />
                       <p className="text-xs font-semibold">Screen 1: Basic Quality</p>
-                      <span className={`text-xs font-semibold ${company.screen_1.passes ? 'text-positive' : 'text-negative'}`}>
-                        {company.screen_1.passes ? '✓ PASS' : '✗ FAIL'}
+                      <span className={`text-xs font-semibold ${company.screen_1.passes ? 'text-positive' : company.screen_1.passes === null ? 'text-muted' : 'text-negative'}`}>
+                        {company.screen_1.passes === null ? 'NOT EVALUATED' : company.screen_1.passes ? '✓ PASS' : '✗ FAIL'}
                       </span>
                     </div>
                     {company.screen_1.reasons.length > 0 && (
@@ -325,9 +306,11 @@ export function ScreeningFunnelView() {
                         <span className={`text-xs font-semibold ${
                           company.screen_2.passes ? 'text-positive' : company.screen_2.passes === null ? 'text-muted' : 'text-negative'
                         }`}>
-                          {company.screen_2.passes === null ? 'N/A' : company.screen_2.passes ? '✓ PASS' : '✗ FAIL'}
+                          {company.screen_2.passes === null ? 'NOT EVALUATED' : company.screen_2.passes ? '✓ PASS' : '✗ FAIL'}
                         </span>
-                        <span className="text-xs text-muted font-mono">{company.screen_2.score.toFixed(0)}/100</span>
+                        {company.screen_2.passes !== null && (
+                          <span className="text-xs text-muted font-mono">{company.screen_2.score.toFixed(0)}/100</span>
+                        )}
                       </div>
                       {company.screen_2.reasons.length > 0 && (
                         <ul className="ml-6 space-y-1 text-xs text-muted">
@@ -348,9 +331,11 @@ export function ScreeningFunnelView() {
                         <span className={`text-xs font-semibold ${
                           company.screen_3.passes ? 'text-positive' : company.screen_3.passes === null ? 'text-muted' : 'text-negative'
                         }`}>
-                          {company.screen_3.passes === null ? 'N/A' : company.screen_3.passes ? '✓ PASS' : '✗ FAIL'}
+                          {company.screen_3.passes === null ? 'NOT EVALUATED' : company.screen_3.passes ? '✓ PASS' : '✗ FAIL'}
                         </span>
-                        <span className="text-xs text-muted font-mono">{company.screen_3.score.toFixed(0)}/100</span>
+                        {company.screen_3.passes !== null && (
+                          <span className="text-xs text-muted font-mono">{company.screen_3.score.toFixed(0)}/100</span>
+                        )}
                       </div>
                       {company.screen_3.reasons.length > 0 && (
                         <ul className="ml-6 space-y-1 text-xs text-muted">
@@ -371,9 +356,11 @@ export function ScreeningFunnelView() {
                         <span className={`text-xs font-semibold ${
                           company.screen_4.passes ? 'text-positive' : company.screen_4.passes === null ? 'text-muted' : 'text-negative'
                         }`}>
-                          {company.screen_4.passes === null ? 'N/A' : company.screen_4.passes ? '✓ PASS' : '✗ FAIL'}
+                          {company.screen_4.passes === null ? 'NOT EVALUATED' : company.screen_4.passes ? '✓ PASS' : '✗ FAIL'}
                         </span>
-                        <span className="text-xs text-muted font-mono">{company.screen_4.score.toFixed(0)}/100</span>
+                        {company.screen_4.passes !== null && (
+                          <span className="text-xs text-muted font-mono">{company.screen_4.score.toFixed(0)}/100</span>
+                        )}
                       </div>
                       {company.screen_4.reasons.length > 0 && (
                         <ul className="ml-6 space-y-1 text-xs text-muted">

@@ -30,6 +30,17 @@ class FinancialFact(Base):
     superseded_by_id: Mapped[int | None] = mapped_column(ForeignKey("financial_fact.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # When the figure became public, and the filing that proves it (e.g. the PSX results
+    # announcement). Null when unknown; known_at then falls back to when we ingested it, which
+    # can only make a backtest see the figure later than it really was, never earlier.
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    publication_document_id: Mapped[int | None] = mapped_column(ForeignKey("source_document.id"), nullable=True)
+    ingestion_run_id: Mapped[int | None] = mapped_column(ForeignKey("ingestion_run.id"), nullable=True)
+
+    @property
+    def known_at(self) -> datetime:
+        return self.published_at or self.created_at
+
 
 class RatioDefinition(Base):
     """A versioned formula. Changing the formula creates a new version, never mutates history."""

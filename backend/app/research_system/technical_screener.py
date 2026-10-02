@@ -1,244 +1,141 @@
-"""Technical screener for PSX securities."""
+"""Technical indicators for PSX securities, computed from stored EOD closes.
 
-from datetime import datetime, timedelta
+Deliberately no composite score: the old 0-100 blend added mean-reversion signals (near a
+low, RSI < 30) to momentum signals (near a high) with uncalibrated weights, so its number had
+no demonstrated relationship to returns. Each indicator is reported on its own, and any
+indicator without enough history is None rather than a default that reads as a real reading.
+"""
+
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import PriceOHLCV, Security, RatioValue, RatioDefinition
+from app.db.models import PriceOHLCV, Security
+
+LOOKBACK_TARGET_DAYS = 252  # about one year of PSX trading days
+NEAR_EXTREME_PCT = 5.0
+VOLUME_SPIKE_MULTIPLE = 2.0
 
 
 @dataclass
 class TechnicalSignal:
-    """A technical signal for a security."""
     symbol: str
     name: str
     sector: str
     price: float
-    change_pct: float
+    change_pct: Optional[float]
+    bars_available: int
 
-    # Technical indicators
-    price_vs_20dma: float  # % above/below 20 DMA
-    price_vs_50dma: float  # % above/below 50 DMA
-    price_vs_200dma: float  # % above/below 200 DMA
-    rsi: Optional[float]  # RSI value (0-100)
-    volume_vs_avg: float  # Current volume vs 20-day average
+    price_vs_20dma: Optional[float]
+    price_vs_50dma: Optional[float]
+    price_vs_200dma: Optional[float]
+    above_20dma: Optional[bool]
+    above_50dma: Optional[bool]
+    above_200dma: Optional[bool]
+    rsi: Optional[float]
 
-    # Signals
-    above_200dma: bool  # Price > 200 DMA
-    price_near_52week_high: bool  # Within 5% of 52-week high
-    price_near_52week_low: bool  # Within 5% of 52-week low
-    volume_spike: bool  # Volume > 2x average
+    volume_vs_avg: Optional[float]
+    volume_spike: Optional[bool]
 
-    # Score (0-100)
-    technical_score: float
+    lookback_days: int
+    lookback_complete: bool
+    lookback_high: float
+    lookback_low: float
+    near_lookback_high: bool
+    near_lookback_low: bool
 
 
 @dataclass
 class TechnicalScreeningSession:
-    """Results from a technical screening session."""
     created_at: datetime
     total_screened: int
     signals: List[TechnicalSignal]
 
 
-class TechnicalScreener:
-    """Technical analysis screener."""
+def _pct_vs(price: float, reference: Optional[float]) -> Optional[float]:
+    return None if not reference else (price - reference) / reference * 100
 
+
+class TechnicalScreener:
     @staticmethod
     def calculate_moving_average(prices: List[float], period: int) -> Optional[float]:
-        """Calculate simple moving average."""
         if len(prices) < period:
             return None
         return sum(prices[-period:]) / period
 
     @staticmethod
     def calculate_rsi(prices: List[float], period: int = 14) -> Optional[float]:
-        """Calculate Relative Strength Index."""
+        """Simple-average RSI over the last `period` changes."""
         if len(prices) < period + 1:
             return None
-
-        gains = []
-        losses = []
-
-        for i in range(1, len(prices)):
-            change = prices[i] - prices[i - 1]
-            if change > 0:
-                gains.append(change)
-                losses.append(0)
-            else:
-                gains.append(0)
-                losses.append(abs(change))
-
-        avg_gain = sum(gains[-period:]) / period
-        avg_loss = sum(losses[-period:]) / period
-
+        changes = [b - a for a, b in zip(prices[-period - 1:-1], prices[-period:])]
+        avg_gain = sum(c for c in changes if c > 0) / period
+        avg_loss = sum(-c for c in changes if c < 0) / period
         if avg_loss == 0:
-            return 100 if avg_gain > 0 else 50
-
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-        return rsi
+            return 100.0 if avg_gain > 0 else 50.0
+        return 100 - 100 / (1 + avg_gain / avg_loss)
 
     @staticmethod
-    def screen_security(
-        db: Session,
-        security: Security,
-        latest_date: datetime,
-    ) -> Optional[TechnicalSignal]:
-        """Screen a single security for technical signals."""
-
-        # Get latest price
-        latest = db.execute(
-            select(PriceOHLCV)
-            .where(
-                PriceOHLCV.security_id == security.id,
-                PriceOHLCV.trade_date == latest_date,
-            )
-        ).scalar_one_or_none()
-
-        if not latest:
-            return None
-
-        # 252 trading days covers both the 200 DMA and the 52-week high/low below.
+    def screen_security(db: Session, security: Security, latest_date) -> Optional[TechnicalSignal]:
         historical = db.execute(
             select(PriceOHLCV)
-            .where(PriceOHLCV.security_id == security.id)
+            .where(PriceOHLCV.security_id == security.id, PriceOHLCV.trade_date <= latest_date)
             .order_by(PriceOHLCV.trade_date.desc())
-            .limit(252)
+            .limit(LOOKBACK_TARGET_DAYS)
         ).scalars().all()
-
-        if len(historical) < 20:
+        if not historical or historical[0].trade_date != latest_date:
             return None
 
-        prices = [float(p.close) for p in reversed(historical)]
-        volumes = [p.volume or 0 for p in reversed(historical)]
+        bars = list(reversed(historical))
+        prices = [float(b.close) for b in bars]
+        price = prices[-1]
 
-        current_price = float(latest.close)
+        mas = {n: TechnicalScreener.calculate_moving_average(prices, n) for n in (20, 50, 200)}
+        vs = {n: _pct_vs(price, ma) for n, ma in mas.items()}
 
-        # Get previous close for change calculation
-        if len(prices) > 1:
-            prev_close = prices[-2]
-            change_pct = (current_price - prev_close) / prev_close * 100
-        else:
-            change_pct = 0
+        prior_volumes = [b.volume for b in bars[-21:-1] if b.volume is not None]
+        latest_volume = bars[-1].volume
+        volume_vs_avg = None
+        if latest_volume is not None and len(prior_volumes) == 20 and sum(prior_volumes) > 0:
+            volume_vs_avg = latest_volume / (sum(prior_volumes) / 20)
 
-        # Calculate moving averages
-        ma_20 = TechnicalScreener.calculate_moving_average(prices, 20)
-        ma_50 = TechnicalScreener.calculate_moving_average(prices, 50)
-        ma_200 = TechnicalScreener.calculate_moving_average(prices, 200)
-
-        # Calculate distances from MAs
-        price_vs_20dma = ((current_price - ma_20) / ma_20 * 100) if ma_20 else 0
-        price_vs_50dma = ((current_price - ma_50) / ma_50 * 100) if ma_50 else 0
-        price_vs_200dma = ((current_price - ma_200) / ma_200 * 100) if ma_200 else 0
-
-        # Calculate RSI
-        rsi = TechnicalScreener.calculate_rsi(prices)
-
-        # Volume analysis
-        avg_volume = sum(volumes[-20:]) / 20 if len(volumes) >= 20 else sum(volumes) / len(volumes)
-        volume_vs_avg = (latest.volume / avg_volume) if avg_volume > 0 else 1
-
-        # 52-week high/low
-        prices_52week = prices[-252:] if len(prices) >= 252 else prices
-        high_52week = max(prices_52week)
-        low_52week = min(prices_52week)
-
-        # Signals
-        above_200dma = current_price > ma_200 if ma_200 else False
-        price_near_52week_high = (current_price > high_52week * 0.95) if high_52week > 0 else False
-        price_near_52week_low = (current_price < low_52week * 1.05) if low_52week > 0 else False
-        volume_spike = volume_vs_avg > 2.0
-
-        # Calculate technical score (0-100)
-        score = 50  # Base score
-
-        # Price positioning (20 points)
-        if above_200dma:
-            score += 10
-        if price_vs_50dma > 0:
-            score += 5
-        if price_vs_20dma > 5:
-            score += 5
-
-        # Momentum (20 points)
-        if rsi and rsi < 30:
-            score += 10  # Oversold
-        elif rsi and rsi > 70:
-            score -= 5  # Overbought
-
-        # Volatility/Volume (20 points)
-        if volume_spike:
-            score += 10
-
-        # Support/Resistance (20 points)
-        if price_near_52week_low:
-            score += 10  # Near support
-        if price_near_52week_high:
-            score += 5  # Approaching resistance
-
-        # Trend (20 points)
-        if change_pct > 2:
-            score += 8
-        elif change_pct < -2:
-            score -= 8
-
-        score = max(0, min(100, score))  # Clamp 0-100
-
+        high, low = max(prices), min(prices)
         return TechnicalSignal(
             symbol=security.symbol,
             name=security.issuer.name if security.issuer else security.symbol,
             sector=security.issuer.sector.name if security.issuer and security.issuer.sector else "UNKNOWN",
-            price=current_price,
-            change_pct=change_pct,
-            price_vs_20dma=price_vs_20dma,
-            price_vs_50dma=price_vs_50dma,
-            price_vs_200dma=price_vs_200dma,
-            rsi=rsi,
+            price=price,
+            change_pct=_pct_vs(price, prices[-2]) if len(prices) > 1 else None,
+            bars_available=len(prices),
+            price_vs_20dma=vs[20],
+            price_vs_50dma=vs[50],
+            price_vs_200dma=vs[200],
+            above_20dma=None if vs[20] is None else vs[20] > 0,
+            above_50dma=None if vs[50] is None else vs[50] > 0,
+            above_200dma=None if vs[200] is None else vs[200] > 0,
+            rsi=TechnicalScreener.calculate_rsi(prices),
             volume_vs_avg=volume_vs_avg,
-            above_200dma=above_200dma,
-            price_near_52week_high=price_near_52week_high,
-            price_near_52week_low=price_near_52week_low,
-            volume_spike=volume_spike,
-            technical_score=score,
+            volume_spike=None if volume_vs_avg is None else volume_vs_avg > VOLUME_SPIKE_MULTIPLE,
+            lookback_days=len(prices),
+            lookback_complete=len(prices) >= LOOKBACK_TARGET_DAYS,
+            lookback_high=high,
+            lookback_low=low,
+            near_lookback_high=price >= high * (1 - NEAR_EXTREME_PCT / 100),
+            near_lookback_low=price <= low * (1 + NEAR_EXTREME_PCT / 100),
         )
 
     @staticmethod
     def run_screening(db: Session) -> TechnicalScreeningSession:
-        """Run technical screening on all active securities."""
-
-        # Get latest trading date
-        from sqlalchemy import func
-        latest_date = db.execute(
-            select(func.max(PriceOHLCV.trade_date))
-        ).scalar()
-
-        if not latest_date:
-            return TechnicalScreeningSession(
-                created_at=datetime.utcnow(),
-                total_screened=0,
-                signals=[],
-            )
-
-        # Get all active securities
-        securities = db.execute(
-            select(Security).where(Security.is_active.is_(True))
-        ).scalars().all()
-
+        latest_date = db.execute(select(func.max(PriceOHLCV.trade_date))).scalar()
+        securities = db.execute(select(Security).where(Security.is_active.is_(True))).scalars().all()
         signals = []
-        for security in securities:
-            signal = TechnicalScreener.screen_security(db, security, latest_date)
-            if signal:
-                signals.append(signal)
-
-        # Sort by technical score descending
-        signals.sort(key=lambda x: x.technical_score, reverse=True)
-
-        return TechnicalScreeningSession(
-            created_at=datetime.utcnow(),
-            total_screened=len(securities),
-            signals=signals,
-        )
+        if latest_date:
+            for security in securities:
+                signal = TechnicalScreener.screen_security(db, security, latest_date)
+                if signal:
+                    signals.append(signal)
+        signals.sort(key=lambda s: s.symbol)
+        return TechnicalScreeningSession(created_at=datetime.utcnow(), total_screened=len(securities), signals=signals)

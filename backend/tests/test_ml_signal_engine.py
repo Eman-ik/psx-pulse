@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -16,10 +18,33 @@ from app.etl.ml_signal_engine import (
     load_sector_index_panel,
     load_symbol_sector_map,
     synthetic_benchmark,
-    synthetic_market,
     validate_prices,
     validation_metrics,
 )
+
+
+# Seeded test-only market data; lives here so production code can't import a simulator.
+def synthetic_market(symbols: Iterable[str] = ("MARI", "SYS", "FFC", "HBL", "LUCK", "OGDC"), days: int = 720, seed: int = 42) -> pd.DataFrame:
+    """Deterministic development/test data. Never presented as live market data."""
+    rng = np.random.default_rng(seed)
+    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=days)
+    benchmark_returns = rng.normal(0.00035, 0.011, days)
+    benchmark = 100_000 * np.cumprod(1 + benchmark_returns)
+    rows = []
+    for index, symbol in enumerate(symbols):
+        factor = (index - 2.5) * 0.00008
+        returns = 0.65 * benchmark_returns + rng.normal(0.00025 + factor, 0.014 + index * 0.0004, days)
+        close = (80 + index * 35) * np.cumprod(1 + returns)
+        open_ = close * (1 + rng.normal(0, 0.004, days))
+        spread = np.abs(rng.normal(0.01, 0.004, days))
+        volume = rng.lognormal(14.2 + index * 0.08, 0.45, days).astype(int)
+        for i, day in enumerate(dates):
+            rows.append({
+                "date": day, "symbol": symbol, "open": open_[i],
+                "high": max(open_[i], close[i]) * (1 + spread[i]), "low": min(open_[i], close[i]) * (1 - spread[i]),
+                "close": close[i], "volume": volume[i], "benchmark_close": benchmark[i],
+            })
+    return pd.DataFrame(rows)
 
 
 @pytest.fixture(scope="module")

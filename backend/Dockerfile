@@ -22,9 +22,9 @@ COPY . .
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 
-EXPOSE 8001
+EXPOSE 8000
 
 # Alembic migrations are a separate step (docker-compose's backend service runs them
 # before this, or a deploy script does) -- not baked into the container's own startup,
 # so a container restart never silently re-runs migrations against a live DB.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

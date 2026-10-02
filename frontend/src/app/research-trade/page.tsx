@@ -1,7 +1,7 @@
-﻿import { UnifiedResearchTradeFlow } from "@/components/research/UnifiedResearchTradeFlow";
+import { TradeCheck } from "@/components/research/TradeCheck";
 
-export const metadata = { title: "Research-to-Trade Flow | PSX QuantResearch" };
+export const metadata = { title: "Trade check | Khronos" };
 
 export default function ResearchTradePage() {
-  return <UnifiedResearchTradeFlow />;
+  return <TradeCheck />;
 }

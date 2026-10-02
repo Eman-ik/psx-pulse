@@ -55,7 +55,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -498,29 +497,6 @@ class SignalModel:
         return sorted(records, key=lambda x: x["outperformance_probability"], reverse=True)
 
 
-def synthetic_market(symbols: Iterable[str] = ("MARI", "SYS", "FFC", "HBL", "LUCK", "OGDC"), days: int = 720, seed: int = 42) -> pd.DataFrame:
-    """Deterministic development/test data. Never presented as live market data."""
-    rng = np.random.default_rng(seed)
-    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=days)
-    benchmark_returns = rng.normal(0.00035, 0.011, days)
-    benchmark = 100_000 * np.cumprod(1 + benchmark_returns)
-    rows = []
-    for index, symbol in enumerate(symbols):
-        factor = (index - 2.5) * 0.00008
-        returns = 0.65 * benchmark_returns + rng.normal(0.00025 + factor, 0.014 + index * 0.0004, days)
-        close = (80 + index * 35) * np.cumprod(1 + returns)
-        open_ = close * (1 + rng.normal(0, 0.004, days))
-        spread = np.abs(rng.normal(0.01, 0.004, days))
-        volume = rng.lognormal(14.2 + index * 0.08, 0.45, days).astype(int)
-        for i, day in enumerate(dates):
-            rows.append({
-                "date": day, "symbol": symbol, "open": open_[i],
-                "high": max(open_[i], close[i]) * (1 + spread[i]), "low": min(open_[i], close[i]) * (1 - spread[i]),
-                "close": close[i], "volume": volume[i], "benchmark_close": benchmark[i],
-            })
-    return pd.DataFrame(rows)
-
-
 # ─── DB-facing orchestration (new) ──────────────────────────────────────────────────────────
 
 
@@ -634,8 +610,10 @@ def load_fundamental_panel(db: Session) -> pd.DataFrame:
     if not anchors:
         return empty
 
+    # Several periods can share one known_as_of; sorting makes aggfunc="last" pick the latest period.
     wide = (
         ratios.merge(pd.DataFrame(anchors), on=["issuer_id", "period_end"], how="inner")
+        .sort_values("period_end")
         .pivot_table(index=["issuer_id", "known_as_of"], columns="key", values="value", aggfunc="last")
         .reset_index()
     )

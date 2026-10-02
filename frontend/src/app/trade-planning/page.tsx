@@ -1,20 +1,11 @@
-/**
- * Trade Planning Dashboard Page
- *
- * Khronos Module 6 - Trade Planning & Risk Management
- * Integrated into PSX Frontend
- */
-
 import { Metadata } from "next";
-import { UnifiedResearchTradeFlow } from "@/components/UnifiedResearchTradeFlow";
+import { TradeCheck } from "@/components/research/TradeCheck";
 
 export const metadata: Metadata = {
-  title: "Unified Research & Trade Planning | Khronos",
-  description: "Evidence gates, thesis synthesis, and risk-based position sizing",
+  title: "Trade check | Khronos",
+  description: "Individual pre-trade checks and risk-based position sizing from stored PSX data",
 };
 
 export default function TradePlanningPage() {
-  return (
-    <UnifiedResearchTradeFlow />
-  );
+  return <TradeCheck />;
 }

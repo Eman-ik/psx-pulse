@@ -4,7 +4,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from app.api import data_status, market, research_data, research_trade, research_workspace_api, screeners, screening_api, sources, sprint4_endpoints
+from app.api import (
+    admin,
+    companies,
+    comparison,
+    data_status,
+    fundamentals,
+    market,
+    research_trade,
+    research_workspace,
+    screeners,
+    screening_api,
+    sectors,
+    signals,
+    sources,
+    sprint4_endpoints,
+)
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -13,21 +28,29 @@ settings = get_settings()
 
 app = FastAPI(title=settings.app_name)
 
+# CORS only limits which browser origins can read responses; it is not access control.
+# No endpoint uses cookies or auth headers yet, so credentials stay off.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
+# Static /companies/* routes must register before sprint4's /companies/{ticker} catch-all.
+app.include_router(comparison.router)
+app.include_router(companies.router)
 app.include_router(sprint4_endpoints.router)
+app.include_router(sectors.router)
+app.include_router(research_workspace.router)
+app.include_router(admin.router)
+app.include_router(signals.router)
 app.include_router(market.router)
 app.include_router(data_status.router)
+app.include_router(fundamentals.router)
 app.include_router(screeners.router)
 app.include_router(screening_api.router)
-app.include_router(research_data.router)
-app.include_router(research_workspace_api.router)
 app.include_router(research_trade.router)
 app.include_router(sources.router)
 

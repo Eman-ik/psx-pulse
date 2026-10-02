@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 
-type Fact = { id: number; line_item: string; period_end: string; value: number; unit: string; source_document_id: number };
+type Fact = { id: number; line_item: string; period_end: string; value: number; unit: string; scope: string; source_document_id: number };
 type Ratio = {
   key: string;
   name: string;
@@ -157,6 +157,13 @@ export function Fundamentals({ symbol, api }: { symbol: string; api: string }) {
       .filter((f): f is Fact => !!f)
       .map((f) => `${f.line_item} (${yearLabel(f.period_end)}) = ${formatFact(f)}${f.unit === "PKR_thousand" ? " bn" : ""}`);
   const anyFlaggedRatio = data.ratios.some(usesFlaggedBalance);
+  const isLargeChange = (r: Ratio) => r.category === "growth" && Math.abs(r.value) > 100;
+  const anyLargeChange = data.ratios.some(isLargeChange);
+  const sourceById = new Map(data.sources.map((s) => [s.id, s]));
+  const sourceLabel = (f: Fact) => {
+    const s = sourceById.get(f.source_document_id);
+    return `${f.scope} · ${s ? s.url ?? s.local_path : "source"}`;
+  };
 
   return (
     <div className="space-y-8">
@@ -171,12 +178,21 @@ export function Fundamentals({ symbol, api }: { symbol: string; api: string }) {
             ) : (
               s.local_path
             )}
-            {s.document_type.endsWith("manual_entry") && (
-              <span className="text-muted"> (figures entered by hand from this document)</span>
-            )}
+            <span className="text-muted">
+              {" "}
+              ({s.document_type.endsWith("manual_entry")
+                ? "figures entered by hand from this document"
+                : s.document_type === "financials_snapshot"
+                  ? "PSX company page annual table, standalone"
+                  : "company filing on PSX; figures read from the statements and tied out"}
+              )
+            </span>
           </p>
         ))}
-        <p className="text-xs text-muted">Annual, consolidated. Amounts in PKR billions unless marked.</p>
+        <p className="text-xs text-muted">
+          Annual, {[...new Set(data.facts.map((f) => f.scope))].join(" and ")} statements. Amounts in PKR billions unless marked.
+          A dash means that figure has not been loaded from the sources on file for that year.
+        </p>
       </div>
 
       {data.balance_sheet_flags.map((f) => (
@@ -203,8 +219,8 @@ export function Fundamentals({ symbol, api }: { symbol: string; api: string }) {
                   {periods.map((p) => {
                     const f = factAt.get(`${key}|${p}`);
                     return (
-                      <td key={p} className="py-2 pl-3 text-right tabular-nums">
-                        {f ? formatFact(f) : <span className="text-muted" title="Not in the source document">—</span>}
+                      <td key={p} className="py-2 pl-3 text-right tabular-nums" title={f ? sourceLabel(f) : undefined}>
+                        {f ? formatFact(f) : <span className="text-muted" title="Not loaded from the sources on file">—</span>}
                       </td>
                     );
                   })}
@@ -248,6 +264,7 @@ export function Fundamentals({ symbol, api }: { symbol: string; api: string }) {
                           >
                             {formatRatio(r)}
                             {usesFlaggedBalance(r) && <span className="text-negative">†</span>}
+                            {isLargeChange(r) && <span className="text-negative" title="Change of more than 100% in one year">‡</span>}
                           </button>
                         </td>
                       );
@@ -279,6 +296,8 @@ export function Fundamentals({ symbol, api }: { symbol: string; api: string }) {
         Every ratio is computed only from the figures above; select a value to see its inputs. ROA, ROE and turnover use
         the average of opening and closing balances, so their first year is blank.
         {anyFlaggedRatio && " † uses balance-sheet totals from a year where the source doesn't balance."}
+        {anyLargeChange &&
+          " ‡ A change of more than 100% in one year usually reflects a merger, acquisition or restatement rather than organic growth; check the company's announcements before comparing these years."}
       </p>
     </div>
   );

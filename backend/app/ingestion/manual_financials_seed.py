@@ -34,6 +34,9 @@ logger = logging.getLogger(__name__)
 
 # issuer_name -> source label -> {line_item: {year: value}}, values in PKR thousands (except eps, in PKR)
 FFC_DATA = {
+    # standalone: every 2022-23 revenue/PAT figure here equals the standalone figure on PSX's company page,
+    # and FFC's own Q2-2026 standalone statements match that page exactly.
+    "scope": "standalone",
     "source_label": "RAP Workings updated.xlsx (FFC P&L / FFC SOFP) — ACCA RAP workbook from FFC annual reports",
     "fiscal_year_end_month": 12,
     "facts": {
@@ -55,6 +58,8 @@ FFC_DATA = {
 }
 
 EFERT_DATA = {
+    # standalone: 2023-25 revenue equals the standalone figure on PSX's company page exactly.
+    "scope": "standalone",
     "source_label": "EFERT.docx + EFERT_Debt_and_Activity_Ratio_Analysis_2024_2025.xlsx — user-provided EFERT analysis",
     "fiscal_year_end_month": 12,
     "facts": {
@@ -72,6 +77,9 @@ EFERT_DATA = {
 }
 
 FATIMA_DATA = {
+    # consolidated (inferred, not confirmed): revenue is far above PSX's standalone figure for the same
+    # years (e.g. 2025: 276.2bn here vs 170.1bn standalone), so these cannot be standalone.
+    "scope": "consolidated",
     "source_label": "Fatima Fertilizer.pdf — user-provided analysis citing Fatima Annual Reports 2024/2025 and PACRA",
     "fiscal_year_end_month": 12,
     "facts": {
@@ -140,6 +148,7 @@ def seed_issuer_financials(db: Session, issuer_name: str, data: dict) -> dict[st
 
     source_document = _get_or_create_source_document(db, issuer, data["source_label"])
     fiscal_month = data["fiscal_year_end_month"]
+    scope = data["scope"]
 
     inserted = skipped = superseded = 0
     for line_item, values_by_year in data["facts"].items():
@@ -151,7 +160,7 @@ def seed_issuer_financials(db: Session, issuer_name: str, data: dict) -> dict[st
                     FinancialFact.line_item == line_item,
                     FinancialFact.period_end == period_end,
                     FinancialFact.period_type == "annual",
-                    FinancialFact.scope == "consolidated",
+                    FinancialFact.scope == scope,
                     FinancialFact.superseded_by_id.is_(None),
                 )
             ).scalar_one_or_none()
@@ -170,7 +179,7 @@ def seed_issuer_financials(db: Session, issuer_name: str, data: dict) -> dict[st
                     period_start=period_start,
                     period_end=period_end,
                     period_type="annual",
-                    scope="consolidated",
+                    scope=scope,
                     unit=UNIT_OVERRIDES.get(line_item, "PKR_thousand"),
                     value=value,
                     source_document_id=source_document.id,
@@ -189,7 +198,7 @@ def seed_issuer_financials(db: Session, issuer_name: str, data: dict) -> dict[st
                     period_start=period_start,
                     period_end=period_end,
                     period_type="annual",
-                    scope="consolidated",
+                    scope=scope,
                     unit=UNIT_OVERRIDES.get(line_item, "PKR_thousand"),
                     value=value,
                     source_document_id=source_document.id,

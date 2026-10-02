@@ -199,7 +199,7 @@ def ingest_company_financials(db: Session, security: Security, symbol: str) -> d
                 period_start=today,
                 period_end=today,
                 period_type="snapshot",
-                scope="consolidated",
+                scope="standalone",
                 unit="PKR_thousand" if key == "market_cap" else "shares",
                 value=value,
                 source_document_id=source_document.id,
@@ -233,7 +233,7 @@ def ingest_company_financials(db: Session, security: Security, symbol: str) -> d
                     FinancialFact.line_item == key,
                     FinancialFact.period_end == period_end,
                     FinancialFact.period_type == "annual",
-                    FinancialFact.scope == "consolidated",
+                    FinancialFact.scope == "standalone",
                     FinancialFact.superseded_by_id.is_(None),
                 )
             ).scalars().first()
@@ -248,7 +248,7 @@ def ingest_company_financials(db: Session, security: Security, symbol: str) -> d
                     period_start=period_start,
                     period_end=period_end,
                     period_type="annual",
-                    scope="consolidated",  # best-effort guess; not independently confirmed — see docs/source_registry.yaml
+                    scope="standalone",  # verified: matches FFC standalone statements — see docs/source_registry.yaml
                     unit=unit,
                     value=value,
                     source_document_id=source_document.id,
@@ -282,7 +282,7 @@ def ingest_company_financials(db: Session, security: Security, symbol: str) -> d
                         issuer_id=issuer.id,
                         period_end=period_end,
                         period_type="annual",
-                        scope="consolidated",
+                        scope="standalone",
                         value=value,
                         input_fact_ids=[],
                     )

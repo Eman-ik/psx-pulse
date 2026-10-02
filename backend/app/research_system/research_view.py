@@ -36,8 +36,11 @@ def months_old(period_end: date, today: date) -> int:
 
 
 def _last_two(series: list[tuple[date, float]] | None):
+    """The two latest points, only if they are consecutive fiscal years (no missing year between)."""
     s = sorted(series or [])
-    return (s[-2], s[-1]) if len(s) >= 2 else None
+    if len(s) < 2 or not 340 <= (s[-1][0] - s[-2][0]).days <= 390:
+        return None
+    return s[-2], s[-1]
 
 
 def financial_health(ratios: dict[str, list[tuple[date, float]]], today: date) -> dict:
@@ -49,14 +52,15 @@ def financial_health(ratios: dict[str, list[tuple[date, float]]], today: date) -
         ("current_ratio", "Current ratio", CURRENT_RATIO, +1, "x"),
     ]
     score, available, inputs, supports = 0, 0, [], []
-    latest_period = None
+    pairs = {key: _last_two(ratios.get(key)) for key, *_ in rules}
+    # Every signal must describe the same latest year; an older pair would mix eras.
+    latest_period = max((pair[1][0] for pair in pairs.values() if pair), default=None)
     for key, label, threshold, good_direction, unit in rules:
-        pair = _last_two(ratios.get(key))
-        if pair is None:
+        pair = pairs[key]
+        if pair is None or pair[1][0] != latest_period:
             continue
         available += 1
         (p0, v0), (p1, v1) = pair
-        latest_period = max(latest_period or p1, p1)
         delta = v1 - v0
         signal = 0 if abs(delta) < threshold else (1 if delta * good_direction > 0 else -1)
         score += signal

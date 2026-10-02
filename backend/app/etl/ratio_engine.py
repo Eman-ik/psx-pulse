@@ -13,7 +13,7 @@ Two tiers of coverage, matching what's actually in financial_fact for each issue
 
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import math
@@ -52,6 +52,22 @@ def _get_or_create_ratio_definition(db: Session, key: str, name: str, category: 
     return definition
 
 
+def _scope_for(db: Session, issuer_id: int) -> str:
+    """The statement scope an issuer's ratios are computed on: whichever scope has the most annual facts.
+    Ratios never mix scopes; a tie goes to consolidated."""
+    rows = db.execute(
+        select(FinancialFact.scope, func.count()).where(
+            FinancialFact.issuer_id == issuer_id, FinancialFact.period_type == "annual",
+            FinancialFact.superseded_by_id.is_(None)).group_by(FinancialFact.scope)
+    ).all()
+    return max(rows, key=lambda r: (r[1], r[0] == "consolidated"))[0] if rows else "consolidated"
+
+
+def _consecutive(prior, current) -> bool:
+    """True when two annual facts are one fiscal year apart (no missing year in between)."""
+    return 340 <= (current.period_end - prior.period_end).days <= 390
+
+
 def _facts_by_period(db: Session, issuer_id: int, line_item: str) -> list[FinancialFact]:
     return list(
         db.execute(
@@ -60,7 +76,7 @@ def _facts_by_period(db: Session, issuer_id: int, line_item: str) -> list[Financ
                 FinancialFact.issuer_id == issuer_id,
                 FinancialFact.line_item == line_item,
                 FinancialFact.period_type == "annual",
-                FinancialFact.scope == "consolidated",
+                FinancialFact.scope == _scope_for(db, issuer_id),
                 FinancialFact.superseded_by_id.is_(None),
             )
             .order_by(FinancialFact.period_end)
@@ -81,7 +97,7 @@ def compute_growth_ratios(db: Session, issuer_id: int) -> int:
             f"(current period {line_item} - prior period {line_item}) / prior period {line_item} * 100",
         )
         for prior, current in zip(facts, facts[1:]):
-            if prior.value == 0:
+            if prior.value == 0 or not _consecutive(prior, current):
                 continue
             existing = db.execute(
                 select(RatioValue).where(
@@ -107,7 +123,7 @@ def compute_growth_ratios(db: Session, issuer_id: int) -> int:
                     issuer_id=issuer_id,
                     period_end=current.period_end,
                     period_type="annual",
-                    scope="consolidated",
+                    scope=_scope_for(db, issuer_id),
                     value=growth,
                     input_fact_ids=[prior.id, current.id],
                 )
@@ -151,7 +167,7 @@ def compute_net_profit_margin(db: Session, issuer_id: int) -> int:
                 issuer_id=issuer_id,
                 period_end=period_end,
                 period_type="annual",
-                scope="consolidated",
+                scope=_scope_for(db, issuer_id),
                 value=margin,
                 input_fact_ids=[revenue.id, pat.id],
             )
@@ -179,7 +195,7 @@ def _store_ratio_value(
             issuer_id=issuer_id,
             period_end=period_end,
             period_type="annual",
-            scope="consolidated",
+            scope=_scope_for(db, issuer_id),
             value=value,
             input_fact_ids=input_fact_ids,
         )
@@ -428,6 +444,8 @@ def compute_average_denominator_ratios(db: Session, issuer_id: int) -> int:
         )
         definition.unit = unit
         for prior_den, current_den in zip(denominator_facts, denominator_facts[1:]):
+            if not _consecutive(prior_den, current_den):
+                continue
             period_end = current_den.period_end
             numerator = numerators.get(period_end)
             if numerator is None:

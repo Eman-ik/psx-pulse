@@ -37,10 +37,13 @@ class EarningsQualityEngine:
                 "period_type": "Q",
             }
 
-        # Get aligned FY period data (most reliable for earnings quality assessment)
+        # Get aligned FY period data with required + optional metrics
+        # Required: PAT only (absolute minimum for earnings quality)
+        # Optional: OCF, EBIT, other_income, finance_cost, revenue, tax_expense
         aligned_fy = context.get_aligned_values(
-            ["profit_after_tax", "operating_cash_flow", "operating_profit",
-             "other_income", "finance_cost", "revenue", "tax_expense"],
+            required_metrics=["profit_after_tax"],
+            optional_metrics=["operating_cash_flow", "operating_profit",
+                            "other_income", "finance_cost", "revenue", "tax_expense"],
             period_type="FY",
             limit=1
         )
@@ -48,8 +51,9 @@ class EarningsQualityEngine:
         if not aligned_fy:
             # Fall back to Q if FY not available
             aligned_fy = context.get_aligned_values(
-                ["profit_after_tax", "operating_cash_flow", "operating_profit",
-                 "other_income", "finance_cost", "revenue", "tax_expense"],
+                required_metrics=["profit_after_tax"],
+                optional_metrics=["operating_cash_flow", "operating_profit",
+                                "other_income", "finance_cost", "revenue", "tax_expense"],
                 period_type="Q",
                 limit=1
             )
@@ -59,7 +63,7 @@ class EarningsQualityEngine:
                 "status": "insufficient_data",
                 "quality": "Cannot assess",
                 "confidence": "None",
-                "reason": "No aligned period data available",
+                "reason": "Profit after tax data not available",
                 "period_type": "FY/Q",
             }
 
@@ -144,44 +148,65 @@ class EarningsQualityEngine:
                         )
 
         # ============================================================================
-        # ASSIGN QUALITY AND CONFIDENCE
+        # ASSIGN QUALITY AND CONFIDENCE (Graceful degradation)
         # ============================================================================
 
-        if critical_missing:
-            # Cannot claim HIGH without OCF or EBIT
-            quality = "Moderate (provisional)"
-            confidence = "Low"
-            data_coverage = 60
-            narrative = (
-                "Earnings quality cannot be assessed with high confidence due to missing "
-                f"critical metrics: {', '.join(critical_missing)}. "
-                "Core validation (OCF vs. reported earnings) is unavailable. "
-            )
-            if issues:
-                narrative += f"Available checks reveal: {issues[0]}"
+        # Count available optional evidence
+        evidence_count = sum([
+            ocf is not None,
+            ebit is not None,
+            other_income is not None,
+            finance_cost is not None,
+            revenue is not None,
+            tax_expense is not None,
+        ])
 
-        elif issues:
+        status = "partial" if evidence_count < 3 else "complete"
+
+        if issues:
             # Has issues, so at best Moderate
             quality = "Moderate"
-            confidence = "Medium"
-            data_coverage = 85
+            if evidence_count < 2:
+                confidence = "Low"
+                data_coverage = 45
+            elif evidence_count < 4:
+                confidence = "Medium"
+                data_coverage = 65
+            else:
+                confidence = "Medium"
+                data_coverage = 80
+
             narrative = f"Reported earnings show quality concerns: {' '.join(issues[:2])}"
             if positive_indicators:
                 narrative += f" However, {positive_indicators[0]}"
 
+        elif evidence_count >= 4:
+            # Strong evidence, no issues
+            quality = "High"
+            confidence = "High"
+            data_coverage = 90
+            narrative = "Reported earnings are well-supported by available evidence. " + " ".join(positive_indicators[:2] if positive_indicators else ["No issues detected."])
+
+        elif evidence_count >= 2 and ocf is not None:
+            # Core evidence (PAT + OCF) present, no issues
+            quality = "Strong"
+            confidence = "High"
+            data_coverage = 85
+            narrative = "Operating cash flow supports reported earnings quality. " + " ".join(positive_indicators[:2] if positive_indicators else ["No issues detected."])
+
+        elif evidence_count >= 2:
+            # Some evidence but not OCF, no issues
+            quality = "Appears strong"
+            confidence = "Medium"
+            data_coverage = 70
+            narrative = "Available metrics suggest earnings quality, but OCF validation unavailable. "
+
         else:
-            # No issues, has OCF supporting evidence
-            if has_ocf:
-                quality = "High"
-                confidence = "High"
-                data_coverage = 95
-                narrative = "Reported earnings are well-supported by operating cash flow. " + " ".join(positive_indicators)
-            else:
-                # No issues but no OCF either
-                quality = "Appears strong"
-                confidence = "Medium"
-                data_coverage = 75
-                narrative = "Available metrics suggest earnings quality, but cash-flow validation unavailable. "
+            # Only PAT available, no issues (provisional)
+            quality = "Provisional"
+            confidence = "Low"
+            data_coverage = 40
+            narrative = "Limited evidence available for quality assessment. Profit after tax only; additional validation needed. "
 
         # ============================================================================
         # FORMAT OUTPUT WITH EVIDENCE CONTEXT
@@ -195,15 +220,22 @@ class EarningsQualityEngine:
         )
 
         result = output.to_dict()
+        result["status"] = status
         result["issues"] = issues
         result["positive_indicators"] = positive_indicators
         result["quality_rationale"] = {
             "has_ocf_validation": ocf is not None,
             "has_ebit_validation": ebit is not None,
+            "has_revenue": revenue is not None,
+            "has_other_income": other_income is not None,
+            "has_finance_cost": finance_cost is not None,
+            "has_tax_expense": tax_expense is not None,
             "issues_count": len(issues),
             "positive_signals": len(positive_indicators),
+            "evidence_available": evidence_count,
+            "evidence_total": 6,
         }
-        result["period_type"] = period_type  # Explicitly document which period type was analyzed
+        result["period_type"] = period_type
         result["period_end"] = latest.get("period_end").isoformat() if latest.get("period_end") else None
 
         # Validation: check for contradictions with context

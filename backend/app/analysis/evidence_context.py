@@ -8,12 +8,23 @@ This ensures:
 - Data gaps are transparent to the user
 """
 
+from enum import Enum
 from typing import Dict, List, Optional, Set
 from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
 from app.db.models import FinancialFact
+
+
+class ClaimType(str, Enum):
+    """Canonical claim types. Used for both PROHIBITED_CLAIMS validation and can_claim() checks."""
+
+    VALUATION = "valuation"
+    EARNINGS_QUALITY_HIGH = "earnings_quality_high"
+    DIVIDEND_SUSTAINABLE = "dividend_sustainable"
+    COMPANY_SPECIFIC_CONCENTRATION = "company_specific_concentration"
+    STRONG_CASH_GENERATION = "strong_cash_generation"
 
 
 class MetricCoverage:
@@ -68,13 +79,13 @@ class ResearchContext:
         "customer_concentration": ["customer_concentration"],
     }
 
-    # PROHIBITED CLAIMS when data is missing
+    # PROHIBITED CLAIMS when data is missing (must match ClaimType enum and claim_requirements keys)
     PROHIBITED_CLAIMS = {
-        "valuation": ["cheap", "expensive", "undervalued", "overvalued", "priced in", "re-rating", "current valuation"],
-        "earnings_quality_high": ["high earnings quality", "quality score > 80"],
-        "dividend_sustainable": ["dividend sustainability", "dividend safe", "distribution growth"],
-        "company_specific_risk": ["customer concentration", "supplier concentration", "market share"],
-        "ocf_backed_earnings": ["backed by cash", "cash generation strong"],
+        ClaimType.VALUATION: ["cheap", "expensive", "undervalued", "overvalued", "priced in", "re-rating", "current valuation"],
+        ClaimType.EARNINGS_QUALITY_HIGH: ["high earnings quality", "quality score > 80"],
+        ClaimType.DIVIDEND_SUSTAINABLE: ["dividend sustainability", "dividend safe", "distribution growth"],
+        ClaimType.COMPANY_SPECIFIC_CONCENTRATION: ["customer concentration", "supplier concentration", "market share"],
+        ClaimType.STRONG_CASH_GENERATION: ["backed by cash", "cash generation strong"],
     }
 
     def __init__(self, db: Session, issuer_id: int):
@@ -174,23 +185,33 @@ class ResearchContext:
             return []
         return self.metrics[metric].series(periods)
 
-    def can_claim(self, claim_type: str, verbose: bool = False) -> bool:
+    def can_claim(self, claim_type, verbose: bool = False) -> bool:
         """Whether an engine is permitted to make a specific type of claim.
 
         Args:
-            claim_type: One of the keys in PROHIBITED_CLAIMS
+            claim_type: A ClaimType enum value or string (converted to enum)
             verbose: Whether to return reason with result
 
         Returns:
             bool or (bool, str) if verbose
         """
-        # Map claim types to required metrics
+        # Convert string to enum if needed
+        if isinstance(claim_type, str):
+            try:
+                claim_type = ClaimType(claim_type)
+            except ValueError:
+                # Unknown claim type — safest to deny it
+                if verbose:
+                    return False, f"Unknown claim type: {claim_type}"
+                return False
+
+        # Map claim types to required metrics (must match PROHIBITED_CLAIMS keys exactly)
         claim_requirements = {
-            "valuation": ["pe_ratio"],
-            "earnings_quality_high": ["profit_after_tax", "operating_cash_flow"],
-            "dividend_sustainable": ["profit_after_tax", "operating_cash_flow", "dividend_per_share"],
-            "company_specific_concentration": ["customer_concentration"],
-            "strong_cash_generation": ["operating_cash_flow"],
+            ClaimType.VALUATION: ["pe_ratio"],
+            ClaimType.EARNINGS_QUALITY_HIGH: ["profit_after_tax", "operating_cash_flow"],
+            ClaimType.DIVIDEND_SUSTAINABLE: ["profit_after_tax", "operating_cash_flow", "dividend_per_share"],
+            ClaimType.COMPANY_SPECIFIC_CONCENTRATION: ["customer_concentration"],
+            ClaimType.STRONG_CASH_GENERATION: ["operating_cash_flow"],
         }
 
         required = claim_requirements.get(claim_type, [])

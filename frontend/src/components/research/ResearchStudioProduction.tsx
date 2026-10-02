@@ -6,6 +6,7 @@ import { Search } from "lucide-react";
 import { API_BASE_URL } from "@/lib/config";
 import type { SearchResult } from "@/lib/studio-api";
 import { Fundamentals } from "@/components/research/Fundamentals";
+import { ResearchIntelligenceDashboard } from "@/components/ResearchIntelligence";
 import { BusinessTab, GovernanceTab } from "./studio/BusinessTab";
 import { EventsTab } from "./studio/EventsTab";
 import { EvidenceTab } from "./studio/EvidenceTab";
@@ -17,6 +18,7 @@ import { Card, day, Label, num } from "./studio/ui";
 
 const TABS = [
   ["overview", "Overview"],
+  ["intelligence", "Intelligence"],
   ["business", "Business"],
   ["financials", "Financials"],
   ["valuation", "Valuation"],
@@ -171,6 +173,7 @@ export function ResearchStudioProduction() {
           Viewing <span className="font-semibold text-foreground">{symbol}</span>. Research evidence, not a recommendation.
         </p>
         {tab === "overview" && <OverviewTab symbol={symbol} onOpenTab={(t) => go({ tab: t as TabId })} />}
+        {tab === "intelligence" && <ResearchIntelligenceDashboard ticker={symbol} apiUrl={API_BASE_URL} />}
         {tab === "business" && <BusinessTab symbol={symbol} />}
         {tab === "financials" && (
           <Card title="Financial statements and ratios">

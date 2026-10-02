@@ -25,7 +25,7 @@ from app.db.models import Security
 from app.etl.industry_intelligence import build_industry_intelligence
 from app.universe import SNAPSHOT_PATH, coverage_tier
 
-router = APIRouter(prefix="/research-workspace", tags=["research-workspace"])
+router = APIRouter(prefix="/api/v1/research", tags=["research"])
 
 
 def _snapshot() -> dict:

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.research_system.trade_check import run_trade_check
 
-router = APIRouter(prefix="/api/research-trade", tags=["research-trade"])
+router = APIRouter(prefix="/api/v1/research/trade", tags=["research"])
 
 
 class TradeCheckRequest(BaseModel):

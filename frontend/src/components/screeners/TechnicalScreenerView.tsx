@@ -51,7 +51,7 @@ export default function TechnicalScreenerView() {
       rsi_oversold: String(rsiOversold),
       volume_spike: String(volumeSpike),
     })
-    fetch(`${API_BASE_URL}/screeners/technical/filter?${params}`)
+    fetch(`${API_BASE_URL}/api/v1/research/screeners/technical/filter?${params}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((d) => {
         setData(d)

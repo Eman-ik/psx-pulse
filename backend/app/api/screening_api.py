@@ -16,7 +16,7 @@ from app.universe import load_snapshot
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/screening", tags=["screening"])
+router = APIRouter(prefix="/api/v1/research/screening", tags=["research"])
 
 
 def get_issuer_by_symbol(db: Session, symbol: str):

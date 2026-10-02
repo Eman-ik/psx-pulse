@@ -43,7 +43,7 @@ const ResearchIntelligenceDashboard: React.FC<ResearchIntelligenceDashboardProps
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${apiUrl}/research-intelligence/${ticker.toUpperCase()}/analysis`);
+        const response = await fetch(`${apiUrl}/api/v1/research/${ticker.toUpperCase()}/analysis`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch: ${response.statusText}`);

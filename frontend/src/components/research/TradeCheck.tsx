@@ -82,7 +82,7 @@ export function TradeCheck() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/research-trade/check`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/research/trade/check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

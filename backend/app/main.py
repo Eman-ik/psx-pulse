@@ -19,7 +19,6 @@ from app.api import (
     sectors,
     signals,
     sources,
-    sprint4_endpoints,
 )
 from app.api.v1 import companies as v1_companies
 from app.core.config import get_settings
@@ -40,10 +39,9 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-# Static /companies/* routes must register before sprint4's /companies/{ticker} catch-all.
+# Static /companies/* routes must register before any catch-all routes.
 app.include_router(comparison.router)
 app.include_router(companies.router)
-app.include_router(sprint4_endpoints.router)
 app.include_router(sectors.router)
 app.include_router(research_workspace.router)
 app.include_router(admin.router)

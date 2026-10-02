@@ -49,7 +49,7 @@ export default function MomentumScreenerView() {
   const [sortKey, setSortKey] = useState<SortKey>('momentum_12_1')
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/screeners/momentum`)
+    fetch(`${API_BASE_URL}/api/v1/research/screeners/momentum`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(setData)
       .catch(() => setError(`Could not reach the API at ${API_BASE_URL}.`))

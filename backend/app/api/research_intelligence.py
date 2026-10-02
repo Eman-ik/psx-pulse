@@ -28,7 +28,7 @@ from app.analysis.catalyst_engine import CatalystEngine
 from app.analysis.valuation_context import ValuationContextEngine
 from app.analysis.what_to_watch import WhatToWatchEngine
 
-router = APIRouter(prefix="/research-intelligence", tags=["research-intelligence"])
+router = APIRouter(prefix="/api/v1/research", tags=["research"])
 
 
 @router.get("/{ticker}/analysis")

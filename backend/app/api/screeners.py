@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.research_system.momentum_screener import MAX_ANCHOR_GAP_DAYS, MomentumScreener
 from app.research_system.technical_screener import TechnicalScreener
 
-router = APIRouter(prefix="/screeners", tags=["screeners"])
+router = APIRouter(prefix="/api/v1/research/screeners", tags=["research"])
 
 
 def _rounded(signal) -> dict:

@@ -83,7 +83,7 @@ export function ScreeningFunnelView() {
   useEffect(() => {
     const runScreening = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/screening/run`)
+        const response = await fetch(`${API_BASE_URL}/api/v1/research/screening/run`)
         const result = await response.json()
         setData(result)
       } catch (error) {

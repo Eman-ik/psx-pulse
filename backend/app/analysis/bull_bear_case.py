@@ -73,11 +73,9 @@ class BullBearCaseEngine:
 
         bull_case += f"If {', '.join(bull_drivers[-2:]) if bull_drivers else 'current operating trends'} continue, earnings expansion is likely. "
 
-        # ONLY add dividend claim if data exists
+        # ONLY add dividend claim if data exists (completely omit if not allowed)
         if context.can_claim("dividend_sustainable"):
             bull_case += "Dividend sustainability is strong given cash generation."
-        else:
-            bull_case += "Dividend capacity depends on cash flow sustainability."
 
         # BEAR CASE
         bear_drivers = []

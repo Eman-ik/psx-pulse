@@ -8,6 +8,7 @@ Interpretation: The latest result is operationally stronger but deterioration in
 from typing import Optional, Dict
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
+from app.analysis.period_alignment import PeriodAlignedAnalyzer
 
 
 class WhatChangedEngine:
@@ -15,38 +16,44 @@ class WhatChangedEngine:
 
     @staticmethod
     def analyze(context: ResearchContext) -> Dict:
-        """Detect key changes between latest two periods using shared Evidence Context."""
+        """Detect key changes between latest two aligned periods."""
         output = ContextualizedOutput("what_changed", context)
+        analyzer = PeriodAlignedAnalyzer(context)
 
-        # Get all periods from context
-        all_periods = sorted(set(
-            p for m in context.metrics.values() for p in m.periods
-        ))
+        # Get aligned Q data for the latest 2 periods (guaranteed same period type)
+        aligned_metrics = [
+            "revenue", "gross_profit", "finance_cost", "operating_cash_flow",
+            "accounts_receivable", "inventory", "dividend_per_share", "total_debt", "ebitda"
+        ]
+        q_trend = context.get_aligned_values(aligned_metrics, period_type="Q", limit=2)
 
-        if len(all_periods) < 2:
+        if len(q_trend) < 2:
             return {
                 "status": "insufficient_data",
                 "positive_changes": [],
                 "negative_changes": [],
-                "interpretation": "Insufficient period data for comparison.",
+                "interpretation": "Insufficient aligned period data for comparison.",
+                "period_type": "Q",
             }
 
-        period_prior_end = all_periods[-2]
-        period_latest_end = all_periods[-1]
+        latest = q_trend[0]
+        prior = q_trend[1]
+        period_latest_end = latest.get("period_end")
+        period_prior_end = prior.get("period_end")
 
         positive = []
         negative = []
 
         # Revenue growth
-        rev_latest = context.get_value("revenue", period_latest_end)
-        rev_prior = context.get_value("revenue", period_prior_end)
+        rev_latest = latest.get("revenue")
+        rev_prior = prior.get("revenue")
         if rev_latest and rev_prior and rev_prior > 0:
             growth_latest = (rev_latest - rev_prior) / rev_prior
             positive.append(f"Revenue growth reached {growth_latest:.1%}.")
 
         # Gross margin
-        gm_latest = context.get_value("gross_profit", period_latest_end)
-        gm_prior = context.get_value("gross_profit", period_prior_end)
+        gm_latest = latest.get("gross_profit")
+        gm_prior = prior.get("gross_profit")
         if gm_latest and gm_prior and rev_latest and rev_prior:
             gm_bps_latest = (gm_latest / rev_latest) * 10000 if rev_latest > 0 else 0
             gm_bps_prior = (gm_prior / rev_prior) * 10000 if rev_prior > 0 else 0
@@ -56,56 +63,56 @@ class WhatChangedEngine:
             elif change_bps < -50:
                 negative.append(f"Gross margin contracted by {int(abs(change_bps))} bps.")
 
-        # Finance cost
-        fc_latest = context.get_value("finance_cost", period_latest_end)
-        fc_prior = context.get_value("finance_cost", period_prior_end)
-        if fc_latest and fc_prior:
+        # Finance cost (period-aligned comparison)
+        fc_latest = latest.get("finance_cost")
+        fc_prior = prior.get("finance_cost")
+        if fc_latest is not None and fc_prior is not None:
             if fc_latest < fc_prior:
                 positive.append(f"Finance cost declined {((fc_prior - fc_latest) / fc_prior):.1%}.")
             elif fc_latest > fc_prior:
                 negative.append(f"Finance cost increased {((fc_latest - fc_prior) / fc_prior):.1%}.")
 
-        # Operating cash flow
-        ocf_latest = context.get_value("operating_cash_flow", period_latest_end)
-        ocf_prior = context.get_value("operating_cash_flow", period_prior_end)
+        # Operating cash flow (period-aligned comparison)
+        ocf_latest = latest.get("operating_cash_flow")
+        ocf_prior = prior.get("operating_cash_flow")
         if ocf_latest is not None and ocf_prior is not None:
             if ocf_prior < 0 and ocf_latest > 0:
                 positive.append("Operating cash flow turned positive.")
-            elif ocf_latest > ocf_prior:
+            elif ocf_latest > ocf_prior and ocf_prior != 0:
                 positive.append(f"Operating cash flow improved {((ocf_latest - ocf_prior) / abs(ocf_prior)):.1%}.")
 
-        # Receivables
-        ar_latest = context.get_value("accounts_receivable", period_latest_end)
-        ar_prior = context.get_value("accounts_receivable", period_prior_end)
+        # Receivables (period-aligned comparison)
+        ar_latest = latest.get("accounts_receivable")
+        ar_prior = prior.get("accounts_receivable")
         if ar_latest and ar_prior and rev_latest and rev_prior:
             ar_days_latest = (ar_latest / rev_latest) * 365 if rev_latest > 0 else 0
             ar_days_prior = (ar_prior / rev_prior) * 365 if rev_prior > 0 else 0
             if ar_days_latest > ar_days_prior + 5:
                 negative.append(f"Receivable days rose from {ar_days_prior:.0f} to {ar_days_latest:.0f}.")
 
-        # Inventory
-        inv_latest = context.get_value("inventory", period_latest_end)
-        inv_prior = context.get_value("inventory", period_prior_end)
+        # Inventory (period-aligned comparison)
+        inv_latest = latest.get("inventory")
+        inv_prior = prior.get("inventory")
         if inv_latest and inv_prior and rev_latest and rev_prior:
             inv_growth = (inv_latest - inv_prior) / inv_prior if inv_prior > 0 else 0
             rev_growth = (rev_latest - rev_prior) / rev_prior if rev_prior > 0 else 0
             if inv_growth > rev_growth * 1.2:
                 negative.append("Inventory growth exceeded revenue growth.")
 
-        # Dividend
-        dividend_latest = context.get_value("dividend_per_share", period_latest_end)
-        dividend_prior = context.get_value("dividend_per_share", period_prior_end)
-        if dividend_latest and dividend_prior:
+        # Dividend (period-aligned comparison)
+        dividend_latest = latest.get("dividend_per_share")
+        dividend_prior = prior.get("dividend_per_share")
+        if dividend_latest is not None and dividend_prior is not None:
             if dividend_latest > dividend_prior:
                 positive.append(f"Dividend per share increased {((dividend_latest - dividend_prior) / dividend_prior):.1%}.")
             elif dividend_latest < dividend_prior:
                 negative.append(f"Dividend per share fell {((dividend_prior - dividend_latest) / dividend_prior):.1%}.")
 
-        # Debt/EBITDA
-        debt_latest = context.get_value("total_debt", period_latest_end)
-        ebitda_latest = context.get_value("ebitda", period_latest_end)
-        debt_prior = context.get_value("total_debt", period_prior_end)
-        ebitda_prior = context.get_value("ebitda", period_prior_end)
+        # Debt/EBITDA (period-aligned comparison)
+        debt_latest = latest.get("total_debt")
+        ebitda_latest = latest.get("ebitda")
+        debt_prior = prior.get("total_debt")
+        ebitda_prior = prior.get("ebitda")
         if all([debt_latest, ebitda_latest, debt_prior, ebitda_prior]):
             leverage_latest = debt_latest / ebitda_latest if ebitda_latest > 0 else None
             leverage_prior = debt_prior / ebitda_prior if ebitda_prior > 0 else None
@@ -131,7 +138,7 @@ class WhatChangedEngine:
         else:
             interpretation = "No material changes detected since the prior period."
 
-        # Confidence based on data availability
+        # Confidence based on period alignment quality
         metrics_checked = sum([
             context.has_metric("revenue"),
             context.has_metric("gross_profit"),
@@ -140,8 +147,11 @@ class WhatChangedEngine:
             context.has_metric("accounts_receivable"),
             context.has_metric("inventory"),
         ])
+        # Bonus if we have aligned periods
+        alignment_bonus = 10 if len(q_trend) >= 2 else 0
+        coverage = int((metrics_checked / 6) * 100) + alignment_bonus
+
         confidence = "High" if metrics_checked >= 5 else "Medium" if metrics_checked >= 3 else "Low"
-        coverage = (metrics_checked / 6) * 100
 
         # Calculate score based on changes
         score = 50 + len(positive) * 5 - len(negative) * 5
@@ -149,18 +159,19 @@ class WhatChangedEngine:
 
         # Set assessment
         output.set_assessment(
-            assessment="Complete" if len(all_periods) >= 2 else "Partial",
+            assessment="Complete",
             score=score,
             narrative=interpretation,
             confidence=confidence,
-            data_coverage=int(coverage),
+            data_coverage=int(min(100, coverage)),
         )
 
         result = output.to_dict()
         result["periods"] = {
-            "prior": period_prior_end.isoformat(),
-            "latest": period_latest_end.isoformat(),
+            "prior": period_prior_end.isoformat() if period_prior_end else None,
+            "latest": period_latest_end.isoformat() if period_latest_end else None,
         }
+        result["period_type"] = "Q"  # Explicitly document that analysis uses quarterly periods
         result["positive_changes"] = positive
         result["negative_changes"] = negative
 

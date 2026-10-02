@@ -3,11 +3,14 @@
 Instead of showing Revenue +18%, PAT +11%, ROE 24%, this generates:
 Business health: Improving
 Revenue has expanded for three consecutive reporting periods...
+
+NOTE: Uses period-aligned comparisons to ensure FY/Q metrics aren't mixed.
 """
 
 from typing import Optional, Dict
 
 from app.analysis.evidence_context import ResearchContext, ContextualizedOutput
+from app.analysis.period_alignment import PeriodAlignedAnalyzer
 
 
 class BusinessHealthEngine:
@@ -39,8 +42,9 @@ class BusinessHealthEngine:
 
     @staticmethod
     def analyze(context: ResearchContext) -> Dict:
-        """Full business health diagnosis using shared Evidence Context."""
+        """Full business health diagnosis with period-aligned comparisons."""
         output = ContextualizedOutput("business_health", context)
+        analyzer = PeriodAlignedAnalyzer(context)
 
         # Check critical metrics upfront
         has_revenue = context.has_metric("revenue")
@@ -58,37 +62,66 @@ class BusinessHealthEngine:
                 "reason": "Revenue data not available",
             }
 
-        # Get data from context
-        revenue = context.get_series("revenue")
-        pat = context.get_series("profit_after_tax")
-        ocf = context.get_series("operating_cash_flow")
-        total_debt = context.get_series("total_debt")
-        equity = context.get_series("total_equity")
+        # Get FY trend with guaranteed period alignment (all metrics from same FY)
+        fy_trend = analyzer.get_fy_trend(
+            ["revenue", "profit_after_tax", "operating_cash_flow", "total_debt", "total_equity"],
+            limit=5
+        )
 
-        # Calculate growth rates
-        revenue_growth = BusinessHealthEngine.growth_rate(revenue)
-        pat_growth = BusinessHealthEngine.growth_rate(pat)
-        ocf_growth = BusinessHealthEngine.growth_rate(ocf) if has_ocf else None
+        if not fy_trend or len(fy_trend) < 2:
+            return {
+                "status": "insufficient_data",
+                "overall": "Cannot assess",
+                "confidence": "None",
+                "reason": "Insufficient aligned periods for analysis",
+            }
 
-        # Revenue quality: OCF growth vs PAT growth
+        # Calculate growth rates from aligned periods (guaranteed same FY)
+        revenue_growth = None
+        pat_growth = None
+        ocf_growth = None
+
+        if "revenue" in fy_trend[0] and "revenue" in fy_trend[1]:
+            rev_latest = fy_trend[0]["revenue"]
+            rev_prior = fy_trend[1]["revenue"]
+            if rev_prior and rev_prior > 0:
+                revenue_growth = (rev_latest - rev_prior) / rev_prior
+
+        if "profit_after_tax" in fy_trend[0] and "profit_after_tax" in fy_trend[1]:
+            pat_latest = fy_trend[0]["profit_after_tax"]
+            pat_prior = fy_trend[1]["profit_after_tax"]
+            if pat_prior and pat_prior > 0:
+                pat_growth = (pat_latest - pat_prior) / pat_prior
+
+        if has_ocf and "operating_cash_flow" in fy_trend[0] and "operating_cash_flow" in fy_trend[1]:
+            ocf_latest = fy_trend[0]["operating_cash_flow"]
+            ocf_prior = fy_trend[1]["operating_cash_flow"]
+            if ocf_prior and ocf_prior > 0:
+                ocf_growth = (ocf_latest - ocf_prior) / ocf_prior
+
+        # Revenue quality: OCF growth vs PAT growth (now guaranteed aligned periods)
         revenue_quality = "Strong" if ocf_growth and pat_growth and ocf_growth > pat_growth else "Weak" if has_ocf else "Unknown"
 
-        # Margin trend
+        # Margin trend from aligned periods (all from same FY)
         margins = []
-        if len(revenue) > 0 and len(pat) > 0:
-            for i in range(min(len(revenue), len(pat))):
-                if revenue[i] > 0:
-                    margins.append(pat[i] / revenue[i])
+        for period_data in fy_trend:
+            if "revenue" in period_data and "profit_after_tax" in period_data:
+                revenue = period_data["revenue"]
+                profit = period_data["profit_after_tax"]
+                if revenue and revenue > 0:
+                    margins.append(profit / revenue)
 
-        margin_trend = "Expanding" if len(margins) >= 2 and margins[-1] > margins[-2] else "Contracting"
+        margin_trend = "Expanding" if len(margins) >= 2 and margins[0] > margins[1] else "Contracting"
 
-        # Balance sheet direction
+        # Balance sheet direction from aligned periods (debt/equity from same FY)
         leverage_trend = "Improving"
-        if has_total_debt and has_equity and len(total_debt) >= 2 and len(equity) >= 2:
-            debt_last = total_debt[-1]
-            debt_prior = total_debt[-2]
-            equity_last = equity[-1]
-            if equity_last > 0 and debt_last > debt_prior:
+        if (has_total_debt and has_equity and
+            "total_debt" in fy_trend[0] and "total_equity" in fy_trend[0] and
+            "total_debt" in fy_trend[1] and "total_equity" in fy_trend[1]):
+            debt_latest = fy_trend[0]["total_debt"]
+            debt_prior = fy_trend[1]["total_debt"]
+            equity_latest = fy_trend[0]["total_equity"]
+            if equity_latest and equity_latest > 0 and debt_latest and debt_latest > debt_prior:
                 leverage_trend = "Deteriorating"
 
         # Overall health classification
@@ -117,29 +150,32 @@ class BusinessHealthEngine:
         narrative = f"Business health: {overall}\n"
         if revenue_growth:
             narrative += f"Revenue has {'expanded' if revenue_growth > 0 else 'contracted'} "
-            narrative += f"{'for three consecutive reporting periods' if len(revenue) >= 3 else 'in the latest period'}. "
+            narrative += f"{'for three consecutive reporting periods' if len(fy_trend) >= 3 else 'in the latest period'}. "
         if pat_growth and revenue_growth:
             if pat_growth < revenue_growth:
                 narrative += "Profit growth has lagged sales growth, indicating moderate margin pressure. "
             else:
                 narrative += "Profit growth has kept pace with or exceeded sales growth. "
-        if has_ocf and ocf and pat:
+        if has_ocf and ocf_growth is not None:
             narrative += "Operating cash flow remains above reported earnings, which supports earnings quality. "
         if leverage_trend == "Improving":
             narrative += "Leverage has declined and interest coverage has improved. "
         narrative += "The company's core operating position is therefore " + ("strengthening" if improving_count >= 2 else "under pressure") + "."
 
-        # Determine confidence based on data availability
+        # Determine confidence based on data availability (and period alignment)
         available_metrics = sum([has_revenue, has_pat, has_ocf, has_total_debt, has_equity])
+        # Bonus if we have multiple aligned periods for better trend analysis
+        aligned_period_bonus = min(10, (len(fy_trend) - 2) * 5) if len(fy_trend) >= 2 else 0
+
         if available_metrics >= 4:
             confidence = "High"
-            coverage = 95
+            coverage = min(100, 75 + aligned_period_bonus)
         elif available_metrics >= 3:
             confidence = "Medium"
-            coverage = 75
+            coverage = min(100, 60 + aligned_period_bonus)
         else:
             confidence = "Low"
-            coverage = 50
+            coverage = min(100, 40 + aligned_period_bonus)
 
         # Calculate score based on components
         score = 50 + (improving_count - worsening_count) * 10
@@ -151,17 +187,19 @@ class BusinessHealthEngine:
             score=score,
             narrative=narrative,
             confidence=confidence,
-            data_coverage=coverage,
+            data_coverage=int(coverage),
         )
 
         result = output.to_dict()
         result["components"] = components
         result["latest_data_points"] = {
-            "revenue_latest": revenue[-1] if revenue else None,
-            "pat_latest": pat[-1] if pat else None,
-            "ocf_latest": ocf[-1] if ocf else None,
-            "periods_in_series": len(revenue),
+            "revenue_latest": fy_trend[0].get("revenue") if fy_trend else None,
+            "pat_latest": fy_trend[0].get("profit_after_tax") if fy_trend else None,
+            "ocf_latest": fy_trend[0].get("operating_cash_flow") if fy_trend else None,
+            "periods_in_series": len(fy_trend),
         }
+        result["period_type"] = "FY"  # Explicitly document that analysis uses FY-aligned periods
+        result["periods_analyzed"] = [p.get("period_end").isoformat() if p.get("period_end") else None for p in fy_trend]
 
         # Validate for contradictions
         result["validation"] = output.validate()

@@ -29,31 +29,110 @@ class ClaimType(str, Enum):
 
 
 class MetricCoverage:
-    """Coverage of a single metric across periods."""
+    """Coverage of a single metric across periods, scope-aware.
 
-    def __init__(self, metric: str, values: Dict[date, float]):
+    Stores values with scope: {(period_end, scope): value}
+    Supports preferred_scope selection (consolidated > standalone).
+    """
+
+    def __init__(self, metric: str, values: Dict[tuple, float], preferred_scope: str = "consolidated"):
+        """
+        Args:
+            metric: Metric name (e.g., "revenue")
+            values: {(period_end, scope): value} where scope is "consolidated" or "standalone"
+            preferred_scope: Which scope to prefer when both exist (default: "consolidated")
+        """
         self.metric = metric
-        self.values = values  # {period_end: value}
-        self.periods = sorted(values.keys()) if values else []
+        self.raw_values = values  # {(period_end, scope): value} — all raw data
+        self.preferred_scope = preferred_scope
+
+        # Build scope-merged values for common case (single scope per period)
+        self.values = self._merge_by_preferred_scope()
+
+        # Metadata
+        self.periods = sorted(set(period for period, _ in self.values.keys())) if self.values else []
         self.latest_period = self.periods[-1] if self.periods else None
-        self.latest_value = values.get(self.latest_period) if self.latest_period else None
-        self.count = len(values)
+        self.latest_value = self.values.get((self.latest_period, self.preferred_scope)) if self.latest_period else None
+        self.count = len(self.periods)
+
+        # Track scope availability
+        self.scope_info = self._analyze_scope_coverage()
+
+    def _merge_by_preferred_scope(self) -> Dict[tuple, float]:
+        """Merge scope-aware values with preferred scope selection.
+
+        Returns {(period_end, scope): value} with preferred scope preferred.
+        """
+        merged = {}
+
+        # Group by period to see which scopes are available
+        periods_to_scopes: Dict[date, Dict[str, float]] = defaultdict(dict)
+        for (period_end, scope), value in self.raw_values.items():
+            periods_to_scopes[period_end][scope] = value
+
+        # For each period, select preferred scope
+        for period_end, scope_values in periods_to_scopes.items():
+            # Prefer consolidated if available, otherwise standalone
+            if self.preferred_scope in scope_values:
+                scope_to_use = self.preferred_scope
+            else:
+                # Fall back to first available scope
+                scope_to_use = next(iter(scope_values.keys())) if scope_values else None
+
+            if scope_to_use:
+                merged[(period_end, scope_to_use)] = scope_values[scope_to_use]
+
+        return merged
+
+    def _analyze_scope_coverage(self) -> Dict:
+        """Analyze which scopes are available."""
+        scopes_by_period = defaultdict(set)
+        for period_end, scope in self.raw_values.keys():
+            scopes_by_period[period_end].add(scope)
+
+        return {
+            "has_consolidated": any("consolidated" in scopes for scopes in scopes_by_period.values()),
+            "has_standalone": any("standalone" in scopes for scopes in scopes_by_period.values()),
+            "mixed_scope_periods": [str(p) for p, scopes in scopes_by_period.items() if len(scopes) > 1],
+        }
 
     def exists(self) -> bool:
         """Whether this metric has any data."""
-        return self.count > 0
+        return len(self.raw_values) > 0
 
     def has_multiple_periods(self) -> bool:
         """Whether we have at least 2 periods for comparison."""
         return self.count >= 2
 
-    def get_value(self, period_end: date) -> Optional[float]:
-        """Get value for a specific period."""
-        return self.values.get(period_end)
+    def get_value(self, period_end: date, scope: Optional[str] = None) -> Optional[float]:
+        """Get value for a specific period, with optional scope specification.
 
-    def series(self, limit: int = 10) -> List[float]:
-        """Get latest N values as a list."""
-        recent = sorted(self.values.items(), key=lambda x: x[0], reverse=True)[:limit]
+        If scope not specified, uses preferred scope.
+        """
+        if scope is None:
+            scope = self.preferred_scope
+        return self.values.get((period_end, scope))
+
+    def get_value_any_scope(self, period_end: date) -> Optional[float]:
+        """Get value for a period, any scope (useful for checking existence)."""
+        for (p, _), value in self.values.items():
+            if p == period_end:
+                return value
+        return None
+
+    def series(self, limit: int = 10, scope: Optional[str] = None) -> List[float]:
+        """Get latest N values as a list.
+
+        If scope not specified, uses preferred scope.
+        """
+        if scope is None:
+            scope = self.preferred_scope
+
+        recent = sorted(
+            [(p, v) for (p, s), v in self.values.items() if s == scope],
+            key=lambda x: x[0],
+            reverse=True
+        )[:limit]
         return [v for _, v in reversed(recent)]
 
 
@@ -138,19 +217,21 @@ class ResearchContext:
         optional_metrics: Optional[List[str]] = None,
         period_type: str = "FY",
         limit: int = 3,
+        preferred_scope: str = "consolidated",
     ) -> List[Dict[str, any]]:
-        """Get aligned values for metrics from the same period.
+        """Get aligned values for metrics from the same period, with scope preference.
 
         Args:
             required_metrics: Must exist in period for it to be included
             optional_metrics: Included if present, skipped if missing
             period_type: "FY", "Q", "HY", or "TTM"
             limit: Number of most recent periods to return
+            preferred_scope: "consolidated" (default) or "standalone"
 
         Returns:
-            List of dicts: [{period_end, metric1, metric2, ...}, ...]
+            List of dicts: [{period_end, scope, metric1, metric2, ...}, ...]
             Only includes periods where ALL required metrics have data.
-            Optional metrics are attached when available.
+            Preferred scope is used when available; falls back to other scope if needed.
         """
         if optional_metrics is None:
             optional_metrics = []
@@ -165,15 +246,23 @@ class ResearchContext:
 
         # Collect all periods with required metrics
         aligned_data = {}
+        period_scopes = {}  # Track which scope was used for each period
 
-        # First pass: add required metrics
+        # First pass: add required metrics (prefer specified scope)
         for metric_name in required_metrics:
             metric = self.metrics[metric_name]
-            for period_end, value in metric.values.items():
+
+            # Try to get value for each period using preferred scope
+            for (period_end, scope), value in metric.values.items():
                 if self.get_period_type(period_end) == period_type:
                     if period_end not in aligned_data:
                         aligned_data[period_end] = {"period_end": period_end}
-                    aligned_data[period_end][metric_name] = value
+                        period_scopes[period_end] = scope
+
+                    # Only use this scope if it's the one we already selected for this period
+                    # or if we haven't selected a scope yet
+                    if period_scopes[period_end] == scope:
+                        aligned_data[period_end][metric_name] = value
 
         # Filter to periods with ALL required metrics
         complete_periods = [
@@ -181,14 +270,20 @@ class ResearchContext:
             if len(data) >= len(required_metrics) + 1  # +1 for period_end
         ]
 
-        # Second pass: attach optional metrics where available
+        # Add scope info to each result
+        for period_data in complete_periods:
+            period_end = period_data["period_end"]
+            period_data["scope"] = period_scopes.get(period_end, "unknown")
+
+        # Second pass: attach optional metrics where available (use same scope)
         for metric_name in optional_metrics:
             if metric_name in self.metrics:
                 metric = self.metrics[metric_name]
                 for period_data in complete_periods:
                     period_end = period_data["period_end"]
-                    if period_end in metric.values:
-                        period_data[metric_name] = metric.values[period_end]
+                    scope = period_data["scope"]
+                    if (period_end, scope) in metric.values:
+                        period_data[metric_name] = metric.values[(period_end, scope)]
 
         # Sort by period_end descending and limit
         complete_periods.sort(key=lambda x: x["period_end"], reverse=True)
@@ -224,7 +319,11 @@ class ResearchContext:
         return result
 
     def _load_metrics(self) -> None:
-        """Scan database and build complete metric inventory in one query."""
+        """Scan database and build complete metric inventory with scope preservation.
+
+        CRITICAL: Scope (consolidated vs standalone) is now preserved to prevent
+        silent data loss. When both scopes exist for same period, consolidated is preferred.
+        """
         # Single query: fetch all metrics with period_type and scope from database
         rows = self.db.execute(
             select(
@@ -250,18 +349,38 @@ class ResearchContext:
             "ttm": "TTM",
         }
 
-        # Group by metric name in Python (zero queries, single pass)
-        metrics_dict: Dict[str, Dict[date, float]] = defaultdict(dict)
+        # Group by metric name, preserving scope as key part of the structure
+        # NEW: metrics_dict[metric_name][(period_end, scope)] = value
+        metrics_dict: Dict[str, Dict[tuple, float]] = defaultdict(dict)
+        scope_conflicts = []
+
         for line_item, period_start, period_end, period_type, scope, value in rows:
             if value is not None:
                 # Store the database period type (not guessed from date)
                 normalized_type = PERIOD_TYPE_MAP.get(period_type, "Unknown")
                 self._period_types[period_end] = normalized_type
-                metrics_dict[line_item][period_end] = float(value)
 
-        # Build MetricCoverage objects
-        for metric_name, values in metrics_dict.items():
-            self.metrics[metric_name] = MetricCoverage(metric_name, values)
+                # Key is now (period_end, scope) tuple to preserve scope information
+                key = (period_end, scope or "standalone")
+
+                # Detect scope conflicts (same period with different scopes)
+                if (period_end, "consolidated") in metrics_dict[line_item] and scope == "standalone":
+                    scope_conflicts.append(f"{line_item} on {period_end}: both consolidated and standalone")
+                elif (period_end, "standalone") in metrics_dict[line_item] and scope == "consolidated":
+                    scope_conflicts.append(f"{line_item} on {period_end}: both consolidated and standalone")
+
+                metrics_dict[line_item][key] = float(value)
+
+        # Log scope conflicts for transparency
+        if scope_conflicts:
+            import sys
+            print(f"[ResearchContext] Scope conflicts detected (will prefer consolidated):", file=sys.stderr)
+            for conflict in scope_conflicts[:5]:  # Show first 5
+                print(f"  {conflict}", file=sys.stderr)
+
+        # Build MetricCoverage objects with scope-aware structure
+        for metric_name, scope_values in metrics_dict.items():
+            self.metrics[metric_name] = MetricCoverage(metric_name, scope_values, preferred_scope="consolidated")
 
     def _compute_confidence(self) -> None:
         """For each analysis domain, compute what we can and cannot claim."""

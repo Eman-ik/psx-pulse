@@ -10,6 +10,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.services.market_data_service import MarketDataService
+from app.services.technical_calculator import TechnicalCalculator
 from app.schemas.stock_snapshot import (
     StockSnapshot,
     MarketData,
@@ -115,11 +116,34 @@ class SnapshotBuilder:
         return None
 
     def _build_technical(self, ticker: str) -> Optional[TechnicalIndicators]:
-        """Build technical indicators.
+        """Build technical indicators from historical price data.
 
-        Placeholder: Would fetch 52-week range and trend from price history.
+        Fetches 1-year price history and computes:
+        - Support/resistance (52-week high/low)
+        - Trend direction and strength
+        - Average volume
         """
-        return None
+        try:
+            from datetime import timedelta as td
+
+            # Fetch 52-week price history
+            history = self.market_service.get_history(
+                ticker,
+                start_date=date.today() - td(days=365),
+                use_db_cache=True
+            )
+
+            if not history:
+                logger.debug(f"No price history available for {ticker}")
+                return None
+
+            # Calculate technical indicators
+            technical = TechnicalCalculator.calculate(ticker, history)
+            return technical
+
+        except Exception as e:
+            logger.error(f"Error building technical indicators for {ticker}: {e}")
+            return None
 
     def _build_macro(self) -> Optional[MacroContext]:
         """Build macro context.

@@ -1,4 +1,6 @@
-"""What Changed Engine — automatically answer what changed since the previous quarter.
+"""What Changed Engine — automatically answer what changed period-over-period.
+
+Works with quarterly or annual periods (tries Q first, falls back to FY if unavailable).
 
 Positive changes: Revenue growth accelerated from 8% to 17%, Gross margin expanded by 220 bps
 Negative changes: Receivable days rose sharply, Inventory growth exceeded revenue growth
@@ -16,7 +18,12 @@ class WhatChangedEngine:
 
     @staticmethod
     def analyze(context: ResearchContext) -> Dict:
-        """Detect key changes between latest two aligned periods (modular approach)."""
+        """Detect key changes between latest two aligned periods.
+
+        Modular approach: 8 independent comparisons (revenue, margin, finance cost, OCF, AR, inventory, dividend, debt/EBITDA).
+        Period type: tries quarterly first, falls back to annual if quarterly unavailable.
+        Status: partial (1-5 of 8 comparisons), complete (6+ comparisons), insufficient_data (no 2 aligned periods).
+        """
         output = ContextualizedOutput("what_changed", context)
         analyzer = PeriodAlignedAnalyzer(context)
 
@@ -28,11 +35,24 @@ class WhatChangedEngine:
         period_prior_end = None
 
         # Comparison 1: Revenue growth (fundamental - required for other ratios)
+        # Try quarterly first, fall back to annual if not available
         revenue_pair = context.get_aligned_values(
             required_metrics=["revenue"],
             period_type="Q",
             limit=2
         )
+
+        if len(revenue_pair) < 2:
+            # Fall back to annual periods if quarterly unavailable
+            revenue_pair = context.get_aligned_values(
+                required_metrics=["revenue"],
+                period_type="FY",
+                limit=2
+            )
+            period_type = "FY"
+        else:
+            period_type = "Q"
+
         if len(revenue_pair) >= 2:
             latest = revenue_pair[0]
             prior = revenue_pair[1]
@@ -51,14 +71,14 @@ class WhatChangedEngine:
                 "status": "insufficient_data",
                 "positive_changes": [],
                 "negative_changes": [],
-                "interpretation": "Insufficient aligned Q periods with revenue data.",
-                "period_type": "Q",
+                "interpretation": "Insufficient aligned periods (Q or FY) with revenue data.",
+                "period_type": period_type,
             }
 
         # Comparison 2: Gross margin (requires revenue + gross_profit)
         margin_pair = context.get_aligned_values(
             required_metrics=["revenue", "gross_profit"],
-            period_type="Q",
+            period_type=period_type,
             limit=2
         )
         if len(margin_pair) >= 2:
@@ -82,7 +102,7 @@ class WhatChangedEngine:
         # Comparison 3: Finance cost (only needs finance_cost)
         fc_pair = context.get_aligned_values(
             required_metrics=["finance_cost"],
-            period_type="Q",
+            period_type=period_type,
             limit=2
         )
         if len(fc_pair) >= 2:
@@ -99,7 +119,7 @@ class WhatChangedEngine:
         # Comparison 4: Operating cash flow (only needs OCF)
         ocf_pair = context.get_aligned_values(
             required_metrics=["operating_cash_flow"],
-            period_type="Q",
+            period_type=period_type,
             limit=2
         )
         if len(ocf_pair) >= 2:
@@ -116,7 +136,7 @@ class WhatChangedEngine:
         # Comparison 5: Receivables (requires AR + revenue)
         ar_pair = context.get_aligned_values(
             required_metrics=["accounts_receivable", "revenue"],
-            period_type="Q",
+            period_type=period_type,
             limit=2
         )
         if len(ar_pair) >= 2:
@@ -134,7 +154,7 @@ class WhatChangedEngine:
         # Comparison 6: Inventory (requires inventory + revenue)
         inv_pair = context.get_aligned_values(
             required_metrics=["inventory", "revenue"],
-            period_type="Q",
+            period_type=period_type,
             limit=2
         )
         if len(inv_pair) >= 2:
@@ -152,7 +172,7 @@ class WhatChangedEngine:
         # Comparison 7: Dividend per share (only needs DPS)
         dps_pair = context.get_aligned_values(
             required_metrics=["dividend_per_share"],
-            period_type="Q",
+            period_type=period_type,
             limit=2
         )
         if len(dps_pair) >= 2:
@@ -169,7 +189,7 @@ class WhatChangedEngine:
         # Comparison 8: Debt/EBITDA (requires both metrics)
         leverage_pair = context.get_aligned_values(
             required_metrics=["total_debt", "ebitda"],
-            period_type="Q",
+            period_type=period_type,
             limit=2
         )
         if len(leverage_pair) >= 2:

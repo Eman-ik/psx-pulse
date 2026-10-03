@@ -13,6 +13,7 @@ from sqlalchemy import select
 from app.services.market_data_service import MarketDataService
 from app.services.technical_calculator import TechnicalCalculator
 from app.services.financial_context_service import FinancialContextService
+from app.services.macro_context_service import MacroContextService
 from app.schemas.stock_snapshot import (
     StockSnapshot,
     MarketData,
@@ -73,8 +74,8 @@ class SnapshotBuilder:
             # Build technical data (placeholder - would fetch from database)
             technical = self._build_technical(ticker)
 
-            # Build macro context (placeholder - would fetch from market service)
-            macro = self._build_macro()
+            # Build macro context (sector, market cap bracket, index data)
+            macro = self._build_macro(ticker, market_cap=market_data.market_cap)
 
             # Build data quality metadata
             quality = DataQuality(
@@ -175,23 +176,38 @@ class SnapshotBuilder:
             logger.error(f"Error building technical indicators for {ticker}: {e}")
             return None
 
-    def _build_macro(self) -> Optional[MacroContext]:
-        """Build macro context.
+    def _build_macro(self, ticker: str, market_cap: Optional[float] = None) -> Optional[MacroContext]:
+        """Build macro context from sector and economic data.
 
-        Placeholder: Would fetch KSE-100 level and market conditions.
+        Queries:
+        - Company sector from Issuer.sector
+        - Market cap bracket based on market cap
+        - KSE-100 index level and change
         """
-        macro = MacroContext()
+        if not self.db:
+            logger.debug("No database session for macro context")
+            return None
 
-        # Try to fetch KSE-100 snapshot
         try:
-            index_snapshot = self.market_service.get_index_snapshot()
-            if index_snapshot:
-                macro.kse_100_level = index_snapshot.get("price")
-                macro.kse_100_change_pct = index_snapshot.get("change_pct")
-        except Exception as e:
-            logger.debug(f"Could not fetch index snapshot: {e}")
+            # Get issuer ID from ticker
+            from app.db.models import Issuer as IssuerModel
 
-        return macro
+            issuer = self.db.execute(
+                select(IssuerModel).join(Security).where(Security.symbol == ticker)
+            ).scalar_one_or_none()
+
+            if not issuer:
+                logger.debug(f"Issuer not found for {ticker}")
+                return None
+
+            # Use MacroContextService to build context
+            service = MacroContextService(self.db, self.market_service)
+            macro = service.analyze(issuer.id, market_cap_millions=market_cap)
+            return macro
+
+        except Exception as e:
+            logger.error(f"Error building macro context for {ticker}: {e}")
+            return None
 
     def _assess_market_confidence(self, market_snapshot: dict) -> str:
         """Assess confidence in market data.

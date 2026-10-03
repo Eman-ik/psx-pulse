@@ -107,8 +107,112 @@ def _workspace_company(ticker: str, db: Session) -> dict:
 
 
 @router.get("/{ticker}")
-def research_company(ticker: str, db: Session = Depends(get_db)) -> dict:
-    return _workspace_company(ticker, db)
+async def research_company(
+    ticker: str,
+    db: Session = Depends(get_db),
+    analysis_mode: str = "quick",
+    portfolio_size_thousands: int = 100,
+) -> dict:
+    """Get unified research flow for company (v1 API).
+
+    Returns snapshot → analysis → decision in a single call.
+    Falls back to workspace view if analysis services unavailable.
+
+    Args:
+        ticker: Company ticker
+        analysis_mode: Analysis mode (quick/deep/forecast)
+        portfolio_size_thousands: Portfolio size in thousands
+
+    Returns:
+        UnifiedFlowResponse or workspace company data
+    """
+    try:
+        from app.services.snapshot_builder import SnapshotBuilder
+        from app.services.evidence_pack_builder import EvidencePackBuilder
+        from app.services.llm_client import LLMClient
+        from app.services.analyst_engine import AnalystEngine
+        import logging
+
+        flow_status = "complete"
+        snapshot_data = {}
+        analysis_data = {}
+        decision_data = {}
+        evidence_pack = None
+        llm_result = None
+
+        # Stage 1: Build snapshot
+        try:
+            builder = SnapshotBuilder()
+            snapshot = builder.build(ticker)
+            if not snapshot:
+                raise Exception(f"No data for {ticker}")
+
+            evidence_builder = EvidencePackBuilder()
+            evidence_pack = evidence_builder.build(snapshot)
+            if not evidence_pack:
+                raise Exception("Failed to build evidence pack")
+
+            snapshot_data = evidence_pack.to_dict()
+        except Exception as e:
+            logging.error(f"Snapshot stage failed: {e}")
+            flow_status = "partial"
+            snapshot_data = {"error": str(e)}
+
+        # Stage 2: Run analysis
+        try:
+            if not evidence_pack:
+                raise Exception("No evidence pack from stage 1")
+
+            llm = LLMClient()
+            if analysis_mode == "quick":
+                llm_result = llm.analyze_quick(evidence_pack)
+            elif analysis_mode == "deep":
+                llm_result = llm.analyze_deep(evidence_pack)
+            elif analysis_mode == "forecast":
+                llm_result = llm.analyze_forecast(evidence_pack, months=12)
+            else:
+                raise Exception(f"Unknown analysis mode: {analysis_mode}")
+
+            if not llm_result:
+                raise Exception("Analysis failed")
+
+            analysis_data = llm_result.to_dict()
+        except Exception as e:
+            logging.error(f"Analysis stage failed: {e}")
+            if flow_status == "complete":
+                flow_status = "partial"
+            analysis_data = {"error": str(e)}
+
+        # Stage 3: Generate decision
+        try:
+            if not llm_result or not evidence_pack:
+                raise Exception("Missing data from previous stages")
+
+            analyst = AnalystEngine()
+            decision = analyst.decide(llm_result, evidence_pack, portfolio_size_thousands)
+            if not decision:
+                raise Exception("Decision generation failed")
+
+            decision_data = decision.to_dict()
+        except Exception as e:
+            logging.error(f"Decision stage failed: {e}")
+            if flow_status == "complete":
+                flow_status = "partial"
+            decision_data = {"error": str(e)}
+
+        return {
+            "ticker": ticker,
+            "snapshot": snapshot_data,
+            "analysis": analysis_data,
+            "decision": decision_data,
+            "flow_status": flow_status,
+        }
+
+    except Exception as e:
+        import logging
+        logging.error(f"Research company v1 failed for {ticker}: {e}")
+        # Fallback to workspace view on complete failure
+        return _workspace_company(ticker, db)
 
 
 def _latest_value(series: list[dict]) -> float | None:

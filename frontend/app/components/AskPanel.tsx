@@ -1,12 +1,3 @@
-"""Ask Panel — User interface for research queries.
-
-Allows users to:
-1. Enter a ticker symbol
-2. Select analysis mode (quick/deep/forecast)
-3. Submit research request
-4. View snapshot, analysis, and decision results
-"""
-
 'use client';
 
 import { useState } from 'react';
@@ -128,9 +119,9 @@ export default function AskPanel() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/research/${ticker.toUpperCase()}/unified-flow?analysis_mode=${mode}&portfolio_size_thousands=${portfolioSize}`,
+        `http://localhost:8000/api/v1/research/${ticker.toUpperCase()}`,
         {
-          method: 'POST',
+          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },

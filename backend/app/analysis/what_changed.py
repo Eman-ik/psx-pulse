@@ -63,8 +63,12 @@ class WhatChangedEngine:
             rev_prior = prior.get("revenue")
             if rev_latest and rev_prior and rev_prior > 0:
                 growth_latest = (rev_latest - rev_prior) / rev_prior
-                positive.append(f"Revenue growth reached {growth_latest:.1%}.")
-                available_comparisons += 1
+                if growth_latest > 0.02:  # Growth threshold
+                    positive.append(f"Revenue growth reached {growth_latest:.1%}.")
+                    available_comparisons += 1
+                elif growth_latest < -0.02:  # Decline threshold
+                    negative.append(f"Revenue declined {growth_latest:.1%}.")
+                    available_comparisons += 1
         else:
             # Cannot do other comparisons without revenue baseline
             return {
@@ -256,7 +260,7 @@ class WhatChangedEngine:
             "prior": period_prior_end.isoformat() if period_prior_end else None,
             "latest": period_latest_end.isoformat() if period_latest_end else None,
         }
-        result["period_type"] = "Q"  # Explicitly document that analysis uses quarterly periods
+        result["period_type"] = period_type  # Document actual period type used (Q or FY)
         result["positive_changes"] = positive
         result["negative_changes"] = negative
 

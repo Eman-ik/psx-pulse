@@ -268,13 +268,19 @@ class BusinessHealthEngine:
             nm = metrics["net_margin"]
             assessment_rationale_parts.append(f"net margin {nm['trend'].lower()} ({nm['change_bps']:.0f} bps)")
 
-        # Check OCF quality
+        # Check OCF quality (only if we have both metrics)
         if "ocf_growth" in metrics and pat_growth is not None:
             ocf_growth = metrics["ocf_growth"]["value"]
-            if ocf_growth > pat_growth:
-                assessment_rationale_parts.append("OCF growth exceeded earnings growth, validating earnings quality")
+            # Only claim OCF validation if OCF actually exceeds current PAT level
+            if (ocf_growth > pat_growth and
+                "operating_cash_flow" in latest_period and
+                "profit_after_tax" in latest_period):
+                ocf_current = latest_period["operating_cash_flow"]
+                pat_current = latest_period["profit_after_tax"]
+                if ocf_current > pat_current:
+                    assessment_rationale_parts.append("OCF exceeded PAT, validating earnings quality")
             elif ocf_growth < pat_growth * 0.7:
-                assessment_rationale_parts.append("OCF growth lagged earnings, suggesting earnings quality concerns")
+                assessment_rationale_parts.append("OCF growth lagged earnings growth, suggesting earnings quality concerns")
 
         # Build final rationale
         if assessment_rationale_parts:

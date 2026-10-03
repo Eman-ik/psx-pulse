@@ -12,6 +12,7 @@ from app.api import (
     fundamentals,
     market,
     research_intelligence,
+    research_routes,
     research_trade,
     research_workspace,
     screeners,
@@ -54,6 +55,7 @@ app.include_router(fundamentals.router)
 app.include_router(screeners.router)
 app.include_router(screening_api.router)
 app.include_router(research_intelligence.router)
+app.include_router(research_routes.router)
 app.include_router(research_trade.router)
 app.include_router(trade_planning.router)
 app.include_router(sources.router)

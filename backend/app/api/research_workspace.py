@@ -7,7 +7,7 @@ unverified cement rows remain quarantined by ``companies.get_company_overview``.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from io import BytesIO
 import json
 from pathlib import Path
@@ -23,6 +23,7 @@ from app.api.deps import get_db
 from app.api.sectors import cement_sector, fertilizer_sector
 from app.db.models import Security
 from app.etl.industry_intelligence import build_industry_intelligence
+from app.services.historical_financials import get_financials_as_of, get_financials_series
 from app.universe import SNAPSHOT_PATH, coverage_tier
 
 router = APIRouter(prefix="/api/v1/research", tags=["research"])
@@ -350,3 +351,52 @@ def institutional_report(ticker: str, db: Session = Depends(get_db)) -> Streamin
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/financials/as-of")
+def research_financials_as_of(
+    ticker: str,
+    as_of: str,  # ISO format date: YYYY-MM-DD
+    period_type: str = None,
+    scope: str = "standalone",
+    db: Session = Depends(get_db),
+) -> dict:
+    """Get financial facts as they were known on a specific date.
+
+    Args:
+        ticker: Company ticker symbol
+        as_of: Query date in ISO format (YYYY-MM-DD)
+        period_type: Optional filter (annual/half_year/quarterly/ttm)
+        scope: Filter by scope (standalone/consolidated)
+
+    Returns:
+        Dict with facts known as of as_of date, respecting publication dates
+    """
+    try:
+        from datetime import datetime as dt
+
+        as_of_date = dt.strptime(as_of, "%Y-%m-%d").date()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {as_of}") from e
+
+    return get_financials_as_of(db, ticker, as_of_date, period_type, scope)
+
+
+@router.get("/financials/series")
+def research_financials_series(
+    ticker: str,
+    line_item: str,
+    scope: str = "standalone",
+    db: Session = Depends(get_db),
+) -> dict:
+    """Get time series of a single line item for a company.
+
+    Args:
+        ticker: Company ticker symbol
+        line_item: Canonical line item key (e.g. revenue, profit_after_tax)
+        scope: Filter by scope (standalone/consolidated)
+
+    Returns:
+        Dict with all historical values for the line item
+    """
+    return get_financials_series(db, ticker, line_item, scope)

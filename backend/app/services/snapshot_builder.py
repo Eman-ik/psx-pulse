@@ -8,9 +8,11 @@ import logging
 from datetime import datetime, date, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.services.market_data_service import MarketDataService
 from app.services.technical_calculator import TechnicalCalculator
+from app.services.financial_context_service import FinancialContextService
 from app.schemas.stock_snapshot import (
     StockSnapshot,
     MarketData,
@@ -102,11 +104,39 @@ class SnapshotBuilder:
             return None
 
     def _build_financials(self, ticker: str) -> Optional[FinancialMetrics]:
-        """Build financial metrics from database.
+        """Build financial metrics from database facts.
 
-        Placeholder: Would query ResearchContext for multi-period metrics.
+        Queries financial facts and calculates:
+        - Revenue and PAT growth
+        - Profitability margins (net, gross)
+        - Return on assets and equity
+        - Leverage ratios
+        - Cash flow quality
         """
-        return None
+        if not self.db:
+            logger.debug(f"No database session for financial analysis of {ticker}")
+            return None
+
+        try:
+            # Get issuer ID from ticker
+            from app.db.models import Issuer
+
+            issuer = self.db.execute(
+                select(Issuer).where(Issuer.symbol == ticker)
+            ).scalar_one_or_none()
+
+            if not issuer:
+                logger.debug(f"Issuer not found for {ticker}")
+                return None
+
+            # Use FinancialContextService to calculate metrics
+            service = FinancialContextService(self.db)
+            financials = service.analyze(issuer.id)
+            return financials
+
+        except Exception as e:
+            logger.error(f"Error building financial metrics for {ticker}: {e}")
+            return None
 
     def _build_valuation(self, ticker: str) -> Optional[ValuationData]:
         """Build valuation multiples.

@@ -32,6 +32,7 @@ from app.db.models import (
     SourceDocument,
 )
 from app.ingestion.psx_announcements import BASE_URL, HEADERS
+from app.ingestion.duration_normalizer import FactDurationTagger, IngestionValidator
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -188,23 +189,29 @@ def ingest_company_financials(db: Session, security: Security, symbol: str) -> d
     # re-inserted fresh rather than checked against an "existing" period match — unlike
     # annual facts, a stale snapshot is actively misleading (market cap moves daily).
     today = date.today()
+    duration_tagger = FactDurationTagger(db)
+
     for key in ("market_cap", "shares_outstanding"):
         value = equity_profile.get(key)
         if value is None:
             continue
-        db.add(
-            FinancialFact(
-                issuer_id=issuer.id,
-                line_item=key,
-                period_start=today,
-                period_end=today,
-                period_type="snapshot",
-                scope="standalone",
-                unit="PKR_thousand" if key == "market_cap" else "shares",
-                value=value,
-                source_document_id=source_document.id,
-            )
+
+        fact = FinancialFact(
+            issuer_id=issuer.id,
+            line_item=key,
+            period_start=today,
+            period_end=today,
+            period_type="snapshot",
+            scope="standalone",
+            unit="PKR_thousand" if key == "market_cap" else "shares",
+            value=value,
+            source_document_id=source_document.id,
         )
+
+        # Auto-detect and tag duration_basis
+        fact, metadata = duration_tagger.tag_fact(fact)
+
+        db.add(fact)
         facts_inserted += 1
 
     if financials_section is None:
@@ -220,6 +227,7 @@ def ingest_company_financials(db: Session, security: Security, symbol: str) -> d
 
     fiscal_month = _fiscal_year_end_month(soup)
     years, financial_rows = _parse_annual_table(annual_table)
+
     for label, key in LINE_ITEM_MAP.items():
         values_by_year = financial_rows.get(label, {})
         for year, value in values_by_year.items():
@@ -241,19 +249,23 @@ def ingest_company_financials(db: Session, security: Security, symbol: str) -> d
                 skipped += 1
                 continue
             unit = "PKR_thousand" if key != "eps" else "PKR"
-            db.add(
-                FinancialFact(
-                    issuer_id=issuer.id,
-                    line_item=key,
-                    period_start=period_start,
-                    period_end=period_end,
-                    period_type="annual",
-                    scope="standalone",  # verified: matches FFC standalone statements — see docs/source_registry.yaml
-                    unit=unit,
-                    value=value,
-                    source_document_id=source_document.id,
-                )
+
+            fact = FinancialFact(
+                issuer_id=issuer.id,
+                line_item=key,
+                period_start=period_start,
+                period_end=period_end,
+                period_type="annual",
+                scope="standalone",  # verified: matches FFC standalone statements — see docs/source_registry.yaml
+                unit=unit,
+                value=value,
+                source_document_id=source_document.id,
             )
+
+            # Auto-detect and tag duration_basis
+            fact, metadata = duration_tagger.tag_fact(fact)
+
+            db.add(fact)
             facts_inserted += 1
 
     ratios_inserted = 0

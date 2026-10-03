@@ -14,6 +14,7 @@ from app.services.market_data_service import MarketDataService
 from app.services.technical_calculator import TechnicalCalculator
 from app.services.financial_context_service import FinancialContextService
 from app.services.macro_context_service import MacroContextService
+from app.services.announcement_normalizer import AnnouncementNormalizer
 from app.schemas.stock_snapshot import (
     StockSnapshot,
     MarketData,
@@ -77,6 +78,9 @@ class SnapshotBuilder:
             # Build macro context (sector, market cap bracket, index data)
             macro = self._build_macro(ticker, market_cap=market_data.market_cap)
 
+            # Build recent events (normalized announcements)
+            recent_events = self._build_recent_events(ticker)
+
             # Build data quality metadata
             quality = DataQuality(
                 snapshot_time=datetime.utcnow(),
@@ -94,6 +98,7 @@ class SnapshotBuilder:
                 valuation=valuation,
                 technical=technical,
                 macro=macro,
+                recent_events=recent_events,
                 quality=quality,
             )
 
@@ -208,6 +213,39 @@ class SnapshotBuilder:
         except Exception as e:
             logger.error(f"Error building macro context for {ticker}: {e}")
             return None
+
+    def _build_recent_events(self, ticker: str) -> list:
+        """Build recent events from normalized announcements.
+
+        Fetches recent announcements and normalizes them into
+        structured RecentEvent objects with category, sentiment, materiality.
+        """
+        try:
+            # Fetch announcements from market service
+            announcements = self.market_service.get_announcements(ticker)
+            if not announcements:
+                logger.debug(f"No announcements for {ticker}")
+                return []
+
+            # Normalize announcements
+            normalizer = AnnouncementNormalizer()
+            events = normalizer.normalize_batch(ticker, announcements)
+
+            # Filter to only material events (moderate or higher)
+            material_events = [
+                e for e in events
+                if normalizer.is_material_event(
+                    {"title": e.title, "body": e.body},
+                    materiality_threshold="moderate"
+                )
+            ]
+
+            # Limit to 10 most recent material events
+            return material_events[:10]
+
+        except Exception as e:
+            logger.error(f"Error building recent events for {ticker}: {e}")
+            return []
 
     def _assess_market_confidence(self, market_snapshot: dict) -> str:
         """Assess confidence in market data.

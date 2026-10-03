@@ -1,0 +1,164 @@
+'use client';
+
+import { useState } from 'react';
+
+interface FlowResponse {
+  ticker: string;
+  snapshot: any;
+  analysis: any;
+  decision: any;
+  flow_status: 'complete' | 'partial' | 'failed';
+}
+
+export default function AskPanel() {
+  const [ticker, setTicker] = useState('FFC');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<FlowResponse | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/v1/research/${ticker.toUpperCase()}`,
+        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+      );
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setResult(data);
+      setActiveTab(0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem' }}>
+      <h1>📊 PSX Pulse Research</h1>
+      <p>Enter a ticker to analyze with the unified research endpoint</p>
+
+      <form onSubmit={handleSubmit} style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+          <input
+            type="text"
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value.toUpperCase())}
+            placeholder="e.g., FFC, EFERT"
+            style={{
+              padding: '0.5rem',
+              fontSize: '1rem',
+              flex: 1,
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '1rem',
+              background: loading ? '#999' : '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {loading ? 'Analyzing...' : '🔍 Analyze'}
+          </button>
+        </div>
+
+        {error && (
+          <div
+            style={{
+              padding: '1rem',
+              background: '#ffebee',
+              color: '#c62828',
+              borderRadius: '4px',
+              marginBottom: '1rem',
+            }}
+          >
+            ❌ {error}
+          </div>
+        )}
+      </form>
+
+      {result && (
+        <div style={{ borderTop: '2px solid #ddd', paddingTop: '2rem' }}>
+          <h2>{result.ticker} Research Results</h2>
+          <p style={{ color: result.flow_status === 'complete' ? '#4caf50' : '#ff9800' }}>
+            Status: {result.flow_status.toUpperCase()}
+          </p>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: '1rem',
+                borderBottom: '2px solid #eee',
+                marginBottom: '1rem',
+              }}
+            >
+              {['Snapshot', 'Analysis', 'Decision'].map((tab, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveTab(i)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    border: 'none',
+                    background: activeTab === i ? '#2196F3' : 'transparent',
+                    color: activeTab === i ? 'white' : '#666',
+                    cursor: 'pointer',
+                    borderRadius: activeTab === i ? '4px 4px 0 0' : '0',
+                    fontWeight: activeTab === i ? 'bold' : 'normal',
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            <div
+              style={{
+                background: '#f5f5f5',
+                padding: '1.5rem',
+                borderRadius: '4px',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem',
+                maxHeight: '400px',
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {activeTab === 0 && JSON.stringify(result.snapshot, null, 2)}
+              {activeTab === 1 && JSON.stringify(result.analysis, null, 2)}
+              {activeTab === 2 && JSON.stringify(result.decision, null, 2)}
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: '1rem',
+              background: '#e3f2fd',
+            borderRadius: '4px',
+              fontSize: '0.9rem',
+            }}
+          >
+            ℹ️ This analysis is generated by the PSX Pulse backend. Raw API response shown above.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

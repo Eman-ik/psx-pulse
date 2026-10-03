@@ -1,15 +1,15 @@
-import { Container } from '@mui/material';
-import AskPanel from './components/AskPanel';
+import { Suspense } from "react";
+import AskPanel from "@/app/components/AskPanel";
 
 export const metadata = {
   title: 'Investment Research Ask Panel | Khronos',
   description: 'PSX Pulse LLM Integration - Research any ticker with AI-powered analysis',
 };
 
-export default function HomePage() {
+export default function ResearchAskPage() {
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Suspense fallback={null}>
       <AskPanel />
-    </Container>
+    </Suspense>
   );
 }

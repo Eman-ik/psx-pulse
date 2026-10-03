@@ -184,6 +184,7 @@ class ResearchContext:
 
         # Period alignment tracking
         self._period_types: Dict[date, str] = {}  # {period_end: "FY"|"Q"|"TTM"}
+        self._duration_bases: Dict[date, str] = {}  # {period_end: "discrete"|"ytd"|"point_in_time"}
 
         # Load all available data
         self._load_metrics()
@@ -208,8 +209,12 @@ class ResearchContext:
                 self._period_types[period_end] = "Unknown"
 
     def get_period_type(self, period_end: date) -> str:
-        """Get the type of period: 'FY', 'Q', or 'Other'."""
+        """Get the type of period: 'FY', 'Q', 'HY', 'TTM', or 'Unknown'."""
         return self._period_types.get(period_end, "Unknown")
+
+    def get_duration_basis(self, period_end: date) -> str:
+        """Get the duration basis: 'discrete', 'ytd', 'point_in_time', or 'unknown'."""
+        return self._duration_bases.get(period_end, "unknown")
 
     def get_aligned_values(
         self,
@@ -324,7 +329,7 @@ class ResearchContext:
         CRITICAL: Scope (consolidated vs standalone) is now preserved to prevent
         silent data loss. When both scopes exist for same period, consolidated is preferred.
         """
-        # Single query: fetch all metrics with period_type and scope from database
+        # Single query: fetch all metrics with period_type, scope, and duration_basis from database
         rows = self.db.execute(
             select(
                 FinancialFact.line_item,
@@ -332,6 +337,7 @@ class ResearchContext:
                 FinancialFact.period_end,
                 FinancialFact.period_type,
                 FinancialFact.scope,
+                FinancialFact.duration_basis,
                 FinancialFact.value
             )
             .where(
@@ -350,17 +356,24 @@ class ResearchContext:
         }
 
         # Group by metric name, preserving scope as key part of the structure
-        # NEW: metrics_dict[metric_name][(period_end, scope)] = value
+        # metrics_dict[metric_name][(period_end, scope)] = value
         metrics_dict: Dict[str, Dict[tuple, float]] = defaultdict(dict)
         scope_conflicts = []
+        duration_mismatches = []
 
-        for line_item, period_start, period_end, period_type, scope, value in rows:
+        for line_item, period_start, period_end, period_type, scope, duration_basis, value in rows:
             if value is not None:
                 # Store the database period type (not guessed from date)
                 normalized_type = PERIOD_TYPE_MAP.get(period_type, "Unknown")
                 self._period_types[period_end] = normalized_type
 
-                # Key is now (period_end, scope) tuple to preserve scope information
+                # Store duration basis
+                stored_basis = duration_basis or "discrete"
+                if period_end in self._duration_bases and self._duration_bases[period_end] != stored_basis:
+                    duration_mismatches.append(f"{line_item} on {period_end}: mixed duration_basis ({self._duration_bases[period_end]} vs {stored_basis})")
+                self._duration_bases[period_end] = stored_basis
+
+                # Key is (period_end, scope) tuple to preserve scope information
                 key = (period_end, scope or "standalone")
 
                 # Detect scope conflicts (same period with different scopes)
@@ -377,6 +390,13 @@ class ResearchContext:
             print(f"[ResearchContext] Scope conflicts detected (will prefer consolidated):", file=sys.stderr)
             for conflict in scope_conflicts[:5]:  # Show first 5
                 print(f"  {conflict}", file=sys.stderr)
+
+        # Log duration mismatches
+        if duration_mismatches:
+            import sys
+            print(f"[ResearchContext] Duration basis mismatches (mixed discrete/YTD in same period):", file=sys.stderr)
+            for mismatch in duration_mismatches[:5]:
+                print(f"  {mismatch}", file=sys.stderr)
 
         # Build MetricCoverage objects with scope-aware structure
         for metric_name, scope_values in metrics_dict.items():

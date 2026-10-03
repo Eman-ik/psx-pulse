@@ -21,6 +21,7 @@ class FinancialFact(Base):
     period_start: Mapped[date] = mapped_column(Date)
     period_end: Mapped[date] = mapped_column(Date, index=True)
     period_type: Mapped[str] = mapped_column(String(20))  # annual | half_year | quarterly | ttm
+    duration_basis: Mapped[str] = mapped_column(String(20), default="discrete")  # discrete | ytd | point_in_time
     scope: Mapped[str] = mapped_column(String(20))  # standalone | consolidated
     unit: Mapped[str] = mapped_column(String(20), default="PKR")
     value: Mapped[float] = mapped_column(Numeric(20, 2))

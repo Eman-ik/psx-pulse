@@ -5,6 +5,7 @@ import { CheckCircle2, ChevronDown, XCircle } from "lucide-react";
 import type { Domain, Overview } from "@/lib/studio-api";
 import { Card, day, ErrorNote, Label, Loading, Missing, num, pct, stateText, stateTone, tone, when } from "./ui";
 import { useStudio } from "@/lib/studio-api";
+import { IntelligenceSnapshot } from "./IntelligenceSnapshot";
 
 const NOT_ASSESSED = new Set(["INSUFFICIENT_DATA", "UNAVAILABLE"]);
 
@@ -58,24 +59,7 @@ export function OverviewTab({ symbol, onOpenTab }: { symbol: string; onOpenTab: 
 
   return (
     <div className="space-y-6">
-      <Card>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold">{data.name}</h2>
-            <p className="text-sm text-muted">
-              {data.symbol} · {data.sector ?? "Sector not on file"} · {data.listing_status}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold tabular-nums">{price.close == null ? "—" : `PKR ${num(price.close)}`}</p>
-            <p className={`text-sm font-semibold ${tone(price.change_pct)}`}>{pct(price.change_pct)} on the day</p>
-          </div>
-        </div>
-        <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
-          <Label kind={price.freshness.stale ? "STALE" : price.badge} />
-          Close {day(price.freshness.as_of)} · {price.freshness.sources.join(", ") || "no source"} · retrieved {when(price.freshness.retrieved_at)}
-        </p>
-      </Card>
+      <IntelligenceSnapshot symbol={symbol} overview={data} />
 
       <Card title="What it does">
         {data.what_it_does ? (

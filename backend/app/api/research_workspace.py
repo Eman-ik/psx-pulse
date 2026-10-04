@@ -24,6 +24,7 @@ from app.api.sectors import cement_sector, fertilizer_sector
 from app.db.models import Security
 from app.etl.industry_intelligence import build_industry_intelligence
 from app.services.historical_financials import get_financials_as_of, get_financials_series
+from app.services.historical_universe import historical_universe, universe_timeline
 from app.universe import SNAPSHOT_PATH, coverage_tier
 
 router = APIRouter(prefix="/api/v1/research", tags=["research"])
@@ -400,3 +401,67 @@ def research_financials_series(
         Dict with all historical values for the line item
     """
     return get_financials_series(db, ticker, line_item, scope)
+
+
+@router.get("/universe/as-of")
+def research_universe_as_of(
+    as_of: str,  # ISO format date: YYYY-MM-DD
+    min_price_bars: int = 1,
+    min_financial_facts: int = 1,
+    sector: str = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Get the investable universe as it was on a specific date.
+
+    Shows which securities were listed, which had price data, and which had
+    fundamental coverage available on that date.
+
+    Args:
+        as_of: Query date in ISO format (YYYY-MM-DD)
+        min_price_bars: Minimum price records to count as "covered"
+        min_financial_facts: Minimum facts to count as "fundamentals covered"
+        sector: Optional sector filter (e.g., "Fertilizer")
+
+    Returns:
+        Dict with securities list and coverage statistics
+    """
+    try:
+        from datetime import datetime as dt
+
+        as_of_date = dt.strptime(as_of, "%Y-%m-%d").date()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {as_of}") from e
+
+    return historical_universe(
+        db, as_of_date, min_price_bars, min_financial_facts, sector
+    )
+
+
+@router.get("/universe/timeline")
+def research_universe_timeline(
+    start_date: str,  # ISO format: YYYY-MM-DD
+    end_date: str,  # ISO format: YYYY-MM-DD
+    sample_interval_days: int = 30,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Get historical universe snapshots at regular intervals.
+
+    Useful for understanding how investable universe coverage evolved over time.
+
+    Args:
+        start_date: Timeline start (ISO format)
+        end_date: Timeline end (ISO format)
+        sample_interval_days: Snapshot interval
+
+    Returns:
+        Dict with timeline of snapshots and summary statistics
+    """
+    try:
+        from datetime import datetime as dt
+
+        start_dt = dt.strptime(start_date, "%Y-%m-%d").date()
+        end_dt = dt.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format") from e
+
+    return universe_timeline(db, start_dt, end_dt, sample_interval_days)

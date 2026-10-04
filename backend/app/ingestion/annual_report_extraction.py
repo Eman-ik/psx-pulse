@@ -288,7 +288,7 @@ class MetricExtractor:
         db.add(fact)
         run.rows_inserted += 1
 
-        logger.info(f"  ✓ Stored {issuer.symbol} {metric_key} FY{fiscal_year} = {value:,.0f} {unit}")
+        logger.info(f"  ✓ Stored {issuer.name} {metric_key} FY{fiscal_year} = {value:,.0f} {unit}")
 
 
 def extract_and_ingest_reports(
@@ -311,14 +311,25 @@ def extract_and_ingest_reports(
     extractor = MetricExtractor(db)
     summary = {"FFC": {}, "EFERT": {}}
 
+    # Map ticker to issuer name
+    ticker_to_issuer = {
+        "FFC": "Fauji Fertilizer Company Limited",
+        "EFERT": "Engro Fertilizers Limited",
+    }
+
     for company_symbol, years_reports in reports.items():
-        # Get issuer
+        # Get issuer by name
+        issuer_name = ticker_to_issuer.get(company_symbol)
+        if not issuer_name:
+            logger.error(f"Unknown ticker: {company_symbol}")
+            continue
+
         issuer = db.execute(
-            select(Issuer).where(Issuer.symbol == company_symbol)
+            select(Issuer).where(Issuer.name == issuer_name)
         ).scalar_one_or_none()
 
         if not issuer:
-            logger.error(f"Issuer not found: {company_symbol}")
+            logger.error(f"Issuer not found: {issuer_name}")
             continue
 
         logger.info(f"\n{company_symbol} ({issuer.name}):")

@@ -78,16 +78,49 @@ class ResearchOrchestrator:
         validator = ConsistencyValidator(context, all_outputs)
         validation_report = validator.validate_all()
 
-        # Composite confidence from data coverage + consistency
-        engine_coverages = [
+        # CORRECTED: THREE SEPARATE METRICS (not conflated into one)
+        # 1. DATA COVERAGE: percentage of expected data actually available (0-100%)
+        engine_data_coverages = [
             business_health.get("data_coverage_pct", 0),
             what_changed.get("data_coverage_pct", 0),
             earnings_quality.get("data_coverage_pct", 0),
             valuation.get("data_coverage_pct", 0),
         ]
-        avg_coverage = int(sum(engine_coverages) / len(engine_coverages)) if engine_coverages else 0
+        composite_data_coverage = int(sum(engine_data_coverages) / len(engine_data_coverages)) if engine_data_coverages else 0
+
+        # 2. EVIDENCE QUALITY: reliability, recency, provenance of available data
+        # High: audited financials, recent
+        # Medium: quarterly data, some secondary sources
+        # Low: old data, unverified sources
+        # For now, assume "High" if data_coverage > 70%, "Medium" if > 40%, else "Low"
+        if composite_data_coverage >= 70:
+            evidence_quality = "High"
+        elif composite_data_coverage >= 40:
+            evidence_quality = "Medium"
+        else:
+            evidence_quality = "Low"
+
+        # 3. ANALYTICAL CONFIDENCE: confidence in the engine interpretations
+        # Based on: consistency across engines + signal clarity
+        engine_confidences = [
+            business_health.get("classification_confidence", "Low"),
+            what_changed.get("confidence", "Low"),
+            earnings_quality.get("confidence", "Low"),
+            valuation.get("confidence", "Low"),
+        ]
+        # Count "High" confidences
+        high_count = sum(1 for c in engine_confidences if c == "High")
+        if high_count >= 3 and validation_report.get("overall_valid"):
+            overall_analytical_confidence = "High"
+        elif high_count >= 1 or validation_report.get("overall_valid"):
+            overall_analytical_confidence = "Medium"
+        else:
+            overall_analytical_confidence = "Low"
+
+        # Backward compatibility: old "confidence_score" = data_coverage - penalty
+        # (deprecated: do not use for new features)
         consistency_penalty = 0 if validation_report.get("overall_valid") else 20
-        confidence_score = max(0, min(100, avg_coverage - consistency_penalty))
+        deprecated_confidence_score = max(0, min(100, composite_data_coverage - consistency_penalty))
 
         return {
             "issuer_id": issuer_id,
@@ -101,5 +134,10 @@ class ResearchOrchestrator:
             "valuation_context": valuation,
             "what_to_watch": watch_list,
             "validation": validation_report,
-            "confidence_score": confidence_score,
+            # NEW: Three separate metrics
+            "data_coverage_pct": composite_data_coverage,
+            "evidence_quality": evidence_quality,
+            "analytical_confidence": overall_analytical_confidence,
+            # DEPRECATED (for backward compatibility only)
+            "confidence_score": deprecated_confidence_score,
         }

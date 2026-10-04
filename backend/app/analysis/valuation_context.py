@@ -28,6 +28,11 @@ class ValuationContextEngine:
         interpretation = ""
         discount_premium = None
 
+        # CORRECTED: Explicit input tracking for valuation
+        # Expected valuation inputs: current_pe, historical_pe_series, pb_ratio, roe, revenue_growth, sector_median_pe
+        expected_inputs = 6
+        available_inputs = 0
+
         # P/E Assessment — if PE data missing, return insufficient
         if not context.has_metric("pe_ratio") or current_pe is None:
             assessment += "Unavailable"
@@ -45,9 +50,17 @@ class ValuationContextEngine:
             result["validation"] = output.validate()
             return result
 
+        # Count available inputs
+        available_inputs += 1 if current_pe else 0  # current P/E present
+
         # Get historical median from series
         pe_series = context.get_series("pe_ratio", periods=5)
         historical_median_pe = sorted(pe_series)[len(pe_series) // 2] if pe_series and len(pe_series) > 0 else None
+        available_inputs += 1 if historical_median_pe else 0  # historical P/E series present
+        available_inputs += 1 if pb_ratio else 0  # P/B ratio present
+        available_inputs += 1 if roe else 0  # ROE present
+        available_inputs += 1 if rev_growth else 0  # Revenue growth present
+        # Note: sector_median_pe would be tracked here when implemented
 
         if historical_median_pe:
             discount_premium = (current_pe - historical_median_pe) / historical_median_pe
@@ -104,12 +117,20 @@ class ValuationContextEngine:
         if discount_premium:
             score += discount_premium * 100
 
+        # CORRECTED: Data coverage = actual available inputs / expected inputs
+        data_coverage = int((available_inputs / expected_inputs) * 100)
+
+        # Analytical confidence: separate from data coverage
+        # High if we have current PE + historical median (strong comparison point)
+        # Medium if we have current PE only (weaker but sufficient)
+        analytical_confidence = "High" if (current_pe and historical_median_pe) else "Medium" if current_pe else "Low"
+
         output.set_assessment(
             assessment=assessment,
             score=max(0, min(100, score)),
             narrative=interpretation,
-            confidence="High" if historical_median_pe else "Medium",
-            data_coverage=90 if historical_median_pe else 70,
+            confidence=analytical_confidence,
+            data_coverage=data_coverage,
         )
 
         result = output.to_dict()

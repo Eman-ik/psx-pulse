@@ -163,49 +163,42 @@ class EarningsQualityEngine:
 
         status = "partial" if evidence_count < 3 else "complete"
 
-        if issues:
-            # Has issues, so at best Moderate
-            quality = "Moderate"
-            if evidence_count < 2:
-                confidence = "Low"
-                data_coverage = 45
-            elif evidence_count < 4:
-                confidence = "Medium"
-                data_coverage = 65
-            else:
-                confidence = "Medium"
-                data_coverage = 80
+        # CORRECTED: Calculate data_coverage as transparent availability
+        # Expected evidence items: operating_cash_flow, operating_profit, other_income, finance_cost, revenue, tax_expense
+        expected_evidence = 6
+        data_coverage = int((evidence_count / expected_evidence) * 100)
 
+        # Analytical confidence: based on signal strength (issues, consistency, OCF validation)
+        if issues:
+            # Has issues, so analytical confidence at best Medium
+            quality = "Moderate"
+            confidence = "Low" if evidence_count < 2 else "Medium"
             narrative = f"Reported earnings show quality concerns: {' '.join(issues[:2])}"
             if positive_indicators:
                 narrative += f" However, {positive_indicators[0]}"
 
         elif evidence_count >= 4:
-            # Strong evidence, no issues
+            # Strong evidence, no issues → analytical confidence High
             quality = "High"
             confidence = "High"
-            data_coverage = 90
             narrative = "Reported earnings are well-supported by available evidence. " + " ".join(positive_indicators[:2] if positive_indicators else ["No issues detected."])
 
         elif evidence_count >= 2 and ocf is not None:
-            # Core evidence (PAT + OCF) present, no issues
+            # Core evidence (PAT + OCF) present, no issues → analytical confidence High
             quality = "Strong"
             confidence = "High"
-            data_coverage = 85
             narrative = "Operating cash flow supports reported earnings quality. " + " ".join(positive_indicators[:2] if positive_indicators else ["No issues detected."])
 
         elif evidence_count >= 2:
-            # Some evidence but not OCF, no issues
+            # Some evidence but not OCF, no issues → analytical confidence Medium
             quality = "Appears strong"
             confidence = "Medium"
-            data_coverage = 70
             narrative = "Available metrics suggest earnings quality, but OCF validation unavailable. "
 
         else:
-            # Only PAT available, no issues (provisional)
+            # Only PAT available, no issues (provisional) → analytical confidence Low
             quality = "Provisional"
             confidence = "Low"
-            data_coverage = 40
             narrative = "Limited evidence available for quality assessment. Profit after tax only; additional validation needed. "
 
         # ============================================================================

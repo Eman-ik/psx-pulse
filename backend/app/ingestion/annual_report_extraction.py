@@ -313,8 +313,8 @@ def extract_and_ingest_reports(
 
     # Map ticker to issuer name
     ticker_to_issuer = {
-        "FFC": "Fauji Fertilizer Company Limited",
-        "EFERT": "Engro Fertilizers Limited",
+        "FFC": "Fauji Fertilizer Co",
+        "EFERT": "Engro Fertilizer",
     }
 
     for company_symbol, years_reports in reports.items():

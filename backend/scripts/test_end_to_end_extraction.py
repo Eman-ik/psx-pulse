@@ -73,10 +73,17 @@ def main():
     print("\nSTEP 3: Re-Measure Coverage")
     print("-" * 70)
 
+    # Map ticker to issuer name (as stored in database)
+    ticker_to_issuer_name = {
+        "FFC": "Fauji Fertilizer Co",
+        "EFERT": "Engro Fertilizer",
+    }
+
     with SessionLocal() as db:
         for ticker in ["FFC", "EFERT"]:
+            issuer_name = ticker_to_issuer_name.get(ticker)
             issuer = db.execute(
-                select(Issuer).where(Issuer.symbol == ticker)
+                select(Issuer).where(Issuer.name == issuer_name)
             ).scalars().first()
 
             if not issuer:

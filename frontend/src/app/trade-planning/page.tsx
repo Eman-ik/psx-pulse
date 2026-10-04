@@ -1,11 +1,18 @@
 import { Metadata } from "next";
 import { TradeCheck } from "@/components/research/TradeCheck";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 export const metadata: Metadata = {
-  title: "Trade check | Khronos",
-  description: "Individual pre-trade checks and risk-based position sizing from stored PSX data",
+  title: "Trade Planning | PSX Pulse",
+  description: "Position sizing, risk assessment & pre-trade checks for PSX investments",
 };
 
 export default function TradePlanningPage() {
-  return <TradeCheck />;
+  return (
+    <AppLayout>
+      <div className="flex-1">
+        <TradeCheck />
+      </div>
+    </AppLayout>
+  );
 }

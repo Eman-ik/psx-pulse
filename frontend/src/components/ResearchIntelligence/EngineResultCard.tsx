@@ -11,6 +11,7 @@ interface EngineResult {
   missing_critical_metrics?: string[];
   narrative?: string;
   status?: string;
+  reason?: string;
 }
 
 interface EngineResultCardProps {

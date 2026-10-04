@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 
 const mainNav = [
-  { label: "Screener", icon: SlidersHorizontal, href: "/screener" },
+  { label: "Dashboard", icon: BarChart2, href: "/" },
+  { label: "Market Overview", icon: BarChart2, href: "/market" },
   { label: "Research Studio", icon: FileSearch, href: "/research" },
+  { label: "Screeners", icon: SlidersHorizontal, href: "/screening" },
   { label: "Academy", icon: GraduationCap, href: "#", disabled: true },
   { label: "Watchlists & Alerts", icon: Bell, href: "#", disabled: true },
 ];
@@ -38,10 +40,10 @@ export default function Sidebar() {
           </span>
           <div className="flex flex-col">
             <span className="text-base font-bold tracking-tight text-[#10161A]">
-              PSX<span className="text-[#566680] font-medium ml-1">Research</span>
+              PSX<span className="text-[#566680] font-medium ml-1">Pulse</span>
             </span>
             <span className="text-[10px] uppercase font-mono tracking-widest text-[#8E9CB7]">
-              Intelligence Studio
+              Research Platform
             </span>
           </div>
         </div>
@@ -52,9 +54,9 @@ export default function Sidebar() {
         <nav className="flex flex-col gap-1.5">
           {mainNav.map(({ label, icon: Icon, href, disabled }) => {
             const active = href !== "#" && (href === "/" ? pathname === "/" : pathname.startsWith(href));
-            const isScreenerMain = href === "/screener";
+            const isScreenersMain = href === "/screening";
             const isScreenerSubActive = pathname === "/screening" || pathname === "/technical" || pathname === "/momentum";
-            const showScreenerSub = isScreenerMain || isScreenerSubActive;
+            const showScreenerSub = isScreenersMain || isScreenerSubActive;
 
             return (
               <div key={label}>
@@ -62,14 +64,14 @@ export default function Sidebar() {
                   href={href}
                   aria-disabled={disabled}
                   className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                    (active || (isScreenerMain && isScreenerSubActive))
+                    (active || (isScreenersMain && isScreenerSubActive))
                       ? "bg-[#10161A] text-[#DAE1EE] shadow-md shadow-[#10161A]/15"
                       : disabled
                         ? "cursor-not-allowed text-[#8E9CB7]/60"
                         : "text-[#566680] hover:bg-white/60 hover:text-[#10161A]"
                   }`}
                 >
-                  <Icon size={16} className={(active || (isScreenerMain && isScreenerSubActive)) ? "text-[#DAE1EE]" : "text-[#566680]"} />
+                  <Icon size={16} className={(active || (isScreenersMain && isScreenerSubActive)) ? "text-[#DAE1EE]" : "text-[#566680]"} />
                   <span>{label}</span>
                   {disabled && (
                     <span className="ml-auto rounded-md bg-[#B4C0D5]/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-[#566680]">
@@ -77,7 +79,7 @@ export default function Sidebar() {
                     </span>
                   )}
                 </Link>
-                {isScreenerMain && (
+                {isScreenersMain && (
                   <div className="mt-1 ml-4 flex flex-col gap-1 border-l border-[#8E9CB7]/30 pl-3">
                     {screenerTypes.map(({ label: typeLabel, href: typeHref }) => {
                       const isActive = pathname === typeHref;

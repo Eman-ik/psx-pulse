@@ -1,15 +1,16 @@
-import Sidebar from '@/components/dashboard/Sidebar'
+import { AppLayout } from '@/components/layout/AppLayout'
 import TechnicalScreenerView from '@/components/screeners/TechnicalScreenerView'
+
+export const metadata = {
+  title: 'Technical Analysis | PSX Pulse',
+}
 
 export default function TechnicalPage() {
   return (
-    <div className="flex min-h-screen w-full bg-bg">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="flex-1 px-6 py-6 lg:px-8">
-          <TechnicalScreenerView />
-        </main>
+    <AppLayout>
+      <div className="flex-1 px-6 py-6 lg:px-8">
+        <TechnicalScreenerView />
       </div>
-    </div>
+    </AppLayout>
   )
 }

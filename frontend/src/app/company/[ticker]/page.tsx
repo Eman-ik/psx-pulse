@@ -242,7 +242,7 @@ export default function CompanyPage() {
       <div className="bg-gray-800 text-gray-300 py-8 mt-16">
         <div className="max-w-6xl mx-auto px-6 text-center">
           <p className="text-sm">
-            Khronos Financial Research MVP • Sprint 4 Frontend
+            PSX Pulse Research Platform
           </p>
         </div>
       </div>

@@ -3,7 +3,7 @@
 import { API_BASE_URL } from "@/lib/config";
 import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react'
-import Sidebar from '@/components/dashboard/Sidebar'
+import { AppLayout } from '@/components/layout/AppLayout'
 
 interface MarketSnapshot {
   timestamp: string
@@ -54,38 +54,30 @@ export default function MarketPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen w-full bg-bg">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <main className="flex-1 px-6 py-6 flex items-center justify-center">
-            <div className="text-muted">Loading market data...</div>
-          </main>
+      <AppLayout>
+        <div className="flex-1 px-6 py-6 flex items-center justify-center">
+          <div className="text-muted">Loading market data...</div>
         </div>
-      </div>
+      </AppLayout>
     )
   }
 
   if (fetchError) {
     return (
-      <div className="flex min-h-screen w-full bg-bg">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <main className="flex-1 px-6 py-6 lg:px-8">
-            <div className="rounded-lg border border-negative/30 bg-negative/5 p-4 text-negative">
-              <p className="font-semibold">Error Loading Market Data</p>
-              <p className="text-sm mt-1">{fetchError}</p>
-            </div>
-          </main>
+      <AppLayout>
+        <div className="flex-1 px-6 py-6 lg:px-8">
+          <div className="rounded-lg border border-negative/30 bg-negative/5 p-4 text-negative">
+            <p className="font-semibold">Error Loading Market Data</p>
+            <p className="text-sm mt-1">{fetchError}</p>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     )
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-bg">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="flex-1 px-6 py-6 lg:px-8 space-y-6">
+    <AppLayout>
+      <div className="flex-1 px-6 py-6 lg:px-8 space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Market Overview</h1>
@@ -256,8 +248,7 @@ export default function MarketPage() {
               </div>
             </div>
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
+    </AppLayout>
   )
 }

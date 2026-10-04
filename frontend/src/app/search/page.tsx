@@ -1,5 +1,5 @@
 /**
- * Sprint 4: Search Page
+ * Search Page
  *
  * Main entry point for finding companies.
  */
@@ -30,8 +30,8 @@ export default function SearchPage() {
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-6 py-8">
-          <h1 className="text-4xl font-bold mb-2">Khronos</h1>
-          <p className="text-gray-600">PSX research built only on data with a known source.</p>
+          <h1 className="text-4xl font-bold mb-2">PSX Pulse</h1>
+          <p className="text-gray-600">Research built only on data with a known source.</p>
         </div>
       </div>
 
@@ -82,7 +82,7 @@ export default function SearchPage() {
       <div className="bg-gray-800 text-gray-300 py-8 mt-16">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <p className="text-sm">
-            Khronos Financial Research MVP • Sprint 4 Frontend
+            PSX Pulse Research Platform
           </p>
         </div>
       </div>

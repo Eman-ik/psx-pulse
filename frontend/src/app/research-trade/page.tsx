@@ -1,7 +1,5 @@
-import { TradeCheck } from "@/components/research/TradeCheck";
-
-export const metadata = { title: "Trade check | Khronos" };
+import { redirect } from "next/navigation";
 
 export default function ResearchTradePage() {
-  return <TradeCheck />;
+  redirect("/research?tab=trade");
 }

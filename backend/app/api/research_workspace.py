@@ -26,6 +26,7 @@ from app.etl.industry_intelligence import build_industry_intelligence
 from app.services.historical_financials import get_financials_as_of, get_financials_series
 from app.services.historical_universe import historical_universe, universe_timeline
 from app.services.historical_feature_engine import HistoricalFeatureEngine
+from app.services.historical_snapshot import HistoricalSnapshotEngine
 from app.universe import SNAPSHOT_PATH, coverage_tier
 
 router = APIRouter(prefix="/api/v1/research", tags=["research"])
@@ -498,3 +499,38 @@ def research_features_as_of(
     engine = HistoricalFeatureEngine(db)
     features = engine.calculate(ticker, as_of_date, scope=scope)
     return features.to_dict()
+
+
+@router.get("/snapshot/as-of")
+def research_snapshot_as_of(
+    ticker: str,
+    as_of: str,  # ISO format date: YYYY-MM-DD
+    scope: str = "standalone",
+    db: Session = Depends(get_db),
+) -> dict:
+    """Get complete historical snapshot for a company as-of a specific date.
+
+    Merges Stages 1-3 into unified view:
+    - Universe membership (was it listed, had price/fundamental coverage)
+    - Financial features (growth, profitability, leverage, cash flow)
+    - Price data (closing price on or before as_of_date)
+    - Quality assessment (complete/partial/insufficient)
+
+    Args:
+        ticker: Company ticker symbol
+        as_of: Snapshot date in ISO format (YYYY-MM-DD)
+        scope: Filter by scope (standalone/consolidated)
+
+    Returns:
+        Dict with complete snapshot and investability flag
+    """
+    try:
+        from datetime import datetime as dt
+
+        as_of_date = dt.strptime(as_of, "%Y-%m-%d").date()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {as_of}") from e
+
+    engine = HistoricalSnapshotEngine(db)
+    snapshot = engine.snapshot(ticker, as_of_date, scope=scope)
+    return snapshot.to_dict()

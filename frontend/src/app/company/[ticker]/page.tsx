@@ -9,6 +9,7 @@ import { API_BASE_URL } from "@/lib/config";
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { FinancialTable } from '@/components/FinancialTable';
+import { SectionHeader, LoadingCard, ErrorState, StatusBadge } from '@/components/glass';
 
 interface Company {
   id: number;
@@ -142,11 +143,11 @@ export default function CompanyPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="text-center py-12">
-            <div className="text-gray-600">Loading company data...</div>
-          </div>
+      <main className="min-h-screen bg-[var(--bg-page-deep)]">
+        <div className="atmospheric-bg" aria-hidden="true" />
+        <div className="grain-overlay" aria-hidden="true" />
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12">
+          <LoadingCard message="Loading company data..." />
         </div>
       </main>
     );
@@ -154,96 +155,97 @@ export default function CompanyPage() {
 
   if (error || !company) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="text-center py-12">
-            <div className="text-red-600 font-semibold">{error || 'Company not found'}</div>
-          </div>
+      <main className="min-h-screen bg-[var(--bg-page-deep)]">
+        <div className="atmospheric-bg" aria-hidden="true" />
+        <div className="grain-overlay" aria-hidden="true" />
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-12">
+          <ErrorState
+            title="Company Not Found"
+            description={error || 'The company you are looking for does not exist in our database.'}
+            action={<a href="/search" className="glass-btn-secondary text-sm">← Back to Search</a>}
+          />
         </div>
       </main>
     );
   }
 
-  const getCoverageBadgeColor = (tier: string) => {
+  const getCoverageBadgeStatus = (tier: string): 'positive' | 'warning' | 'neutral' => {
     switch (tier) {
-      case 'full': return 'bg-green-100 text-green-800';
-      case 'partial': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'full': return 'positive';
+      case 'partial': return 'warning';
+      default: return 'neutral';
     }
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">{company.ticker}</h1>
-              <p className="text-lg text-gray-600 mb-3">{company.name}</p>
-              <div className="flex gap-3">
-                <span className="text-sm text-gray-600">Sector: {company.sector}</span>
-                <span className={`text-xs px-2 py-1 rounded ${getCoverageBadgeColor(company.coverage_tier)}`}>
-                  {company.coverage_tier.toUpperCase()} COVERAGE
-                </span>
+    <main className="min-h-screen bg-[var(--bg-page-deep)]">
+      <div className="atmospheric-bg" aria-hidden="true" />
+      <div className="grain-overlay" aria-hidden="true" />
+
+      <div className="relative z-10">
+        {/* Header */}
+        <div className="border-b border-[rgba(142,156,183,0.2)]">
+          <div className="max-w-6xl mx-auto px-6 py-12">
+            <div className="flex justify-between items-start gap-8">
+              <div className="flex-1">
+                <h1 className="text-5xl font-bold mb-2 text-[var(--text-primary)]">{company.ticker}</h1>
+                <p className="text-lg text-[var(--text-secondary)] mb-4">{company.name}</p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm text-[var(--text-secondary)]">Sector: {company.sector}</span>
+                  <StatusBadge
+                    status={getCoverageBadgeStatus(company.coverage_tier)}
+                    label={`${company.coverage_tier.toUpperCase()} Coverage`}
+                  />
+                </div>
               </div>
-            </div>
-            <a
-              href="/search"
-              className="text-blue-600 hover:text-blue-800 underline text-sm"
-            >
-              ← Back to Search
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {/* Period Selector */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {periods.map(period => (
-              <button
-                key={period.id}
-                onClick={() => setSelectedPeriodId(period.id)}
-                className={`px-4 py-2 rounded whitespace-nowrap transition ${
-                  selectedPeriodId === period.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                }`}
+              <a
+                href="/search"
+                className="glass-btn-secondary text-sm whitespace-nowrap"
               >
-                {period.period_type === 'annual'
-                  ? `FY${period.fiscal_year}`
-                  : `Q${period.quarter} ${period.fiscal_year}`}
-              </button>
-            ))}
+                ← Back to Search
+              </a>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Financial Data */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {facts.length === 0 ? (
-          <div className="bg-white rounded-lg p-8 text-center">
-            <p className="text-gray-600">No financial data available for this period</p>
+        {/* Period Selector */}
+        <div className="border-b border-[rgba(142,156,183,0.2)] sticky top-0 z-10 bg-[var(--surface-glass)]">
+          <div className="max-w-6xl mx-auto px-6 py-4">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {periods.map(period => (
+                <button
+                  key={period.id}
+                  onClick={() => setSelectedPeriodId(period.id)}
+                  className={`px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
+                    selectedPeriodId === period.id
+                      ? 'glass-btn-primary text-xs font-semibold'
+                      : 'glass-btn-secondary text-xs font-semibold'
+                  }`}
+                >
+                  {period.period_type === 'annual'
+                    ? `FY${period.fiscal_year}`
+                    : `Q${period.quarter} ${period.fiscal_year}`}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow p-8">
-            <FinancialTable
-              facts={facts}
-              sources={sources}
-              priorFacts={priorFacts}
-            />
-          </div>
-        )}
-      </div>
+        </div>
 
-      {/* Footer */}
-      <div className="bg-gray-800 text-gray-300 py-8 mt-16">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <p className="text-sm">
-            PSX Pulse Research Platform
-          </p>
+        {/* Financial Data */}
+        <div className="max-w-6xl mx-auto px-6 py-12">
+          {facts.length === 0 ? (
+            <div className="glass-card p-8 text-center">
+              <p className="text-[var(--text-secondary)]">No financial data available for this period</p>
+            </div>
+          ) : (
+            <div className="glass-strong p-8">
+              <FinancialTable
+                facts={facts}
+                sources={sources}
+                priorFacts={priorFacts}
+              />
+            </div>
+          )}
         </div>
       </div>
     </main>

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   SlidersHorizontal,
@@ -12,6 +11,8 @@ import {
   BarChart2,
   FileSearch,
 } from "lucide-react";
+import { NavigationItem } from "@/components/glass";
+import clsx from "clsx";
 
 const mainNav = [
   { label: "Dashboard", icon: BarChart2, href: "/" },
@@ -28,75 +29,77 @@ const screenerTypes = [
   { label: "Momentum Analysis", href: "/momentum" },
 ];
 
+const supportNav = [
+  { label: "Documentation", icon: HelpCircle, href: "#" },
+  { label: "Preferences", icon: Settings, href: "#" },
+  { label: "Sign Out", icon: LogOut, href: "#" },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
 
+  const isActive = (href: string) => {
+    if (href === "#") return false;
+    return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  };
+
+  const isScreenerSubActive =
+    pathname === "/screening" || pathname === "/technical" || pathname === "/momentum";
+
   return (
-    <aside className="hidden lg:flex w-64 shrink-0 flex-col justify-between border-r border-white/60 bg-[rgba(218,225,238,0.75)] backdrop-blur-xl px-5 py-6">
+    <aside className={clsx(
+      "hidden lg:flex w-64 shrink-0 flex-col justify-between",
+      "glass-strong rounded-2xl m-4 p-6",
+      "border border-[rgba(255,255,255,0.72)]"
+    )}>
+      {/* Logo & Branding */}
       <div>
-        <div className="mb-8 flex items-center gap-2.5 px-1">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#10161A] text-[#DAE1EE] shadow-sm">
-            <BarChart2 size={16} />
-          </span>
+        <div className="mb-8 flex items-center gap-3 px-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#10161A] text-white shadow-md">
+            <BarChart2 size={18} />
+          </div>
           <div className="flex flex-col">
-            <span className="text-base font-bold tracking-tight text-[#10161A]">
+            <span className="text-base font-bold text-[#10161A]">
               PSX<span className="text-[#566680] font-medium ml-1">Pulse</span>
             </span>
-            <span className="text-[10px] uppercase font-mono tracking-widest text-[#8E9CB7]">
-              Research Platform
+            <span className="text-[9px] uppercase font-semibold tracking-wider text-[#8E9CB7]">
+              Research
             </span>
           </div>
         </div>
 
-        <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-wider text-[#566680]">
-          Main Menu
+        {/* Main Navigation */}
+        <p className="mb-4 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#566680]">
+          Menu
         </p>
-        <nav className="flex flex-col gap-1.5">
+        <nav className="flex flex-col gap-1">
           {mainNav.map(({ label, icon: Icon, href, disabled }) => {
-            const active = href !== "#" && (href === "/" ? pathname === "/" : pathname.startsWith(href));
+            const active = isActive(href);
             const isScreenersMain = href === "/screening";
-            const isScreenerSubActive = pathname === "/screening" || pathname === "/technical" || pathname === "/momentum";
             const showScreenerSub = isScreenersMain || isScreenerSubActive;
 
             return (
               <div key={label}>
-                <Link
+                <NavigationItem
                   href={href}
-                  aria-disabled={disabled}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                    (active || (isScreenersMain && isScreenerSubActive))
-                      ? "bg-[#10161A] text-[#DAE1EE] shadow-md shadow-[#10161A]/15"
-                      : disabled
-                        ? "cursor-not-allowed text-[#8E9CB7]/60"
-                        : "text-[#566680] hover:bg-white/60 hover:text-[#10161A]"
-                  }`}
-                >
-                  <Icon size={16} className={(active || (isScreenersMain && isScreenerSubActive)) ? "text-[#DAE1EE]" : "text-[#566680]"} />
-                  <span>{label}</span>
-                  {disabled && (
-                    <span className="ml-auto rounded-md bg-[#B4C0D5]/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-[#566680]">
-                      soon
-                    </span>
-                  )}
-                </Link>
-                {isScreenersMain && (
-                  <div className="mt-1 ml-4 flex flex-col gap-1 border-l border-[#8E9CB7]/30 pl-3">
-                    {screenerTypes.map(({ label: typeLabel, href: typeHref }) => {
-                      const isActive = pathname === typeHref;
-                      return (
-                        <Link
-                          key={typeLabel}
-                          href={typeHref}
-                          className={`text-xs font-medium rounded-lg px-2.5 py-2 transition-all ${
-                            isActive
-                              ? "bg-[#10161A]/60 text-[#DAE1EE]"
-                              : "text-[#566680] hover:bg-white/40 hover:text-[#10161A]"
-                          }`}
-                        >
-                          {typeLabel}
-                        </Link>
-                      );
-                    })}
+                  label={label}
+                  icon={<Icon size={16} />}
+                  isActive={active || (isScreenersMain && isScreenerSubActive)}
+                  badge={disabled ? "soon" : undefined}
+                  disabled={disabled}
+                />
+
+                {/* Screener Submenu */}
+                {showScreenerSub && (
+                  <div className="mt-2 ml-4 flex flex-col gap-1 border-l border-[#8E9CB7]/30 pl-3">
+                    {screenerTypes.map(({ label: typeLabel, href: typeHref }) => (
+                      <NavigationItem
+                        key={typeLabel}
+                        href={typeHref}
+                        label={typeLabel}
+                        isActive={pathname === typeHref}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -105,30 +108,31 @@ export default function Sidebar() {
         </nav>
       </div>
 
+      {/* Environment & Support */}
       <div>
-        <div className="mb-4 rounded-xl border border-white/70 bg-white/50 p-3 backdrop-blur-md">
-          <p className="text-[11px] font-semibold text-[#10161A]">PSX Pilot Environment</p>
-          <p className="text-[10px] text-[#566680] leading-tight mt-0.5">
-            Fertilizer Sector Fundamental Data &amp; Research Index
+        {/* Environment Badge */}
+        <div className="mb-6 rounded-xl border border-[rgba(255,255,255,0.58)] bg-[rgba(180,192,213,0.34)] p-3 backdrop-blur-lg">
+          <p className="text-[10px] font-semibold uppercase text-[#10161A]">
+            PSX Pilot
+          </p>
+          <p className="text-[10px] text-[#566680] leading-snug mt-1">
+            Fertilizer Sector Data
           </p>
         </div>
 
-        <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-[#566680]">
-          Support &amp; Preferences
+        {/* Support Navigation */}
+        <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#566680]">
+          Support
         </p>
         <nav className="flex flex-col gap-1">
-          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-[#566680] hover:bg-white/60 hover:text-[#10161A] transition-colors">
-            <HelpCircle size={15} />
-            Documentation
-          </Link>
-          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-[#566680] hover:bg-white/60 hover:text-[#10161A] transition-colors">
-            <Settings size={15} />
-            Preferences
-          </Link>
-          <Link href="#" className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-[#566680] hover:bg-white/60 hover:text-[#10161A] transition-colors">
-            <LogOut size={15} />
-            Sign Out
-          </Link>
+          {supportNav.map(({ label, icon: Icon, href }) => (
+            <NavigationItem
+              key={label}
+              href={href}
+              label={label}
+              icon={<Icon size={15} />}
+            />
+          ))}
         </nav>
       </div>
     </aside>

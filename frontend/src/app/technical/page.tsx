@@ -8,8 +8,10 @@ export const metadata = {
 export default function TechnicalPage() {
   return (
     <AppLayout>
-      <div className="flex-1 px-6 py-6 lg:px-8">
-        <TechnicalScreenerView />
+      <div className="flex-1 px-6 py-12 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <TechnicalScreenerView />
+        </div>
       </div>
     </AppLayout>
   )

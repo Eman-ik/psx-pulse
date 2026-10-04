@@ -16,6 +16,7 @@ import { TechnicalsTab } from "./studio/TechnicalsTab";
 import { ValuationTab } from "./studio/ValuationTab";
 import { Card, day, Label, num } from "./studio/ui";
 import TradePlanningView from "./TradePlanningView";
+import { GlassInput } from "@/components/glass";
 
 const TABS = [
   ["overview", "Overview"],
@@ -71,7 +72,6 @@ function CompanySearch({ onSelect }: { onSelect: (symbol: string) => void }) {
     <div ref={box} className="relative w-full sm:max-w-md">
       <label className="relative block">
         <span className="sr-only">Search companies by ticker or name</span>
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <input
           value={query}
           onChange={(e) => {
@@ -83,25 +83,26 @@ function CompanySearch({ onSelect }: { onSelect: (symbol: string) => void }) {
             if (e.key === "Enter" && results[0]) pick(results[0].symbol);
             if (e.key === "Escape") setOpen(false);
           }}
-          placeholder="Search ticker or company"
+          placeholder="Search ticker or company..."
           role="combobox"
           aria-expanded={open && results.length > 0}
           aria-controls="company-results"
-          className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="glass-input w-full pl-10 text-sm"
         />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]" />
       </label>
       {open && results.length > 0 && (
-        <ul id="company-results" role="listbox" className="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-border bg-[#f4f6fa] shadow-lg">
+        <ul id="company-results" role="listbox" className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-[rgba(255,255,255,0.72)] bg-white/80 shadow-xl backdrop-blur-md">
           {results.map((r) => (
             <li key={r.security_id} role="option" aria-selected={false}>
-              <button type="button" onClick={() => pick(r.symbol)} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent/10">
+              <button type="button" onClick={() => pick(r.symbol)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm hover:bg-[rgba(142,156,183,0.12)] transition-colors border-b border-[rgba(255,255,255,0.3)] last:border-0">
                 <span>
-                  <span className="font-semibold">{r.symbol}</span> <span className="text-muted">{r.name}</span>
-                  <span className="block text-xs text-muted">{r.sector ?? "No sector"}</span>
+                  <span className="font-semibold text-[var(--text-primary)]">{r.symbol}</span> <span className="text-[var(--text-secondary)]">{r.name}</span>
+                  <span className="block text-xs text-[var(--text-secondary)]">{r.sector ?? "No sector"}</span>
                 </span>
-                <span className="text-right text-xs">
+                <span className="text-right text-xs text-[var(--text-secondary)]">
                   {r.price.close == null ? "No price" : num(r.price.close)}
-                  <span className="block text-muted">{r.price.freshness.stale ? "stale" : day(r.price.freshness.as_of)}</span>
+                  <span className="block text-[var(--text-secondary)]">{r.price.freshness.stale ? "stale" : day(r.price.freshness.as_of)}</span>
                 </span>
               </button>
             </li>
@@ -137,19 +138,21 @@ export function ResearchStudioProduction() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border/40">
-        <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+    <div className="min-h-screen bg-[var(--bg-page-deep)] text-[var(--text-primary)]">
+      <header className="border-b border-[rgba(142,156,183,0.2)]">
+        <div className="mx-auto max-w-7xl px-6 pt-8 sm:px-8">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-6">
             <div>
-              <h1 className="text-3xl font-bold">Equity Research Studio</h1>
-              <p className="text-xs text-muted">
+              <h1 className="text-4xl font-bold text-[var(--text-primary)] mb-2">Equity Research Studio</h1>
+              <p className="text-xs text-[var(--text-secondary)]">
                 <Label kind="VERIFIED" /> source-backed data only; anything missing is shown as missing
               </p>
             </div>
             <CompanySearch onSelect={(s) => go({ t: s })} />
           </div>
-          <div role="tablist" aria-label="Research sections" onKeyDown={onTabKey} className="-mb-px flex gap-1 overflow-x-auto">
+
+          {/* Glass Tab Strip */}
+          <div role="tablist" aria-label="Research sections" onKeyDown={onTabKey} className="glass-tabs mb-8 overflow-x-auto">
             {TABS.map(([id, label]) => (
               <button
                 key={id}
@@ -159,9 +162,7 @@ export function ResearchStudioProduction() {
                 aria-controls="studio-panel"
                 tabIndex={tab === id ? 0 : -1}
                 onClick={() => go({ tab: id })}
-                className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition ${
-                  tab === id ? "border-accent text-accent" : "border-transparent text-muted hover:text-foreground"
-                }`}
+                className={`glass-tab whitespace-nowrap ${tab === id ? "active" : ""}`}
               >
                 {label}
               </button>
@@ -170,9 +171,9 @@ export function ResearchStudioProduction() {
         </div>
       </header>
 
-      <main id="studio-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <p className="mb-4 text-xs text-muted">
-          Viewing <span className="font-semibold text-foreground">{symbol}</span>. Research evidence, not a recommendation.
+      <main id="studio-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="mx-auto max-w-7xl px-6 py-12 sm:px-8">
+        <p className="mb-6 text-xs text-[var(--text-secondary)]">
+          Viewing <span className="font-semibold text-[var(--text-primary)]">{symbol}</span>. Research evidence, not a recommendation.
         </p>
         {tab === "overview" && <OverviewTab symbol={symbol} onOpenTab={(t) => go({ tab: t as TabId })} />}
         {tab === "intelligence" && <ResearchIntelligenceDashboard ticker={symbol} apiUrl={API_BASE_URL} />}

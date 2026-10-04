@@ -10,6 +10,9 @@ import {
   LogOut,
   BarChart2,
   FileSearch,
+  MessageSquare,
+  TrendingUp,
+  Search,
 } from "lucide-react";
 import { NavigationItem } from "@/components/glass";
 import clsx from "clsx";
@@ -18,7 +21,11 @@ const mainNav = [
   { label: "Dashboard", icon: BarChart2, href: "/" },
   { label: "Market Overview", icon: BarChart2, href: "/market" },
   { label: "Research Studio", icon: FileSearch, href: "/research" },
-  { label: "Screeners", icon: SlidersHorizontal, href: "/screening" },
+  { label: "Compare Companies", icon: BarChart2, href: "/compare" },
+  { label: "Ask PSX Pulse", icon: MessageSquare, href: "/research-ask", disabled: true },
+  { label: "Trade Planning", icon: TrendingUp, href: "/research?tab=trade" },
+  { label: "Company Search", icon: Search, href: "/search", disabled: true },
+  { label: "Screeners", icon: SlidersHorizontal, href: "/screener" },
   { label: "Academy", icon: GraduationCap, href: "#", disabled: true },
   { label: "Watchlists & Alerts", icon: Bell, href: "#", disabled: true },
 ];
@@ -30,9 +37,8 @@ const screenerTypes = [
 ];
 
 const supportNav = [
-  { label: "Documentation", icon: HelpCircle, href: "#" },
-  { label: "Preferences", icon: Settings, href: "#" },
-  { label: "Sign Out", icon: LogOut, href: "#" },
+  { label: "Preferences", icon: Settings, href: "#", disabled: true },
+  { label: "Documentation", icon: HelpCircle, href: "#", disabled: true },
 ];
 
 export default function Sidebar() {
@@ -75,7 +81,7 @@ export default function Sidebar() {
         <nav className="flex flex-col gap-1">
           {mainNav.map(({ label, icon: Icon, href, disabled }) => {
             const active = isActive(href);
-            const isScreenersMain = href === "/screening";
+            const isScreenersMain = href === "/screener";
             const showScreenerSub = isScreenersMain || isScreenerSubActive;
 
             return (

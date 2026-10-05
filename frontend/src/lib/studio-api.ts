@@ -33,6 +33,23 @@ export type StudioEvent = {
   source_url: string | null;
   source_tier: string | null;
 };
+export type ResearchOverview = {
+  business_health: string;
+  business_health_confidence: string;
+  earnings_quality: string;
+  earnings_quality_confidence: string;
+  valuation: string;
+  valuation_confidence: string;
+  risk_level: string;
+  what_changed: string;
+  bull_thesis: string;
+  bear_thesis: string;
+  key_debate: string;
+  red_flags: Array<{ issue?: string }>;
+  watch_metrics: string[];
+  data_availability: number;
+};
+
 export type Overview = {
   generated_at: string;
   security_id: number;
@@ -44,7 +61,8 @@ export type Overview = {
   profile_source: { url: string; retrieved_at: string } | null;
   price: PriceSnapshot;
   coverage: { prices: boolean; statements: boolean; profile: boolean; tier: string };
-  research_view: ResearchView;
+  research_overview: ResearchOverview;
+  research_view?: ResearchView;
   latest_events: StudioEvent[];
 };
 export type SearchResult = { security_id: number; symbol: string; name: string; sector: string | null; price: PriceSnapshot };

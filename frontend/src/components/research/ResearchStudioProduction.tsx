@@ -16,7 +16,6 @@ import { TechnicalsTab } from "./studio/TechnicalsTab";
 import { ValuationTab } from "./studio/ValuationTab";
 import { Card, day, Label, num } from "./studio/ui";
 import TradePlanningView from "./TradePlanningView";
-import { GlassInput } from "@/components/glass";
 
 const TABS = [
   ["overview", "Overview"],
@@ -138,7 +137,7 @@ export function ResearchStudioProduction() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-page-deep)] text-[var(--text-primary)]">
+    <div className="min-h-screen bg-transparent text-[var(--text-primary)]">
       <header className="border-b border-[rgba(142,156,183,0.2)]">
         <div className="mx-auto max-w-7xl px-6 pt-8 sm:px-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-6">

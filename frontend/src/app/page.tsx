@@ -10,7 +10,7 @@ export default function HomePage() {
     {
       icon: <BarChart3 className="w-6 h-6" />,
       title: "Market Overview",
-      description: "Real-time PSX indices, breadth analysis, gainers & losers",
+      description: "End-of-day PSX indices, breadth analysis, gainers & losers",
       href: "/market",
     },
     {
@@ -49,7 +49,7 @@ export default function HomePage() {
         />
 
         <p className="text-base text-[var(--text-secondary)] mb-12 max-w-2xl">
-          Comprehensive analysis, real-time market data, and intelligence-driven research for PSX investors
+          Comprehensive analysis, end-of-day market data, and intelligence-driven research for PSX investors
         </p>
 
         {/* Feature Grid - Asymmetric layout */}

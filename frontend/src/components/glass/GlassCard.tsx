@@ -35,7 +35,7 @@ export function GlassCard({
       className={clsx(
         variantClass,
         elevationClass,
-        interactive && 'interactive-lift cursor-pointer',
+        interactive && 'glass-card--interactive cursor-pointer',
         'rounded-[var(--radius-md)] p-6',
         className
       )}

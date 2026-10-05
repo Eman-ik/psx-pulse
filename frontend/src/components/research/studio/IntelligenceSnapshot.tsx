@@ -71,126 +71,88 @@ export function IntelligenceSnapshot({ symbol, overview }: { symbol: string; ove
     return () => controller.abort();
   }, [symbol]);
 
-  const { research_view: view, price } = overview;
-  const eo = view.overall;
-  const conf = view.data_confidence;
-  const intel = intelligence?.executive_summary;
+  const { research_overview: ro, price } = overview;
 
-  // Extract domain states
-  const domainMap: Record<string, string | undefined> = {};
-  view.domains.forEach((d) => {
-    const key = d.key.toLowerCase();
-    if (!key.includes("confidence")) {
-      domainMap[key] = d.state;
-    }
-  });
+  if (!ro) {
+    return (
+      <Card>
+        <div className="space-y-4">
+          <div className="flex items-baseline justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">{overview.name}</h2>
+              <p className="text-sm text-muted">
+                {symbol} · {overview.sector ?? "Sector not classified"} · {overview.listing_status}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-bold tabular-nums text-foreground">
+                {price.close == null ? "—" : `PKR ${price.close.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </p>
+            </div>
+          </div>
+          <p className="text-sm text-muted italic">Research overview data not available for this dataset.</p>
+        </div>
+      </Card>
+    );
+  }
 
-  // Helper: Get domain state and build metrics
-  const getDomainState = (keys: string[]): string | null => {
-    for (const key of keys) {
-      const s = domainMap[key];
-      if (s && !["INSUFFICIENT_DATA", "UNAVAILABLE"].includes(s)) {
-        return s;
-      }
-    }
-    return null;
-  };
-
-  // Map to institutional research states
   const mapToInstitutional = (state: string | null | undefined): "positive" | "negative" | "neutral" => {
     if (!state) return "neutral";
     const s = state.toUpperCase();
     if (["IMPROVING", "POSITIVE", "FAVORABLE", "HIGH_GROWTH", "ATTRACTIVE"].includes(s)) return "positive";
-    if (["DETERIORATING", "NEGATIVE", "UNFAVORABLE", "WEAK", "EXPENSIVE"].includes(s)) return "negative";
+    if (["DETERIORATING", "NEGATIVE", "UNFAVORABLE", "WEAK", "EXPENSIVE", "HIGH"].includes(s)) return "negative";
     return "neutral";
   };
 
-  // Build metrics from domains
+  // Build metrics from research_overview
   const metrics: SnapshotMetric[] = [
     {
       label: "Financial Health",
-      value:
-        intel?.business_health && intel.business_health !== "Unknown"
-          ? intel.business_health
-          : getDomainState(["profitability", "leverage", "efficiency"])
-            ? stateText(getDomainState(["profitability", "leverage", "efficiency"]) || "")
-            : "Not assessed",
+      value: ro.business_health || "Not assessed",
       icon: <DollarSign className="h-4 w-4" />,
-      state: mapToInstitutional(intel?.business_health || getDomainState(["profitability"])),
+      state: mapToInstitutional(ro.business_health),
+      confidence: 0.75,
     },
     {
       label: "Growth",
-      value:
-        getDomainState(["growth"])
-          ? stateText(getDomainState(["growth"]) || "")
-          : intelligence?.executive_summary?.business_health?.includes("Growth")
-            ? "Evident"
-            : "Not assessed",
+      value: ro.what_changed?.includes("revenue") ? "Evident" : "Not assessed",
       icon: <TrendingUp className="h-4 w-4" />,
-      state: mapToInstitutional(getDomainState(["growth"])),
+      state: mapToInstitutional(ro.what_changed),
+      confidence: 0.70,
     },
     {
       label: "Valuation",
-      value:
-        intel?.valuation_assessment && intel.valuation_assessment !== "Unknown"
-          ? intel.valuation_assessment
-          : getDomainState(["valuation"])
-            ? stateText(getDomainState(["valuation"]) || "")
-            : "Not assessed",
+      value: ro.valuation || "Not assessed",
       icon: <Target className="h-4 w-4" />,
-      state: mapToInstitutional(intel?.valuation_assessment || getDomainState(["valuation"])),
+      state: mapToInstitutional(ro.valuation),
+      confidence: 0.65,
     },
     {
       label: "Technical",
-      value:
-        getDomainState(["momentum", "technicals"])
-          ? stateText(getDomainState(["momentum", "technicals"]) || "")
-          : "Not assessed",
+      value: "Not assessed",
       icon: <Zap className="h-4 w-4" />,
-      state: mapToInstitutional(getDomainState(["momentum"])),
+      state: "neutral",
+      confidence: 0.50,
     },
     {
       label: "Risk",
-      value:
-        intel?.risk_level && intel.risk_level > 0
-          ? `${intel.risk_level} high-priority`
-          : getDomainState(["risk", "risks"])
-            ? stateText(getDomainState(["risk", "risks"]) || "")
-            : "Not assessed",
+      value: ro.risk_level || "Not assessed",
       icon: <Shield className="h-4 w-4" />,
-      state: mapToInstitutional(getDomainState(["risk"])) === "negative" ? "negative" : "neutral",
+      state: mapToInstitutional(ro.risk_level),
+      confidence: 0.70,
     },
     {
       label: "Earnings Quality",
-      value:
-        intel?.earnings_quality && intel.earnings_quality !== "Unknown"
-          ? intel.earnings_quality
-          : getDomainState(["earnings"])
-            ? stateText(getDomainState(["earnings"]) || "")
-            : "Not assessed",
+      value: ro.earnings_quality || "Not assessed",
       icon: <TrendingUp className="h-4 w-4" />,
-      state: mapToInstitutional(intel?.earnings_quality),
+      state: mapToInstitutional(ro.earnings_quality),
+      confidence: 0.60,
     },
   ];
 
-  // Extract strengths and risks (limited to 3 each)
-  const strengths =
-    intelligence?.intelligence?.business_health?.strengths?.slice(0, 3) ||
-    view.domains
-      .filter((d) => d.supports && d.supports.length > 0)
-      .slice(0, 3)
-      .flatMap((d) => d.supports);
-
-  const risks =
-    intelligence?.intelligence?.red_flags?.flags?.slice(0, 3).map((f) => f.issue) ||
-    view.domains
-      .filter((d) => d.could_change && d.could_change.length > 0)
-      .slice(0, 3)
-      .flatMap((d) => d.could_change);
-
-  // Data freshness and gaps
-  const allStale = view.domains.some((d) => d.stale);
-  const missingDomains = view.domains.filter((d) => ["INSUFFICIENT_DATA", "UNAVAILABLE"].includes(d.state));
+  const strengths = ro.bull_thesis ? [ro.bull_thesis] : [];
+  const risks = ro.red_flags?.slice(0, 3).map((f) => f.issue || "Unknown risk") || [];
+  const dataAvailability = ro.data_availability ?? 0;
 
   return (
     <div className="space-y-4">
@@ -239,28 +201,27 @@ export function IntelligenceSnapshot({ symbol, overview }: { symbol: string; ove
       {/* Overall Assessment */}
       <div className="rounded-lg border border-border bg-surface/30 p-4">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted mb-1">Overall Assessment</p>
-            <p className={`text-lg font-semibold ${stateTone(eo.state)}`}>{stateText(eo.state)}</p>
-            <p className="mt-2 text-sm text-muted">{eo.reason}</p>
-            {eo.disagreements && eo.disagreements.length > 0 && (
-              <ul className="mt-2 space-y-1 text-xs text-muted">
-                {eo.disagreements.map((d) => (
-                  <li key={d}>
-                    <span className="text-foreground">·</span> {d}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="shrink-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted mb-1">Data Quality</p>
-            <div className="text-right">
-              <p className={`text-base font-bold ${stateTone(conf.level)}`}>{stateText(conf.level)}</p>
-              <p className="text-xs text-muted mt-1">{conf.passed} of {conf.total} checks</p>
-            </div>
+          <div className="flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted mb-1">Bull Case</p>
+            <p className="text-sm text-foreground leading-relaxed">{ro.bull_thesis || "No bull thesis on file."}</p>
           </div>
         </div>
+      </div>
+
+      {/* Bear Case & Key Debate */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Bear Case</p>
+            <p className="text-sm text-foreground">{ro.bear_thesis || "No bear thesis on file."}</p>
+          </div>
+        </Card>
+        <Card>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Key Debate</p>
+            <p className="text-sm text-foreground">{ro.key_debate || "No key debate identified."}</p>
+          </div>
+        </Card>
       </div>
 
       {/* Strengths & Risks */}
@@ -268,18 +229,18 @@ export function IntelligenceSnapshot({ symbol, overview }: { symbol: string; ove
         {/* Key Strengths */}
         <Card>
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Key Strengths</p>
-            {strengths && strengths.length > 0 ? (
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">What to Watch</p>
+            {ro.watch_metrics && ro.watch_metrics.length > 0 ? (
               <ul className="space-y-1.5 text-sm">
-                {strengths.slice(0, 3).map((s, i) => (
+                {ro.watch_metrics.slice(0, 3).map((m, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-positive" />
-                    <span className="text-foreground">{s}</span>
+                    <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                    <span className="text-foreground">{m}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <Missing>No verified strengths on file.</Missing>
+              <Missing>No watch metrics identified.</Missing>
             )}
           </div>
         </Card>
@@ -287,7 +248,7 @@ export function IntelligenceSnapshot({ symbol, overview }: { symbol: string; ove
         {/* Key Risks */}
         <Card>
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Key Risks</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Red Flags</p>
             {risks && risks.length > 0 ? (
               <ul className="space-y-1.5 text-sm">
                 {risks.slice(0, 3).map((r, i) => (
@@ -298,28 +259,22 @@ export function IntelligenceSnapshot({ symbol, overview }: { symbol: string; ove
                 ))}
               </ul>
             ) : (
-              <Missing>No critical risks identified.</Missing>
+              <Missing>No red flags identified.</Missing>
             )}
           </div>
         </Card>
       </div>
 
-      {/* Data Quality Warnings */}
-      {(allStale || missingDomains.length > 0) && (
+      {/* Data Availability */}
+      {dataAvailability < 70 && (
         <div className="rounded-lg border border-yellow-200/50 bg-yellow-50/30 p-3.5">
           <div className="flex items-start gap-3">
             <AlertCircle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" />
             <div className="text-xs">
-              <p className="font-semibold text-yellow-900 mb-1">Data Quality Notice</p>
-              <ul className="space-y-0.5 text-yellow-800">
-                {allStale && <li>· Some data is stale; check source timestamps</li>}
-                {missingDomains.length > 0 && (
-                  <li>
-                    · <span className="font-medium">{missingDomains.length}</span> assessment{missingDomains.length !== 1 ? "s" : ""} not assessable due to insufficient data
-                    {missingDomains.length <= 3 && `: ${missingDomains.map((d) => d.label).join(", ")}`}
-                  </li>
-                )}
-              </ul>
+              <p className="font-semibold text-yellow-900 mb-1">Data Availability Notice</p>
+              <p className="text-yellow-800">
+                Data coverage is {dataAvailability}%. Some assessments may be incomplete due to limited data availability.
+              </p>
             </div>
           </div>
         </div>

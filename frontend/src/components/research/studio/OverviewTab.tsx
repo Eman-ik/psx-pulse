@@ -54,8 +54,7 @@ export function OverviewTab({ symbol, onOpenTab }: { symbol: string; onOpenTab: 
   const { data, error, loading } = useStudio<Overview>(symbol, "overview");
   if (loading) return <Loading what="Loading overview" />;
   if (error || !data) return <ErrorNote message={error ?? "No data."} />;
-  const { price, research_view: view } = data;
-  const conf = view.data_confidence;
+  const view = data.research_view;
 
   return (
     <div className="space-y-6">
@@ -77,43 +76,45 @@ export function OverviewTab({ symbol, onOpenTab }: { symbol: string; onOpenTab: 
         )}
       </Card>
 
-      <Card
-        title="Research view"
-        aside={<span className="text-xs text-muted">Methodology {view.methodology_version}</span>}
-      >
-        <div className="mb-5 rounded-lg bg-background/60 p-4 text-sm">
-          <p className="font-semibold">
-            Overall: <span className={stateTone(view.overall.state)}>{stateText(view.overall.state)}</span>
-          </p>
-          <p className="mt-1 text-muted">{view.overall.reason}</p>
-          {view.overall.disagreements.map((x) => (
-            <p key={x} className="mt-1">{x}</p>
-          ))}
-          <p className="mt-2 text-xs text-muted">
-            There is no single score: each domain stands alone, and a missing or stale input leaves a domain unassessed instead of
-            filling it in.
-          </p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {view.domains.map((d) => (
-            <DomainCard key={d.key} d={d} />
-          ))}
-          <div className="rounded-lg border border-border p-4">
-            <p className="text-xs text-muted">Data confidence</p>
-            <p className={`mt-1 text-lg font-bold ${stateTone(conf.level)}`}>{stateText(conf.level)}</p>
-            <ul className="mt-2 space-y-1 text-xs">
-              {conf.checks.map((c) => (
-                <li key={c.key} className="flex gap-1.5">
-                  {c.passed ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive" /> : <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-negative" />}
-                  <span><span className="font-medium">{c.key.replaceAll("_", " ")}:</span> <span className="text-muted">{c.detail}</span></span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[11px] text-muted">{conf.rule}</p>
+      {view && (
+        <Card
+          title="Research view"
+          aside={view ? <span className="text-xs text-muted">Methodology {view.methodology_version}</span> : undefined}
+        >
+          <div className="mb-5 rounded-lg bg-background/60 p-4 text-sm">
+            <p className="font-semibold">
+              Overall: <span className={stateTone(view.overall.state)}>{stateText(view.overall.state)}</span>
+            </p>
+            <p className="mt-1 text-muted">{view.overall.reason}</p>
+            {view.overall.disagreements.map((x) => (
+              <p key={x} className="mt-1">{x}</p>
+            ))}
+            <p className="mt-2 text-xs text-muted">
+              There is no single score: each domain stands alone, and a missing or stale input leaves a domain unassessed instead of
+              filling it in.
+            </p>
           </div>
-        </div>
-        <p className="mt-4 text-xs text-muted">Describes the evidence on file as of {when(data.generated_at)}. It is not a recommendation.</p>
-      </Card>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {view.domains.map((d) => (
+              <DomainCard key={d.key} d={d} />
+            ))}
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-xs text-muted">Data confidence</p>
+              <p className={`mt-1 text-lg font-bold ${stateTone(view.data_confidence.level)}`}>{stateText(view.data_confidence.level)}</p>
+              <ul className="mt-2 space-y-1 text-xs">
+                {view.data_confidence.checks.map((c) => (
+                  <li key={c.key} className="flex gap-1.5">
+                    {c.passed ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive" /> : <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-negative" />}
+                    <span><span className="font-medium">{c.key.replaceAll("_", " ")}:</span> <span className="text-muted">{c.detail}</span></span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] text-muted">{view.data_confidence.rule}</p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-muted">Describes the evidence on file as of {when(data.generated_at)}. It is not a recommendation.</p>
+        </Card>
+      )}
 
       <Card
         title="Latest announcements"

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PSX Research | Intelligence Dashboard",
+  title: "PSX Pulse | Research Platform",
   description:
     "Pakistan Stock Exchange research platform — fundamentals, market data, sector intelligence, and compliance-gated AI signal scoring across 20 PSX sectors.",
 };

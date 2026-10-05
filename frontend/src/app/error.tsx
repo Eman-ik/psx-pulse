@@ -22,8 +22,8 @@ export default function Error({
         </span>
         <h1 className="text-xl font-semibold text-[#10161A]">Something went wrong</h1>
         <p className="text-sm text-[#566680]">
-          This page hit an unexpected error — most often the backend API or database being
-          unreachable, not lost data. Retrying usually fixes it once the backend is back up.
+          This page encountered an unexpected error. Some data or application services may be
+          temporarily unavailable. Try again, or return to the previous page.
         </p>
         {error.digest && <p className="text-[10px] text-[#8E9CB7]">Error ref: {error.digest}</p>}
         <button

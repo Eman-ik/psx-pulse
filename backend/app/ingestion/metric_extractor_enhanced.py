@@ -169,25 +169,44 @@ class NarrativeMetricExtractor:
 
     @staticmethod
     def _extract_dps(text: str) -> Optional[float]:
-        """Extract dividend per share from narrative.
+        """Extract total annual DPS, aggregating all dividend events.
 
-        Handles: "1.50 per share" or "1.50 + 1.00 = 2.50" (interim + final).
+        Handles multiple interim dividends + final (PSX companies can pay multiple interims).
+        Sequence: explicit total > aggregate events > addition pattern.
         """
-        # Try explicit final DPS
-        patterns = [
-            r"dividend per share.*?(\d+\.\d+)",
-            r"dps.*?(\d+\.\d+)",
-            r"final dividend.*?(?:pkr\s+)?(\d+\.\d+)",
-        ]
+        # Priority 1: Explicit "total annual dividend"
+        match = re.search(r"total\s+(?:annual\s+)?dividend.*?(\d+\.\d+)", text, re.IGNORECASE)
+        if match:
+            logger.info(f"  DPS: Explicit total = {match.group(1)}")
+            return float(match.group(1))
 
-        for pattern in patterns:
-            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
-            if match:
-                return float(match.group(1))
+        # Priority 2: Aggregate ALL interim + final dividends
+        # Pattern: Find all "interim X.XX" and "final X.XX"
+        interim_matches = re.findall(r"(?:first\s+)?interim\s+(?:dividend)?\s*(?:pkr)?\s*:?\s*(\d+\.\d+)", text, re.IGNORECASE)
+        second_interim = re.findall(r"second\s+interim\s+(?:dividend)?\s*(?:pkr)?\s*:?\s*(\d+\.\d+)", text, re.IGNORECASE)
+        final_matches = re.findall(r"final\s+dividend\s*(?:pkr)?\s*:?\s*(\d+\.\d+)", text, re.IGNORECASE)
 
-        # Try interim + final pattern: "1.50 + 1.00 = 2.50" or "interim 1.50, final 1.00"
+        total = 0.0
+        count = 0
+
+        if interim_matches:
+            total += float(interim_matches[0])
+            count += 1
+        if second_interim:
+            total += float(second_interim[0])
+            count += 1
+        if final_matches:
+            total += float(final_matches[0])
+            count += 1
+
+        if count >= 2:
+            logger.info(f"  DPS: Aggregated {count} events = {total}")
+            return total
+
+        # Priority 3: Derived from "1.50 + 1.00" pattern
         derived = NarrativeMetricExtractor._extract_derived_dps(text)
         if derived:
+            logger.info(f"  DPS: Derived from addition = {derived}")
             return derived
 
         return None
@@ -292,60 +311,64 @@ class EnhancedMetricExtractor:
 
     def extract_with_fallbacks(self, pages_text: list[tuple[int, str]],
                                metric_key: str, aliases: list[str]) -> Optional[dict]:
-        """Extract metric with fallback chain:
+        """Extract metric with CORRECT fallback order (classify first).
 
-        1. Try original line-by-line extraction (fast, works for tables)
-        2. Detect statement type
-        3. If narrative, use narrative extractor
-        4. If scanned, flag for manual review
-        5. Return metadata about extraction method
+        WRONG order (old): regex first → classify later (spurious numbers can win)
+        CORRECT order (new):
+        1. Classify each page (income_statement, narrative, balance_sheet, scanned)
+        2. Check for scanned early
+        3. Filter to pages appropriate for this metric
+        4. Try table extraction on authoritative pages (high confidence)
+        5. Fall back to narrative if present (medium confidence)
+
+        This prevents narrative commentary from beating authoritative statement values.
         """
 
-        # Step 1: Original extraction
-        for page_num, text in pages_text:
-            for alias in aliases:
-                for line in text.split("\n"):
-                    if alias.lower() in line.lower():
-                        value = self.original_extract(line)
-                        if value is not None:
-                            return {
-                                "value": value,
-                                "page": page_num,
-                                "raw_line": line.strip(),
-                                "alias_found": alias,
-                                "extraction_method": "table",
-                                "confidence": "high",
-                            }
-
-        # Step 2: Detect statement type
         detector = StatementDetector()
-        statement_types = [detector.detect_statement_type(text) for _, text in pages_text]
 
-        logger.info(f"  Statement types detected: {set(statement_types)}")
+        # Step 1: Check for scanned PDF early
+        if detector.detect_scanned_pdf(pages_text):
+            logger.warning(f"  PDF appears scanned; cannot extract {metric_key}")
+            return {"value": None, "extraction_method": "scanned_pdf", "confidence": "none", "flag": "requires_ocr"}
 
-        # Step 3: Try narrative extraction if narrative detected
-        if "narrative" in statement_types:
-            logger.info(f"  Attempting narrative extraction for {metric_key}...")
-            for page_num, text in pages_text:
-                if detector.detect_statement_type(text) == "narrative":
+        # Step 2: Classify all pages
+        page_classifications = [
+            (i, text, detector.detect_statement_type(text))
+            for i, text in pages_text
+        ]
+        logger.info(f"  Statement types: {set(c[2] for c in page_classifications)}")
+
+        # Step 3: Income statement metrics → income_statement pages (high) then narrative (medium)
+        if metric_key in ["operating_profit", "other_income", "tax_expense"]:
+            # High confidence: table extraction from actual income statement
+            for page_num, text, stmt_type in page_classifications:
+                if stmt_type == "income_statement":
+                    for alias in aliases:
+                        for line in text.split("\n"):
+                            if alias.lower() in line.lower():
+                                value = self.original_extract(line)
+                                if value is not None:
+                                    return {
+                                        "value": value, "page": page_num, "raw_line": line.strip(),
+                                        "alias_found": alias, "extraction_method": "table",
+                                        "confidence": "high", "statement_type": "income_statement"
+                                    }
+
+            # Medium confidence: narrative fallback only if no table found
+            for page_num, text, stmt_type in page_classifications:
+                if stmt_type == "narrative":
                     value = NarrativeMetricExtractor.extract_metric_from_narrative(text, metric_key)
                     if value is not None:
-                        return {
-                            "value": value,
-                            "page": page_num,
-                            "extraction_method": "narrative",
-                            "confidence": "medium",
-                        }
+                        return {"value": value, "page": page_num, "extraction_method": "narrative",
+                               "confidence": "medium", "statement_type": "narrative"}
 
-        # Step 4: Check if scanned
-        if detector.detect_scanned_pdf(pages_text):
-            logger.warning(f"  PDF appears to be scanned (image-based); cannot extract {metric_key}")
-            return {
-                "value": None,
-                "extraction_method": "scanned_pdf",
-                "confidence": "none",
-                "flag": "requires_ocr",
-            }
+        # Step 4: DPS → dividend note (can be narrative or income statement)
+        elif metric_key == "dividend_per_share":
+            for page_num, text, stmt_type in page_classifications:
+                value = NarrativeMetricExtractor.extract_metric_from_narrative(text, metric_key)
+                if value is not None:
+                    return {"value": value, "page": page_num, "extraction_method": "narrative",
+                           "confidence": "high", "statement_type": stmt_type}
 
         # Step 5: Not found
         return None
